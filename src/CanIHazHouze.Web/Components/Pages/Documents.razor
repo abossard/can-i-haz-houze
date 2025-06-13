@@ -1,0 +1,143 @@
+@page "/documents"
+@attribute [StreamRendering(true)]
+@attribute [OutputCache(Duration = 5)]
+
+@inject DocumentApiClient DocumentApi
+
+<PageTitle>Documents</PageTitle>
+
+<h1>Documents</h1>
+
+<p>This component demonstrates showing document metadata loaded from the Document Service.</p>
+
+<div class="mb-3">
+    <label for="ownerInput" class="form-label">Owner:</label>
+    <div class="input-group">
+        <input type="text" class="form-control" id="ownerInput" @bind="currentOwner" @onkeypress="OnKeyPress" placeholder="Enter owner name..." />
+        <button class="btn btn-primary" type="button" @onclick="LoadDocuments">Load Documents</button>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (documents == null)
+{
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle"></i> Enter an owner name above to view their documents.
+    </div>
+}
+else if (documents.Length == 0)
+{
+    <div class="alert alert-warning" role="alert">
+        <i class="bi bi-folder-x"></i> No documents found for owner "<strong>@loadedOwner</strong>".
+    </div>
+}
+else
+{
+    <div class="mb-3">
+        <h4>Documents for <span class="text-primary">@loadedOwner</span> (@documents.Length document@(documents.Length == 1 ? "" : "s"))</h4>
+    </div>
+    
+    <div class="row">
+        @foreach (var document in documents)
+        {
+            <div class="col-lg-6 col-xl-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">
+                            <i class="bi bi-file-earmark"></i>
+                            @GetDisplayFileName(document.FileName)
+                        </h6>
+                        <small class="text-muted">@document.UploadedAt.ToString("MMM dd, yyyy")</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>Upload Date:</strong>
+                            <div class="text-muted">@document.UploadedAt.ToString("MMMM dd, yyyy 'at' h:mm tt")</div>
+                        </div>
+                        
+                        @if (document.Tags.Any())
+                        {
+                            <div class="mb-3">
+                                <strong>Tags:</strong>
+                                <div class="mt-1">
+                                    @foreach (var tag in document.Tags)
+                                    {
+                                        <span class="badge bg-secondary me-1">@tag</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        
+                        <div class="mb-2">
+                            <strong>Document ID:</strong>
+                            <div class="font-monospace small text-muted">@document.Id</div>
+                        </div>
+                        
+                        <div>
+                            <strong>File Name:</strong>
+                            <div class="small text-muted">@document.FileName</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private DocumentMeta[]? documents;
+    private string currentOwner = "testuser";
+    private string loadedOwner = "";
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load documents for default owner on page load
+        await LoadDocuments();
+    }
+
+    private async Task LoadDocuments()
+    {
+        if (string.IsNullOrWhiteSpace(currentOwner))
+        {
+            documents = null;
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            documents = await DocumentApi.GetDocumentsAsync(currentOwner.Trim());
+            loadedOwner = currentOwner.Trim();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoadDocuments();
+        }
+    }
+
+    private static string GetDisplayFileName(string fileName)
+    {
+        // Remove the GUID prefix to show a cleaner filename
+        if (fileName.Length > 36 && fileName[36] == '_')
+        {
+            return fileName.Substring(37);
+        }
+        return fileName;
+    }
+}
