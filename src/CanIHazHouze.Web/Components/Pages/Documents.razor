@@ -1,6 +1,6 @@
 @page "/documents"
-@attribute [StreamRendering(true)]
-@attribute [OutputCache(Duration = 5)]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components.Forms
 
 @inject DocumentApiClient DocumentApi
 
@@ -16,6 +16,59 @@
         <span class="input-group-text"><i class="bi bi-person"></i></span>
         <input type="text" class="form-control" id="ownerInput" @bind="currentOwner" @onkeypress="OnKeyPress" placeholder="Enter username..." />
         <button class="btn btn-primary" type="button" @onclick="LoadDocuments">Load Documents</button>
+    </div>
+</div>
+
+@* File Upload Panel *@
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-cloud-upload"></i> Upload Document</h5>
+    </div>
+    <div class="card-body">
+        @if (!string.IsNullOrWhiteSpace(uploadError))
+        {
+            <div class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> @uploadError
+            </div>
+        }
+        
+        @if (!string.IsNullOrWhiteSpace(uploadSuccess))
+        {
+            <div class="alert alert-success" role="alert">
+                <i class="bi bi-check-circle"></i> @uploadSuccess
+            </div>
+        }
+
+        <div class="mb-3">
+            <label for="fileInput" class="form-label">Select File:</label>
+            <InputFile id="fileInput" class="form-control" OnChange="OnFileSelected" accept="*/*" />
+            @if (selectedFile != null)
+            {
+                <div class="form-text">
+                    <i class="bi bi-file-earmark"></i> <strong>@selectedFile.Name</strong> (@FormatFileSize(selectedFile.Size))
+                    <span class="text-muted">- @selectedFile.ContentType</span>
+                </div>
+            }
+        </div>
+
+        <div class="mb-3">
+            <label for="tagsInput" class="form-label">Tags (comma-separated):</label>
+            <input type="text" class="form-control" id="tagsInput" @bind="newDocumentTags" placeholder="e.g., receipt, important, 2024" />
+            <div class="form-text">Add tags to help organize your documents</div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button class="btn btn-success" type="button" @onclick="UploadFile" disabled="@(selectedFile == null || isUploading || string.IsNullOrWhiteSpace(currentOwner))">
+                @if (isUploading)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                }
+                <i class="bi bi-upload"></i> Upload Document
+            </button>
+            <button class="btn btn-outline-secondary" type="button" @onclick="ClearUpload" disabled="@isUploading">
+                <i class="bi bi-x-circle"></i> Clear
+            </button>
+        </div>
     </div>
 </div>
 
@@ -63,27 +116,74 @@ else
                             <div class="text-muted">@document.UploadedAt.ToString("MMMM dd, yyyy 'at' h:mm tt")</div>
                         </div>
                         
-                        @if (document.Tags.Any())
-                        {
-                            <div class="mb-3">
-                                <strong>Tags:</strong>
-                                <div class="mt-1">
-                                    @foreach (var tag in document.Tags)
+                        @* Tags Section with Editing *@
+                        <div class="mb-3">
+                            <strong>Tags:</strong>
+                            @if (editingDocumentId == document.Id)
+                            {
+                                <div class="mt-2">
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" class="form-control" @bind="editingTags" placeholder="Enter tags separated by commas" />
+                                        <button class="btn btn-success btn-sm" type="button" @onclick="() => SaveTags(document.Id)" disabled="@isSavingTags">
+                                            @if (isSavingTags)
+                                            {
+                                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-check"></i>
+                                            }
+                                        </button>
+                                        <button class="btn btn-outline-secondary btn-sm" type="button" @onclick="CancelEdit">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(editError))
                                     {
-                                        <span class="badge bg-secondary me-1">@tag</span>
+                                        <div class="small text-danger mt-1">@editError</div>
                                     }
                                 </div>
-                            </div>
-                        }
+                            }
+                            else
+                            {
+                                <div class="mt-1 d-flex flex-wrap align-items-center gap-1">
+                                    @if (document.Tags.Any())
+                                    {
+                                        @foreach (var tag in document.Tags)
+                                        {
+                                            <span class="badge bg-secondary">@tag</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">No tags</span>
+                                    }
+                                    <button class="btn btn-outline-primary btn-sm ms-2" type="button" @onclick="() => StartEditTags(document.Id, document.Tags)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                </div>
+                            }
+                        </div>
                         
                         <div class="mb-2">
                             <strong>Document ID:</strong>
                             <div class="font-monospace small text-muted">@document.Id</div>
                         </div>
                         
-                        <div>
+                        <div class="mb-3">
                             <strong>File Name:</strong>
                             <div class="small text-muted">@document.FileName</div>
+                        </div>
+                        
+                        @* Actions *@
+                        <div class="mt-auto">
+                            <button class="btn btn-danger btn-sm" type="button" @onclick="() => DeleteDocument(document.Id)" disabled="@(deletingDocumentId == document.Id)">
+                                @if (deletingDocumentId == document.Id)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -97,6 +197,22 @@ else
     private string currentOwner = "testuser";
     private string loadedOwner = "";
     private bool isLoading = false;
+
+    // File upload state
+    private IBrowserFile? selectedFile;
+    private string newDocumentTags = "";
+    private bool isUploading = false;
+    private string uploadError = "";
+    private string uploadSuccess = "";
+
+    // Metadata editing state
+    private Guid? editingDocumentId;
+    private string editingTags = "";
+    private bool isSavingTags = false;
+    private string editError = "";
+
+    // Document deletion state
+    private Guid? deletingDocumentId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -118,6 +234,11 @@ else
             documents = await DocumentApi.GetDocumentsAsync(currentOwner.Trim());
             loadedOwner = currentOwner.Trim();
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading documents: {ex.Message}");
+            documents = [];
+        }
         finally
         {
             isLoading = false;
@@ -132,6 +253,169 @@ else
         }
     }
 
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        selectedFile = e.File;
+        ClearMessages();
+    }
+
+    private async Task UploadFile()
+    {
+        if (selectedFile == null || string.IsNullOrWhiteSpace(currentOwner))
+            return;
+
+        isUploading = true;
+        ClearMessages();
+
+        try
+        {
+            // Parse tags
+            var tags = string.IsNullOrWhiteSpace(newDocumentTags) 
+                ? new List<string>() 
+                : newDocumentTags.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(t => t.Trim())
+                    .Where(t => !string.IsNullOrEmpty(t))
+                    .ToList();
+
+            var result = await DocumentApi.UploadDocumentAsync(currentOwner.Trim(), selectedFile, tags);
+
+            if (result != null)
+            {
+                uploadSuccess = $"Successfully uploaded '{GetDisplayFileName(result.FileName)}'";
+                ClearUpload();
+                
+                // Refresh the document list
+                await LoadDocuments();
+            }
+            else
+            {
+                uploadError = "Failed to upload document. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Upload failed: {ex.Message}";
+            Console.WriteLine($"Upload error: {ex}");
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private void ClearUpload()
+    {
+        selectedFile = null;
+        newDocumentTags = "";
+        ClearMessages();
+    }
+
+    private void ClearMessages()
+    {
+        uploadError = "";
+        uploadSuccess = "";
+        editError = "";
+    }
+
+    private void StartEditTags(Guid documentId, List<string> currentTags)
+    {
+        editingDocumentId = documentId;
+        editingTags = string.Join(", ", currentTags);
+        editError = "";
+    }
+
+    private void CancelEdit()
+    {
+        editingDocumentId = null;
+        editingTags = "";
+        editError = "";
+    }
+
+    private async Task SaveTags(Guid documentId)
+    {
+        if (string.IsNullOrWhiteSpace(currentOwner))
+            return;
+
+        isSavingTags = true;
+        editError = "";
+
+        try
+        {
+            var tags = string.IsNullOrWhiteSpace(editingTags) 
+                ? new List<string>() 
+                : editingTags.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(t => t.Trim())
+                    .Where(t => !string.IsNullOrEmpty(t))
+                    .ToList();
+
+            var result = await DocumentApi.UpdateDocumentTagsAsync(documentId, currentOwner.Trim(), tags);
+
+            if (result != null)
+            {
+                CancelEdit();
+                // Update the document in the local array
+                if (documents != null)
+                {
+                    var index = Array.FindIndex(documents, d => d.Id == documentId);
+                    if (index >= 0)
+                    {
+                        documents[index] = result;
+                        StateHasChanged();
+                    }
+                }
+            }
+            else
+            {
+                editError = "Failed to update tags. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            editError = $"Update failed: {ex.Message}";
+            Console.WriteLine($"Tag update error: {ex}");
+        }
+        finally
+        {
+            isSavingTags = false;
+        }
+    }
+
+    private async Task DeleteDocument(Guid documentId)
+    {
+        if (string.IsNullOrWhiteSpace(currentOwner))
+            return;
+
+        deletingDocumentId = documentId;
+
+        try
+        {
+            var success = await DocumentApi.DeleteDocumentAsync(documentId, currentOwner.Trim());
+
+            if (success)
+            {
+                // Remove from local array
+                if (documents != null)
+                {
+                    documents = documents.Where(d => d.Id != documentId).ToArray();
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                // You could add a delete error message here if needed
+                Console.WriteLine($"Failed to delete document {documentId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Delete error: {ex}");
+        }
+        finally
+        {
+            deletingDocumentId = null;
+        }
+    }
+
     private static string GetDisplayFileName(string fileName)
     {
         // Remove the GUID prefix to show a cleaner filename
@@ -140,5 +424,27 @@ else
             return fileName.Substring(37);
         }
         return fileName;
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        const int scale = 1024;
+        string[] orders = ["B", "KB", "MB", "GB", "TB"];
+        long max = (long)Math.Pow(scale, orders.Length - 1);
+
+        foreach (string order in orders)
+        {
+            if (bytes < scale)
+            {
+                return $"{bytes:##.##} {order}";
+            }
+
+            if (bytes < max)
+            {
+                bytes /= scale;
+            }
+        }
+
+        return $"{bytes:##.##} {orders[^1]}";
     }
 }
