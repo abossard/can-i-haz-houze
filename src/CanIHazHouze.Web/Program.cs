@@ -19,6 +19,13 @@ builder.Services.AddHttpClient<DocumentApiClient>(client =>
         client.BaseAddress = new("https+http://documentservice");
     });
 
+builder.Services.AddHttpClient<LedgerApiClient>(client =>
+    {
+        // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+        // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+        client.BaseAddress = new("https+http://ledgerservice");
+    });
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())

@@ -1,0 +1,269 @@
+@page "/ledger"
+@attribute [StreamRendering(true)]
+@attribute [OutputCache(Duration = 5)]
+
+@inject LedgerApiClient LedgerApi
+
+<PageTitle>Ledger</PageTitle>
+
+<h1>Money Ledger</h1>
+
+<p>This component demonstrates managing user account balances and transactions using the Ledger Service.</p>
+
+<div class="mb-3">
+    <label for="ownerInput" class="form-label">Username:</label>
+    <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-person"></i></span>
+        <input type="text" class="form-control" id="ownerInput" @bind="currentOwner" @onkeypress="OnKeyPress" placeholder="Enter username..." />
+        <button class="btn btn-primary" type="button" @onclick="LoadAccount">Load Account</button>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (account == null)
+{
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle"></i> Enter a username above to view their account.
+    </div>
+}
+else
+{
+    <div class="row">
+        <!-- Account Summary Card -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-wallet2"></i>
+                        Account: @account.Owner
+                    </h5>
+                    <button class="btn btn-outline-warning btn-sm" @onclick="ResetAccount" disabled="@isProcessing">
+                        <i class="bi bi-arrow-clockwise"></i> Reset
+                    </button>
+                </div>
+                <div class="card-body">
+                    <h2 class="text-success">@account.Balance.ToString("C")</h2>
+                    <p class="text-muted mb-2">
+                        <strong>Created:</strong> @account.CreatedAt.ToString("MMM dd, yyyy 'at' h:mm tt")
+                    </p>
+                    <p class="text-muted mb-3">
+                        <strong>Last Updated:</strong> @account.LastUpdatedAt.ToString("MMM dd, yyyy 'at' h:mm tt")
+                    </p>
+                    
+                    <!-- Balance Update Form -->
+                    <div class="mt-3">
+                        <h6>Update Balance</h6>
+                        <div class="input-group mb-2">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" @bind="updateAmount" step="0.01" placeholder="Amount" />
+                        </div>
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control" @bind="updateDescription" placeholder="Description" />
+                        </div>
+                        <div class="btn-group w-100">
+                            <button class="btn btn-success" @onclick="() => UpdateBalance(Math.Abs(updateAmount ?? 0))" 
+                                    disabled="@(isProcessing || updateAmount == null || updateAmount == 0 || string.IsNullOrWhiteSpace(updateDescription))">
+                                <i class="bi bi-plus-circle"></i> Add Money
+                            </button>
+                            <button class="btn btn-danger" @onclick="() => UpdateBalance(-Math.Abs(updateAmount ?? 0))" 
+                                    disabled="@(isProcessing || updateAmount == null || updateAmount == 0 || string.IsNullOrWhiteSpace(updateDescription))">
+                                <i class="bi bi-dash-circle"></i> Subtract Money
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction History -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-list-ul"></i>
+                        Recent Transactions
+                    </h5>
+                </div>
+                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                    @if (transactions.Any())
+                    {
+                        @foreach (var transaction in transactions)
+                        {
+                            <div class="d-flex justify-content-between align-items-start mb-2 pb-2 border-bottom">
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold">@transaction.Description</div>
+                                    <small class="text-muted">@transaction.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="@(transaction.Amount >= 0 ? "text-success" : "text-danger") fw-bold">
+                                        @(transaction.Amount >= 0 ? "+" : "")@transaction.Amount.ToString("C")
+                                    </div>
+                                    <small class="text-muted">Balance: @transaction.BalanceAfter.ToString("C")</small>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="text-muted">No transactions found.</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle"></i>
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle"></i>
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+    </div>
+}
+
+@code {
+    private AccountInfo? account;
+    private TransactionInfo[] transactions = [];
+    private string currentOwner = "testuser";
+    private string loadedOwner = "";
+    private bool isLoading = false;
+    private bool isProcessing = false;
+    
+    private decimal? updateAmount;
+    private string updateDescription = "";
+    private string errorMessage = "";
+    private string successMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load account for default owner on page load
+        await LoadAccount();
+    }
+
+    private async Task LoadAccount()
+    {
+        if (string.IsNullOrWhiteSpace(currentOwner))
+        {
+            account = null;
+            transactions = [];
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = "";
+        
+        try
+        {
+            account = await LedgerApi.GetAccountAsync(currentOwner.Trim());
+            loadedOwner = currentOwner.Trim();
+            
+            if (account != null)
+            {
+                transactions = await LedgerApi.GetTransactionsAsync(loadedOwner, 0, 20);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading account: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task UpdateBalance(decimal amount)
+    {
+        if (account == null || string.IsNullOrWhiteSpace(updateDescription))
+            return;
+
+        isProcessing = true;
+        errorMessage = "";
+        successMessage = "";
+        
+        try
+        {
+            var updatedAccount = await LedgerApi.UpdateBalanceAsync(account.Owner, amount, updateDescription);
+            
+            if (updatedAccount != null)
+            {
+                account = updatedAccount;
+                transactions = await LedgerApi.GetTransactionsAsync(account.Owner, 0, 20);
+                updateAmount = null;
+                updateDescription = "";
+                successMessage = $"Balance updated successfully! {(amount >= 0 ? "Added" : "Subtracted")} {Math.Abs(amount):C}";
+            }
+            else
+            {
+                errorMessage = "Failed to update balance. Please check if you have sufficient funds.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error updating balance: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task ResetAccount()
+    {
+        if (account == null)
+            return;
+
+        isProcessing = true;
+        errorMessage = "";
+        successMessage = "";
+        
+        try
+        {
+            var resetAccount = await LedgerApi.ResetAccountAsync(account.Owner);
+            
+            if (resetAccount != null)
+            {
+                account = resetAccount;
+                transactions = await LedgerApi.GetTransactionsAsync(account.Owner, 0, 20);
+                successMessage = $"Account reset successfully! New balance: {account.Balance:C}";
+            }
+            else
+            {
+                errorMessage = "Failed to reset account.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error resetting account: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoadAccount();
+        }
+    }
+}

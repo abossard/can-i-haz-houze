@@ -317,14 +317,18 @@ public class LedgerServiceImpl : ILedgerService
 
         take = Math.Min(take, 1000); // Limit to prevent excessive data transfer
 
+        // First get all transactions for the owner, then order on client side
         var transactions = await _context.Transactions
             .Where(t => t.Owner == owner)
-            .OrderByDescending(t => t.CreatedAt)
-            .Skip(skip)
-            .Take(take)
             .ToListAsync();
 
-        return transactions.Select(t => new TransactionInfo(t.Id, t.Owner, t.Amount, t.BalanceAfter, t.Description, t.CreatedAt));
+        // Order by CreatedAt on client side and apply pagination
+        var orderedTransactions = transactions
+            .OrderByDescending(t => t.CreatedAt)
+            .Skip(skip)
+            .Take(take);
+
+        return orderedTransactions.Select(t => new TransactionInfo(t.Id, t.Owner, t.Amount, t.BalanceAfter, t.Description, t.CreatedAt));
     }
 
     public async Task<AccountInfo> ResetAccountAsync(string owner)

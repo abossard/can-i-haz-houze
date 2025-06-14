@@ -11,9 +11,10 @@
 <p>This component demonstrates showing document metadata loaded from the Document Service.</p>
 
 <div class="mb-3">
-    <label for="ownerInput" class="form-label">Owner:</label>
+    <label for="ownerInput" class="form-label">Username:</label>
     <div class="input-group">
-        <input type="text" class="form-control" id="ownerInput" @bind="currentOwner" @onkeypress="OnKeyPress" placeholder="Enter owner name..." />
+        <span class="input-group-text"><i class="bi bi-person"></i></span>
+        <input type="text" class="form-control" id="ownerInput" @bind="currentOwner" @onkeypress="OnKeyPress" placeholder="Enter username..." />
         <button class="btn btn-primary" type="button" @onclick="LoadDocuments">Load Documents</button>
     </div>
 </div>

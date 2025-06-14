@@ -1,0 +1,275 @@
+@page "/dashboard"
+@attribute [StreamRendering(true)]
+@attribute [OutputCache(Duration = 5)]
+
+@inject DocumentApiClient DocumentApi
+@inject LedgerApiClient LedgerApi
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1>User Dashboard</h1>
+
+<div class="mb-4">
+    <div class="card">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <label for="usernameInput" class="form-label"><strong>Username:</strong></label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-person"></i></span>
+                        <input type="text" class="form-control" id="usernameInput" @bind="currentUsername" 
+                               @onkeypress="OnKeyPress" placeholder="Enter username to view their data..." />
+                        <button class="btn btn-primary" type="button" @onclick="LoadUserData">
+                            <i class="bi bi-search"></i> Load Data
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    @if (!string.IsNullOrEmpty(loadedUsername))
+                    {
+                        <span class="badge bg-success fs-6">Viewing: @loadedUsername</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (string.IsNullOrEmpty(loadedUsername))
+{
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle"></i> Enter a username above to view their documents and account information.
+    </div>
+}
+else
+{
+    <div class="row">
+        <!-- Account Summary -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-wallet2"></i> Account Balance
+                    </h5>
+                </div>
+                <div class="card-body text-center">
+                    @if (account != null)
+                    {
+                        <h2 class="text-success mb-3">@account.Balance.ToString("C")</h2>
+                        <p class="text-muted mb-2">
+                            <small>Created: @account.CreatedAt.ToString("MMM dd, yyyy")</small>
+                        </p>
+                        <p class="text-muted">
+                            <small>Last Updated: @account.LastUpdatedAt.ToString("MMM dd, yyyy")</small>
+                        </p>
+                        <a href="/ledger" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-gear"></i> Manage Account
+                        </a>
+                    }
+                    else
+                    {
+                        <p class="text-muted">Account not available</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Transactions -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-list-ul"></i> Recent Transactions
+                    </h5>
+                </div>
+                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                    @if (transactions.Any())
+                    {
+                        @foreach (var transaction in transactions.Take(5))
+                        {
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                <div>
+                                    <div class="fw-bold small">@transaction.Description</div>
+                                    <small class="text-muted">@transaction.CreatedAt.ToString("MMM dd")</small>
+                                </div>
+                                <div class="@(transaction.Amount >= 0 ? "text-success" : "text-danger") fw-bold">
+                                    @(transaction.Amount >= 0 ? "+" : "")@transaction.Amount.ToString("C")
+                                </div>
+                            </div>
+                        }
+                        <div class="text-center mt-3">
+                            <a href="/ledger" class="btn btn-outline-secondary btn-sm">View All</a>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No transactions found</p>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Document Summary -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-file-earmark-text"></i> Documents
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (documents.Any())
+                    {
+                        <h3 class="text-primary mb-3">@documents.Length</h3>
+                        <p class="text-muted mb-3">document@(documents.Length == 1 ? "" : "s") stored</p>
+                        
+                        @if (documents.Take(3).Any())
+                        {
+                            <div class="mb-3">
+                                <small class="text-muted">Recent uploads:</small>
+                                @foreach (var doc in documents.Take(3))
+                                {
+                                    <div class="small mb-1">
+                                        <i class="bi bi-file-earmark"></i>
+                                        @GetDisplayFileName(doc.FileName)
+                                    </div>
+                                }
+                            </div>
+                        }
+                        
+                        <a href="/documents" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-folder2-open"></i> View All Documents
+                        </a>
+                    }
+                    else
+                    {
+                        <h3 class="text-muted mb-3">0</h3>
+                        <p class="text-muted mb-3">documents stored</p>
+                        <a href="/documents" class="btn btn-outline-secondary btn-sm">Upload Documents</a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats Row -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-graph-up"></i> Quick Stats for @loadedUsername
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h4 class="text-success">@(account?.Balance.ToString("C") ?? "N/A")</h4>
+                                <small class="text-muted">Current Balance</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h4 class="text-info">@transactions.Length</h4>
+                                <small class="text-muted">Total Transactions</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="border-end">
+                                <h4 class="text-primary">@documents.Length</h4>
+                                <small class="text-muted">Documents Stored</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-warning">@(account != null ? (DateTime.UtcNow - account.CreatedAt.DateTime).Days : 0)</h4>
+                            <small class="text-muted">Days Active</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private AccountInfo? account;
+    private TransactionInfo[] transactions = [];
+    private DocumentMeta[] documents = [];
+    private string currentUsername = "testuser";
+    private string loadedUsername = "";
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load data for default username on page load
+        await LoadUserData();
+    }
+
+    private async Task LoadUserData()
+    {
+        if (string.IsNullOrWhiteSpace(currentUsername))
+        {
+            account = null;
+            transactions = [];
+            documents = [];
+            loadedUsername = "";
+            return;
+        }
+
+        isLoading = true;
+        var username = currentUsername.Trim();
+        
+        try
+        {
+            // Load all user data in parallel
+            var accountTask = LedgerApi.GetAccountAsync(username);
+            var transactionsTask = LedgerApi.GetTransactionsAsync(username, 0, 10);
+            var documentsTask = DocumentApi.GetDocumentsAsync(username);
+
+            await Task.WhenAll(accountTask, transactionsTask, documentsTask);
+
+            account = await accountTask;
+            transactions = await transactionsTask;
+            documents = await documentsTask;
+            loadedUsername = username;
+        }
+        catch (Exception)
+        {
+            // Handle errors gracefully - services might not be available
+            account = null;
+            transactions = [];
+            documents = [];
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoadUserData();
+        }
+    }
+
+    private static string GetDisplayFileName(string fileName)
+    {
+        // Remove the GUID prefix to show a cleaner filename
+        if (fileName.Length > 36 && fileName[36] == '_')
+        {
+            return fileName.Substring(37);
+        }
+        return fileName;
+    }
+}
