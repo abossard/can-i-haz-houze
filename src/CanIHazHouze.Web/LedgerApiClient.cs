@@ -25,11 +25,22 @@ public class LedgerApiClient(HttpClient httpClient)
             {
                 return await response.Content.ReadFromJsonAsync<AccountInfo>(cancellationToken: cancellationToken);
             }
-            
+            else
+            {
+                // Log the error response for debugging
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                Console.WriteLine($"LedgerAPI Error: {response.StatusCode} - {errorContent}");
+                return null;
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"LedgerAPI HTTP Error: {ex.Message}");
             return null;
         }
-        catch (HttpRequestException)
+        catch (Exception ex)
         {
+            Console.WriteLine($"LedgerAPI Unexpected Error: {ex.Message}");
             return null;
         }
     }

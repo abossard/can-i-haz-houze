@@ -62,21 +62,48 @@ else
                         <h6>Update Balance</h6>
                         <div class="input-group mb-2">
                             <span class="input-group-text">$</span>
-                            <input type="number" class="form-control" @bind="updateAmount" step="0.01" placeholder="Amount" />
+                            <input type="number" class="form-control" @bind="updateAmount" @bind:event="oninput" 
+                                   step="0.01" min="0.01" placeholder="Amount" />
                         </div>
                         <div class="input-group mb-2">
-                            <input type="text" class="form-control" @bind="updateDescription" placeholder="Description" />
+                            <input type="text" class="form-control" @bind="updateDescription" @bind:event="oninput" 
+                                   placeholder="Description (required)" maxlength="500" />
                         </div>
                         <div class="btn-group w-100">
                             <button class="btn btn-success" @onclick="() => UpdateBalance(Math.Abs(updateAmount ?? 0))" 
-                                    disabled="@(isProcessing || updateAmount == null || updateAmount == 0 || string.IsNullOrWhiteSpace(updateDescription))">
+                                    disabled="@(isProcessing || updateAmount == null || updateAmount == 0 || string.IsNullOrWhiteSpace(updateDescription))"
+                                    type="button">
+                                @if (isProcessing)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
                                 <i class="bi bi-plus-circle"></i> Add Money
                             </button>
                             <button class="btn btn-danger" @onclick="() => UpdateBalance(-Math.Abs(updateAmount ?? 0))" 
-                                    disabled="@(isProcessing || updateAmount == null || updateAmount == 0 || string.IsNullOrWhiteSpace(updateDescription))">
+                                    disabled="@(isProcessing || updateAmount == null || updateAmount == 0 || string.IsNullOrWhiteSpace(updateDescription))"
+                                    type="button">
+                                @if (isProcessing)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
                                 <i class="bi bi-dash-circle"></i> Subtract Money
                             </button>
                         </div>
+                        
+                        @* Debug info for troubleshooting *@
+                        @if (account != null)
+                        {
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    Debug: Amount=@updateAmount, Description="@updateDescription", Processing=@isProcessing
+                                </small>
+                                <div class="mt-1">
+                                    <button class="btn btn-outline-secondary btn-sm" @onclick="TestConnection" type="button">
+                                        Test API Connection
+                                    </button>
+                                </div>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
@@ -192,7 +219,16 @@ else
     private async Task UpdateBalance(decimal amount)
     {
         if (account == null || string.IsNullOrWhiteSpace(updateDescription))
+        {
+            errorMessage = "Account or description is missing.";
             return;
+        }
+
+        if (amount == 0)
+        {
+            errorMessage = "Amount cannot be zero.";
+            return;
+        }
 
         isProcessing = true;
         errorMessage = "";
@@ -212,8 +248,12 @@ else
             }
             else
             {
-                errorMessage = "Failed to update balance. Please check if you have sufficient funds.";
+                errorMessage = "Failed to update balance. Please check if you have sufficient funds or if the service is available.";
             }
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Network error updating balance: {ex.Message}";
         }
         catch (Exception ex)
         {
@@ -264,6 +304,32 @@ else
         if (e.Key == "Enter")
         {
             await LoadAccount();
+        }
+    }
+
+    private async Task TestConnection()
+    {
+        errorMessage = "";
+        successMessage = "";
+        
+        try
+        {
+            if (account != null)
+            {
+                var testAccount = await LedgerApi.GetAccountAsync(account.Owner);
+                if (testAccount != null)
+                {
+                    successMessage = "API connection working! Account balance: " + testAccount.Balance.ToString("C");
+                }
+                else
+                {
+                    errorMessage = "API connection failed - no response from service.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"API connection error: {ex.Message}";
         }
     }
 }
