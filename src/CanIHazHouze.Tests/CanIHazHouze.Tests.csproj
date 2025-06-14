@@ -17,10 +17,10 @@
     <PackageReference Include="xunit.v3" Version="2.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.2" />
-  </ItemGroup>
-  <ItemGroup>
+  </ItemGroup>  <ItemGroup>
     <ProjectReference Include="..\CanIHazHouze.AppHost\CanIHazHouze.AppHost.csproj" />
     <ProjectReference Include="..\CanIHazHouze.DocumentService\CanIHazHouze.DocumentService.csproj" />
+    <ProjectReference Include="..\CanIHazHouze.LedgerService\CanIHazHouze.LedgerService.csproj" />
   </ItemGroup>
 
   <ItemGroup>

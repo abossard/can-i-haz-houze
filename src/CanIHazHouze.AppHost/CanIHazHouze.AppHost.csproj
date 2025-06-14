@@ -8,9 +8,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>108c1a85-9df2-485b-8313-b8370994728b</UserSecretsId>
-  </PropertyGroup>
-  <ItemGroup>
+  </PropertyGroup>  <ItemGroup>
     <ProjectReference Include="..\CanIHazHouze.DocumentService\CanIHazHouze.DocumentService.csproj" />
+    <ProjectReference Include="..\CanIHazHouze.LedgerService\CanIHazHouze.LedgerService.csproj" />
     <ProjectReference Include="..\CanIHazHouze.Web\CanIHazHouze.Web.csproj" />
   </ItemGroup>
 
