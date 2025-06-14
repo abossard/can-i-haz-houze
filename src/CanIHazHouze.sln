@@ -15,6 +15,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CanIHazHouze.Web", "CanIHaz
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CanIHazHouze.LedgerService", "CanIHazHouze.LedgerService\CanIHazHouze.LedgerService.csproj", "{E3140E94-F5AA-4A11-8E4C-9A559203B4DD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CanIHazHouze.MortgageApprover", "CanIHazHouze.MortgageApprover\CanIHazHouze.MortgageApprover.csproj", "{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -97,6 +99,18 @@ Global
 		{E3140E94-F5AA-4A11-8E4C-9A559203B4DD}.Release|x64.Build.0 = Release|Any CPU
 		{E3140E94-F5AA-4A11-8E4C-9A559203B4DD}.Release|x86.ActiveCfg = Release|Any CPU
 		{E3140E94-F5AA-4A11-8E4C-9A559203B4DD}.Release|x86.Build.0 = Release|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Debug|x64.Build.0 = Debug|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Debug|x86.Build.0 = Debug|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Release|x64.ActiveCfg = Release|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Release|x64.Build.0 = Release|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Release|x86.ActiveCfg = Release|Any CPU
+		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

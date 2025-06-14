@@ -1,0 +1,360 @@
+@page "/mortgage"
+@using CanIHazHouze.Web
+@inject MortgageApiClient MortgageApi
+@inject ILogger<MortgageRequest> Logger
+@rendermode @(new InteractiveServerRenderMode())
+
+<PageTitle>Mortgage Request</PageTitle>
+
+<h1>Mortgage Request Application</h1>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        @errorMessage
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success" role="alert">
+        @successMessage
+    </div>
+}
+
+@if (existingRequest == null)
+{
+    <div class="card">
+        <div class="card-header">
+            <h3>Create New Mortgage Request</h3>
+        </div>
+        <div class="card-body">
+            <EditForm Model="newRequestModel" OnValidSubmit="CreateRequest">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="mb-3">
+                    <label for="userName" class="form-label">Your Username</label>
+                    <InputText id="userName" class="form-control" @bind-Value="newRequestModel.UserName" />
+                </div>
+
+                <button type="submit" class="btn btn-primary" disabled="@isProcessing">
+                    @(isProcessing ? "Creating..." : "Create Mortgage Request")
+                </button>
+            </EditForm>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <h3>Your Mortgage Request</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Request ID:</strong> @existingRequest.Id</p>
+                    <p><strong>Username:</strong> @existingRequest.UserName</p>
+                    <p><strong>Status:</strong> 
+                        <span class="badge @GetStatusBadgeClass(existingRequest.Status)">@existingRequest.Status</span>
+                    </p>
+                    <p><strong>Status Reason:</strong> @existingRequest.StatusReason</p>
+                    @if (!string.IsNullOrEmpty(existingRequest.MissingRequirements))
+                    {
+                        <p><strong>Missing Requirements:</strong> @existingRequest.MissingRequirements</p>
+                    }
+                    <p><strong>Created:</strong> @existingRequest.CreatedAt.ToString("yyyy-MM-dd HH:mm")</p>
+                    <p><strong>Last Updated:</strong> @existingRequest.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</p>
+                </div>
+                <div class="col-md-6">
+                    <h5>Request Data</h5>
+                    @if (existingRequest.RequestData.Any())
+                    {
+                        <ul class="list-group">
+                            @foreach (var item in existingRequest.RequestData)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span><strong>@item.Key:</strong> @item.Value</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else
+                    {
+                        <p class="text-muted">No additional data provided yet.</p>
+                    }
+                </div>
+            </div>
+            
+            <hr />
+            
+            <h5>Add Sample Data</h5>
+            <div class="row">
+                <div class="col-md-4">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("income_verification", "verified"))" disabled="@isProcessing">
+                        Add Income Verification
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("credit_score", 720))" disabled="@isProcessing">
+                        Add Credit Score (720)
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("annual_income", 75000))" disabled="@isProcessing">
+                        Add Annual Income ($75,000)
+                    </button>
+                </div>
+            </div>
+            
+            <div class="row mt-2">
+                <div class="col-md-4">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("employment_verification", "verified"))" disabled="@isProcessing">
+                        Add Employment Verification
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("property_appraisal", "completed"))" disabled="@isProcessing">
+                        Add Property Appraisal
+                    </button>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("loan_amount", 250000))" disabled="@isProcessing">
+                        Add Loan Amount ($250,000)
+                    </button>
+                </div>
+            </div>
+            
+            <hr />
+            
+            <div class="d-flex gap-2">
+                <button class="btn btn-secondary" @onclick="RefreshRequest" disabled="@isProcessing">
+                    @(isProcessing ? "Refreshing..." : "Refresh Status")
+                </button>
+                <button class="btn btn-danger" @onclick="DeleteRequest" disabled="@isProcessing">
+                    @(isProcessing ? "Deleting..." : "Delete Request")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<hr />
+
+<div class="card">
+    <div class="card-header">
+        <h4>All Mortgage Requests</h4>
+    </div>
+    <div class="card-body">
+        <button class="btn btn-info mb-3" @onclick="LoadAllRequests" disabled="@isProcessing">
+            @(isProcessing ? "Loading..." : "Load All Requests")
+        </button>
+        
+        @if (allRequests.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th>Status Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var request in allRequests)
+                        {
+                            <tr>
+                                <td>@request.UserName</td>
+                                <td><span class="badge @GetStatusBadgeClass(request.Status)">@request.Status</span></td>
+                                <td>@request.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                <td>@request.StatusReason</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <p class="text-muted">No requests found.</p>
+        }
+    </div>
+</div>
+
+@code {
+    private readonly NewRequestModel newRequestModel = new();
+    private MortgageRequestDto? existingRequest;
+    private List<MortgageRequestDto> allRequests = new();
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private bool isProcessing = false;
+
+    public class NewRequestModel
+    {
+        public string UserName { get; set; } = string.Empty;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllRequests();
+    }
+
+    private async Task CreateRequest()
+    {
+        if (string.IsNullOrWhiteSpace(newRequestModel.UserName))
+        {
+            errorMessage = "Please enter a username.";
+            return;
+        }
+
+        isProcessing = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            var result = await MortgageApi.CreateMortgageRequestAsync(newRequestModel.UserName);
+            if (result != null)
+            {
+                existingRequest = result;
+                successMessage = "Mortgage request created successfully!";
+                newRequestModel.UserName = string.Empty;
+            }
+            else
+            {
+                errorMessage = "Failed to create mortgage request. You may already have an existing request.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error creating mortgage request");
+            errorMessage = "An error occurred while creating the request.";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task RefreshRequest()
+    {
+        if (existingRequest == null) return;
+
+        isProcessing = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var result = await MortgageApi.GetMortgageRequestByUserAsync(existingRequest.UserName);
+            if (result != null)
+            {
+                existingRequest = result;
+                successMessage = "Request status updated.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error refreshing mortgage request");
+            errorMessage = "An error occurred while refreshing the request.";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task DeleteRequest()
+    {
+        if (existingRequest == null) return;
+
+        isProcessing = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var success = await MortgageApi.DeleteMortgageRequestAsync(existingRequest.Id);
+            if (success)
+            {
+                existingRequest = null;
+                successMessage = "Mortgage request deleted successfully.";
+                await LoadAllRequests();
+            }
+            else
+            {
+                errorMessage = "Failed to delete mortgage request.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error deleting mortgage request");
+            errorMessage = "An error occurred while deleting the request.";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task AddSampleData(string key, object value)
+    {
+        if (existingRequest == null) return;
+
+        isProcessing = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var data = new Dictionary<string, object> { [key] = value };
+            var result = await MortgageApi.UpdateMortgageDataAsync(existingRequest.Id, data);
+            if (result != null)
+            {
+                existingRequest = result;
+                successMessage = $"Added {key}: {value}. Status may have changed.";
+            }
+            else
+            {
+                errorMessage = "Failed to update mortgage request data.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating mortgage request data");
+            errorMessage = "An error occurred while updating the request.";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task LoadAllRequests()
+    {
+        isProcessing = true;
+        try
+        {
+            allRequests = await MortgageApi.GetMortgageRequestsAsync(1, 20);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading all mortgage requests");
+            errorMessage = "An error occurred while loading requests.";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private string GetStatusBadgeClass(string status) => status switch
+    {
+        "Pending" => "bg-warning text-dark",
+        "UnderReview" => "bg-info text-white",
+        "Approved" => "bg-success text-white",
+        "Rejected" => "bg-danger text-white",
+        "RequiresAdditionalInfo" => "bg-secondary text-white",
+        _ => "bg-light text-dark"
+    };
+}

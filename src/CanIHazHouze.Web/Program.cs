@@ -26,6 +26,13 @@ builder.Services.AddHttpClient<LedgerApiClient>(client =>
         client.BaseAddress = new("https+http://ledgerservice");
     });
 
+builder.Services.AddHttpClient<MortgageApiClient>(client =>
+    {
+        // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+        // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+        client.BaseAddress = new("https+http://mortgageapprover");
+    });
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())

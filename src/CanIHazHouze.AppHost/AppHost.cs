@@ -6,12 +6,17 @@ var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>(
 var ledgerService = builder.AddProject<Projects.CanIHazHouze_LedgerService>("ledgerservice")
     .WithHttpHealthCheck("/health");
 
+var mortgageService = builder.AddProject<Projects.CanIHazHouze_MortgageApprover>("mortgageapprover")
+    .WithHttpHealthCheck("/health");
+
 builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(documentService)
     .WithReference(ledgerService)
+    .WithReference(mortgageService)
     .WaitFor(documentService)
-    .WaitFor(ledgerService);
+    .WaitFor(ledgerService)
+    .WaitFor(mortgageService);
 
 builder.Build().Run();
