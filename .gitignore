@@ -485,3 +485,4 @@ $RECYCLE.BIN/
 *.db*
 *.db
 .gitignore
+src/CanIHazHouze.LedgerService/LedgerData_Dev/ledger.db
