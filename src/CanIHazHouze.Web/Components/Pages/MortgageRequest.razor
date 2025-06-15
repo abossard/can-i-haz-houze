@@ -48,8 +48,11 @@
 else
 {
     <div class="card">
-        <div class="card-header">
-            <h3>Your Mortgage Request</h3>
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3>Mortgage Request Details</h3>
+            <button class="btn btn-outline-secondary btn-sm" @onclick="ClearSelection" disabled="@isProcessing">
+                Clear Selection
+            </button>
         </div>
         <div class="card-body">
             <div class="row">
@@ -91,17 +94,22 @@ else
             
             <h5>Add Sample Data</h5>
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("income_verification", "verified"))" disabled="@isProcessing">
                         Add Income Verification
                     </button>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("credit_report", "obtained"))" disabled="@isProcessing">
+                        Add Credit Report
+                    </button>
+                </div>
+                <div class="col-md-3">
                     <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("credit_score", 720))" disabled="@isProcessing">
                         Add Credit Score (720)
                     </button>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("annual_income", 75000))" disabled="@isProcessing">
                         Add Annual Income ($75,000)
                     </button>
@@ -154,23 +162,29 @@ else
         @if (allRequests.Any())
         {
             <div class="table-responsive">
-                <table class="table table-striped">
+                <table class="table table-striped table-hover">
                     <thead>
                         <tr>
                             <th>Username</th>
                             <th>Status</th>
                             <th>Created</th>
                             <th>Status Reason</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var request in allRequests)
                         {
-                            <tr>
+                            <tr class="@(existingRequest?.Id == request.Id ? "table-active" : "")" style="cursor: pointer;">
                                 <td>@request.UserName</td>
                                 <td><span class="badge @GetStatusBadgeClass(request.Status)">@request.Status</span></td>
                                 <td>@request.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
                                 <td>@request.StatusReason</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="@(() => SelectRequest(request))" disabled="@isProcessing">
+                                        @(existingRequest?.Id == request.Id ? "Selected" : "Select")
+                                    </button>
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -336,6 +350,23 @@ else
         try
         {
             allRequests = await MortgageApi.GetMortgageRequestsAsync(1, 20);
+            
+            // If a request is currently selected, refresh it from the list
+            if (existingRequest != null)
+            {
+                var updatedRequest = allRequests.FirstOrDefault(r => r.Id == existingRequest.Id);
+                if (updatedRequest != null)
+                {
+                    existingRequest = updatedRequest;
+                    successMessage = "Requests loaded and selected request refreshed.";
+                }
+                else
+                {
+                    existingRequest = null;
+                    successMessage = "Requests loaded. Previously selected request no longer exists.";
+                }
+                errorMessage = string.Empty;
+            }
         }
         catch (Exception ex)
         {
@@ -346,6 +377,20 @@ else
         {
             isProcessing = false;
         }
+    }
+
+    private void SelectRequest(MortgageRequestDto request)
+    {
+        existingRequest = request;
+        successMessage = $"Selected mortgage request for {request.UserName}";
+        errorMessage = string.Empty;
+    }
+
+    private void ClearSelection()
+    {
+        existingRequest = null;
+        successMessage = "Selection cleared. You can now create a new request.";
+        errorMessage = string.Empty;
     }
 
     private string GetStatusBadgeClass(string status) => status switch

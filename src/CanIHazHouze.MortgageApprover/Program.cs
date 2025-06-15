@@ -14,6 +14,12 @@ builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Configure JSON serialization to use string values for enums
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
+
 // Configure mortgage storage options
 builder.Services.Configure<MortgageStorageOptions>(
     builder.Configuration.GetSection("MortgageStorage"));

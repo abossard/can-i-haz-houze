@@ -23,10 +23,7 @@ public class MortgageApiClient
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<MortgageRequestDto>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                return JsonSerializer.Deserialize<MortgageRequestDto>(json, GetJsonSerializerOptions());
             }
             
             _logger.LogWarning("Failed to create mortgage request for user {UserName}. Status: {StatusCode}", userName, response.StatusCode);
@@ -48,10 +45,7 @@ public class MortgageApiClient
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<MortgageRequestDto>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                return JsonSerializer.Deserialize<MortgageRequestDto>(json, GetJsonSerializerOptions());
             }
             
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -79,10 +73,7 @@ public class MortgageApiClient
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<MortgageRequestDto>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                return JsonSerializer.Deserialize<MortgageRequestDto>(json, GetJsonSerializerOptions());
             }
             
             _logger.LogWarning("Failed to update mortgage request {RequestId}. Status: {StatusCode}", requestId, response.StatusCode);
@@ -110,10 +101,7 @@ public class MortgageApiClient
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<List<MortgageRequestDto>>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                }) ?? new List<MortgageRequestDto>();
+                return JsonSerializer.Deserialize<List<MortgageRequestDto>>(json, GetJsonSerializerOptions()) ?? new List<MortgageRequestDto>();
             }
             
             _logger.LogWarning("Failed to get mortgage requests. Status: {StatusCode}", response.StatusCode);
@@ -138,6 +126,15 @@ public class MortgageApiClient
             _logger.LogError(ex, "Error deleting mortgage request {RequestId}", requestId);
             return false;
         }
+    }
+
+    private static JsonSerializerOptions GetJsonSerializerOptions()
+    {
+        return new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+        };
     }
 }
 
