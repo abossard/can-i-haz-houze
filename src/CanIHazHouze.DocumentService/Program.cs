@@ -385,6 +385,90 @@ app.MapDelete("/documents/{id}", async (Guid id, [Required] string owner, IDocum
 .Produces(StatusCodes.Status404NotFound)
 .Produces(StatusCodes.Status500InternalServerError);
 
+// Document verification endpoint for mortgage approval
+app.MapGet("/documents/user/{owner}/verification", async (string owner, IDocumentService documentService) =>
+{
+    try
+    {
+        var documents = await documentService.GetDocumentsAsync(owner);
+        
+        // Check for required document types by tags
+        var hasIncomeDocuments = documents.Any(d => d.Tags.Any(t => 
+            t.Contains("income", StringComparison.OrdinalIgnoreCase) || 
+            t.Contains("salary", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("pay", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("w2", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("paystub", StringComparison.OrdinalIgnoreCase)));
+            
+        var hasCreditReport = documents.Any(d => d.Tags.Any(t => 
+            t.Contains("credit", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("credit-report", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("creditreport", StringComparison.OrdinalIgnoreCase)));
+            
+        var hasEmploymentVerification = documents.Any(d => d.Tags.Any(t => 
+            t.Contains("employment", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("employer", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("employment-verification", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("verification", StringComparison.OrdinalIgnoreCase)));
+            
+        var hasPropertyAppraisal = documents.Any(d => d.Tags.Any(t => 
+            t.Contains("appraisal", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("property", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("valuation", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("property-appraisal", StringComparison.OrdinalIgnoreCase)));
+
+        // Create verification result
+        var result = new
+        {
+            UserName = owner,
+            Documents = documents.Select(d => new
+            {
+                DocumentType = string.Join(", ", d.Tags),
+                FileName = d.FileName,
+                IsVerified = true, // Assume uploaded documents are verified
+                UploadedAt = d.UploadedAt,
+                VerifiedAt = d.UploadedAt
+            }).ToList(),
+            HasIncomeDocuments = hasIncomeDocuments,
+            HasCreditReport = hasCreditReport,
+            HasEmploymentVerification = hasEmploymentVerification,
+            HasPropertyAppraisal = hasPropertyAppraisal,
+            AllDocumentsVerified = hasIncomeDocuments && hasCreditReport && hasEmploymentVerification && hasPropertyAppraisal
+        };
+        
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error verifying documents for user {Owner}", owner);
+        return Results.Problem("An error occurred while verifying documents");
+    }
+})
+.WithName("VerifyDocuments")
+.WithSummary("Verify mortgage documents for a user")
+.WithDescription("""
+    Verifies that a user has uploaded all required documents for mortgage approval.
+    
+    **Required Document Types (identified by tags):**
+    - **Income Documents**: Tags containing 'income', 'salary', 'pay', 'w2', 'paystub'
+    - **Credit Report**: Tags containing 'credit', 'credit-report', 'creditreport'
+    - **Employment Verification**: Tags containing 'employment', 'employer', 'employment-verification', 'verification'
+    - **Property Appraisal**: Tags containing 'appraisal', 'property', 'valuation', 'property-appraisal'
+    
+    **Parameters:**
+    - `owner` (required): Username/identifier to verify documents for
+    
+    **Response:**
+    Returns verification status with detailed breakdown of each document type.
+    """)
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Document Verification" }];
+    return operation;
+})
+.Produces(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status500InternalServerError);
+
 app.MapDefaultEndpoints();
 
 app.Run();

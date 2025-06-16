@@ -579,7 +579,8 @@ public class DocumentVerificationResult
     public bool HasCreditReport { get; set; }
     public bool HasEmploymentVerification { get; set; }
     public bool HasPropertyAppraisal { get; set; }
-    public bool AllDocumentsVerified => Documents.All(d => d.IsVerified);
+    public int DocumentCount => Documents.Count;
+    public bool AllDocumentsVerified => HasIncomeDocuments && HasCreditReport && HasEmploymentVerification && HasPropertyAppraisal;
 }
 
 public class VerifiedDocument
