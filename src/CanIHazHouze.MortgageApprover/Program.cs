@@ -70,6 +70,17 @@ builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 // Configure JSON serialization to use string values for enums
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -117,6 +128,9 @@ using (var scope = app.Services.CreateScope())
 
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
+
+// Use CORS
+app.UseCors();
 
 if (app.Environment.IsDevelopment())
 {
