@@ -1171,10 +1171,12 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
     {
         try
         {
+            // Build query string with all conditions
             var queryBuilder = "SELECT * FROM c WHERE c.Type = @type";
             var queryDefinition = new QueryDefinition(queryBuilder)
                 .WithParameter("@type", "mortgage");
 
+            // Add status filter if provided
             if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<MortgageRequestStatus>(status, true, out var statusEnum))
             {
                 queryBuilder += " AND c.Status = @status";
@@ -1183,18 +1185,20 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
                     .WithParameter("@status", statusEnum.ToString());
             }
 
+            // Add pagination - build final query with all parameters
             queryBuilder += " ORDER BY c.UpdatedAt DESC OFFSET @skip LIMIT @take";
-            queryDefinition = new QueryDefinition(queryBuilder)
+            var finalQuery = new QueryDefinition(queryBuilder)
                 .WithParameter("@type", "mortgage")
                 .WithParameter("@skip", (page - 1) * pageSize)
                 .WithParameter("@take", pageSize);
 
+            // Re-add status parameter if it was specified
             if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<MortgageRequestStatus>(status, true, out statusEnum))
             {
-                queryDefinition = queryDefinition.WithParameter("@status", statusEnum.ToString());
+                finalQuery = finalQuery.WithParameter("@status", statusEnum.ToString());
             }
 
-            var iterator = _container.GetItemQueryIterator<MortgageRequest>(queryDefinition);
+            var iterator = _container.GetItemQueryIterator<MortgageRequest>(finalQuery);
             var requests = new List<MortgageRequest>();
 
             while (iterator.HasMoreResults)
@@ -1203,12 +1207,13 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
                 requests.AddRange(response);
             }
 
+            _logger.LogInformation("Retrieved {Count} mortgage requests", requests.Count);
             return requests;
         }
         catch (CosmosException ex)
         {
             _logger.LogError(ex, "Error retrieving mortgage requests");
-            throw;
+            return new List<MortgageRequest>();
         }
     }
 

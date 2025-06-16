@@ -26,13 +26,33 @@ public class MortgageApiClient
                 return JsonSerializer.Deserialize<MortgageRequestDto>(json, GetJsonSerializerOptions());
             }
             
-            _logger.LogWarning("Failed to create mortgage request for user {UserName}. Status: {StatusCode}", userName, response.StatusCode);
-            return null;
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Failed to create mortgage request for user {UserName}. Status: {StatusCode}, Content: {Content}", userName, response.StatusCode, errorContent);
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                throw new InvalidOperationException($"User {userName} already has an existing mortgage request");
+            }
+            
+            throw new HttpRequestException($"API returned {response.StatusCode}: {errorContent}");
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "JSON deserialization error when creating mortgage request for user {UserName}", userName);
+            throw new InvalidOperationException("Failed to parse mortgage request response from API", ex);
+        }
+        catch (HttpRequestException)
+        {
+            throw; // Re-throw HTTP exceptions
+        }
+        catch (InvalidOperationException)
+        {
+            throw; // Re-throw business logic exceptions
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating mortgage request for user {UserName}", userName);
-            return null;
+            _logger.LogError(ex, "Unexpected error creating mortgage request for user {UserName}", userName);
+            throw new InvalidOperationException("Unexpected error occurred while creating mortgage request", ex);
         }
     }
 
@@ -101,16 +121,27 @@ public class MortgageApiClient
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();
+                _logger.LogInformation("Raw API response for mortgage requests: {Json}", json);
                 return JsonSerializer.Deserialize<List<MortgageRequestDto>>(json, GetJsonSerializerOptions()) ?? new List<MortgageRequestDto>();
             }
             
-            _logger.LogWarning("Failed to get mortgage requests. Status: {StatusCode}", response.StatusCode);
-            return new List<MortgageRequestDto>();
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Failed to get mortgage requests. Status: {StatusCode}, Content: {Content}", response.StatusCode, errorContent);
+            throw new HttpRequestException($"API returned {response.StatusCode}: {errorContent}");
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "JSON deserialization error when getting mortgage requests");
+            throw new InvalidOperationException("Failed to parse mortgage requests response from API", ex);
+        }
+        catch (HttpRequestException)
+        {
+            throw; // Re-throw HTTP exceptions
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting mortgage requests");
-            return new List<MortgageRequestDto>();
+            _logger.LogError(ex, "Unexpected error getting mortgage requests");
+            throw new InvalidOperationException("Unexpected error occurred while getting mortgage requests", ex);
         }
     }
 
@@ -206,7 +237,8 @@ public class MortgageApiClient
 
 public class MortgageRequestDto
 {
-    public Guid Id { get; set; }
+    public Guid RequestId { get; set; }
+    public Guid Id => RequestId; // Backward compatibility property
     public string UserName { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string StatusReason { get; set; } = string.Empty;

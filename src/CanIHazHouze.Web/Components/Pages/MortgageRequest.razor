@@ -928,16 +928,27 @@ else
                 existingRequest = result;
                 successMessage = "Mortgage request created successfully!";
                 newRequestModel.UserName = string.Empty;
+                await LoadAllRequests(); // Refresh the list
             }
             else
             {
                 errorMessage = "Failed to create mortgage request. You may already have an existing request.";
             }
         }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogError(ex, "HTTP error creating mortgage request");
+            errorMessage = $"API Error: {ex.Message}";
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogError(ex, "Data error creating mortgage request");
+            errorMessage = $"Data Error: {ex.Message}";
+        }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error creating mortgage request");
-            errorMessage = "An error occurred while creating the request.";
+            Logger.LogError(ex, "Unexpected error creating mortgage request");
+            errorMessage = $"Unexpected Error: {ex.Message}";
         }
         finally
         {
@@ -1041,6 +1052,9 @@ else
     private async Task LoadAllRequests()
     {
         isProcessing = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        
         try
         {
             allRequests = await MortgageApi.GetMortgageRequestsAsync(1, 20);
@@ -1059,13 +1073,30 @@ else
                     existingRequest = null;
                     successMessage = "Requests loaded. Previously selected request no longer exists.";
                 }
-                errorMessage = string.Empty;
             }
+            else if (allRequests.Any())
+            {
+                successMessage = $"Successfully loaded {allRequests.Count} mortgage requests.";
+            }
+            else
+            {
+                successMessage = "No mortgage requests found.";
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogError(ex, "HTTP error loading mortgage requests");
+            errorMessage = $"API Error: {ex.Message}";
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogError(ex, "Deserialization error loading mortgage requests");
+            errorMessage = $"Data Format Error: {ex.Message}";
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error loading all mortgage requests");
-            errorMessage = "An error occurred while loading requests.";
+            Logger.LogError(ex, "Unexpected error loading mortgage requests");
+            errorMessage = $"Unexpected Error: {ex.Message}";
         }
         finally
         {
