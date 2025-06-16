@@ -84,8 +84,16 @@ All entities now include:
 ## Configuration Requirements
 
 ### Local Development
-- Install Azure Cosmos DB Emulator
-- No additional connection strings needed (handled by Aspire)
+
+#### Apple Silicon (M1/M2/M3) Macs
+- **Solution**: Using the new Linux-based Azure Cosmos DB Emulator (Preview) with ARM64 support
+- **Image**: `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview`
+- **No additional setup required**: Aspire handles Docker container management automatically
+- **Native ARM64 support**: No need for Rosetta or x64 emulation
+
+#### Intel Macs / Windows / Linux
+- Standard Cosmos DB emulator configuration
+- Uses the same preview image for consistency
 
 ### Azure Deployment
 - Azure Cosmos DB account required
@@ -104,6 +112,24 @@ All entities now include:
 3. **Data Migration Scripts**: Create scripts to migrate existing SQLite data if needed
 4. **Monitoring**: Set up Cosmos DB monitoring and alerting
 5. **Cost Optimization**: Review and optimize Cosmos DB provisioning and indexing
+
+## Troubleshooting
+
+### Apple Silicon Mac Issues
+- **Problem**: `WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8)`
+- **Solution**: Updated AppHost to use `vnext-preview` image with native ARM64 support
+- **Status**: ✅ Resolved with Linux-based emulator preview
+
+### SSL Connection Errors
+- **Problem**: `The SSL connection could not be established` when connecting to emulator
+- **Root Cause**: Self-signed certificates in Cosmos DB emulator
+- **Solution**: Aspire automatically handles certificate validation for development scenarios
+- **Note**: If issues persist, ensure Docker has proper networking permissions
+
+### Container Platform Warnings
+- **Issue**: Docker platform mismatch warnings
+- **Resolution**: Using the `vnext-preview` image eliminates platform compatibility issues
+- **Alternative**: For older emulator versions, add `--platform linux/amd64` to Docker run commands
 
 ## Files Modified
 - `/src/CanIHazHouze.AppHost/AppHost.cs`

@@ -1,14 +1,13 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 // Add Azure Cosmos DB with emulator for local development
+// Using the new Linux-based emulator that supports Apple Silicon
 var cosmos = builder.AddAzureCosmosDB("cosmos")
     .RunAsEmulator(emulator =>
     {
         emulator.WithLifetime(ContainerLifetime.Persistent)
                 .WithDataVolume() // Persist data across container restarts
-                .WithArgs("--enableRateLimiting", "false") // Disable rate limiting for development
-                .WithArgs("--disableRateLimiting") // Additional flag for rate limiting
-                .WithEnvironment("AZURE_COSMOS_EMULATOR_GREMLIN_ENDPOINT", "false"); // Disable Gremlin if not needed
+                .WithImageTag("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview");
     });
 
 // Create shared database with separate containers for each service
