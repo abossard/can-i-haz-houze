@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Scalar.AspNetCore;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
@@ -133,7 +134,7 @@ app.MapPost("/mortgage-requests", async (
     try
     {
         var mortgageRequest = await mortgageService.CreateMortgageRequestAsync(request.UserName);
-        return Results.Created($"/mortgage-requests/{mortgageRequest.Id}", mortgageRequest);
+        return Results.Created($"/mortgage-requests/{mortgageRequest.RequestId}", mortgageRequest);
     }
     catch (InvalidOperationException ex)
     {
@@ -956,7 +957,7 @@ public class MortgageRequest
 {
     public string id { get; set; } = string.Empty; // Cosmos DB id property
     public string owner { get; set; } = string.Empty; // Partition key (username)
-    public Guid Id { get; set; }
+    public Guid RequestId { get; set; }
     public string UserName { get; set; } = string.Empty;
     public MortgageRequestStatus Status { get; set; } = MortgageRequestStatus.Pending;
     public string StatusReason { get; set; } = "Application submitted - awaiting documentation";
@@ -964,9 +965,10 @@ public class MortgageRequest
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public string RequestDataJson { get; set; } = "{}"; // Store additional data as JSON
-    public string Type { get; set; } = "mortgage-request"; // Document type discriminator
+    public string Type { get; set; } = "mortgage"; // Document type discriminator
     
     // Navigation property for additional data
+    [JsonIgnore]
     public Dictionary<string, object> RequestData
     {
         get => System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(RequestDataJson) ?? new Dictionary<string, object>();
@@ -1024,7 +1026,7 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
             var query = new QueryDefinition(
                 "SELECT * FROM c WHERE c.owner = @userName AND c.Type = @type")
                 .WithParameter("@userName", userName)
-                .WithParameter("@type", "mortgage-request");
+                .WithParameter("@type", "mortgage");
 
             var iterator = _container.GetItemQueryIterator<MortgageRequest>(query);
             if (iterator.HasMoreResults)
@@ -1045,19 +1047,19 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         {
             id = $"mortgage:{Guid.NewGuid()}",
             owner = userName,
-            Id = Guid.NewGuid(),
+            RequestId = Guid.NewGuid(),
             UserName = userName,
             Status = MortgageRequestStatus.Pending,
             StatusReason = "Application submitted - awaiting documentation",
             MissingRequirements = "Income verification, Credit report, Property appraisal, Employment verification",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
-            Type = "mortgage-request"
+            Type = "mortgage"
         };
 
         await _container.CreateItemAsync(mortgageRequest, new PartitionKey(userName));
 
-        _logger.LogInformation("Created mortgage request {RequestId} for user {UserName}", mortgageRequest.Id, userName);
+        _logger.LogInformation("Created mortgage request {RequestId} for user {UserName}", mortgageRequest.RequestId, userName);
         return mortgageRequest;
     }
 
@@ -1066,9 +1068,9 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         try
         {
             var query = new QueryDefinition(
-                "SELECT * FROM c WHERE c.Id = @requestId AND c.Type = @type")
+                "SELECT * FROM c WHERE c.RequestId = @requestId AND c.Type = @type")
                 .WithParameter("@requestId", requestId)
-                .WithParameter("@type", "mortgage-request");
+                .WithParameter("@type", "mortgage");
 
             var iterator = _container.GetItemQueryIterator<MortgageRequest>(query);
             if (iterator.HasMoreResults)
@@ -1091,7 +1093,7 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
             var query = new QueryDefinition(
                 "SELECT * FROM c WHERE c.owner = @userName AND c.Type = @type")
                 .WithParameter("@userName", userName)
-                .WithParameter("@type", "mortgage-request");
+                .WithParameter("@type", "mortgage");
 
             var iterator = _container.GetItemQueryIterator<MortgageRequest>(query);
             if (iterator.HasMoreResults)
@@ -1171,19 +1173,19 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         {
             var queryBuilder = "SELECT * FROM c WHERE c.Type = @type";
             var queryDefinition = new QueryDefinition(queryBuilder)
-                .WithParameter("@type", "mortgage-request");
+                .WithParameter("@type", "mortgage");
 
             if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<MortgageRequestStatus>(status, true, out var statusEnum))
             {
                 queryBuilder += " AND c.Status = @status";
                 queryDefinition = new QueryDefinition(queryBuilder)
-                    .WithParameter("@type", "mortgage-request")
+                    .WithParameter("@type", "mortgage")
                     .WithParameter("@status", statusEnum.ToString());
             }
 
             queryBuilder += " ORDER BY c.UpdatedAt DESC OFFSET @skip LIMIT @take";
             queryDefinition = new QueryDefinition(queryBuilder)
-                .WithParameter("@type", "mortgage-request")
+                .WithParameter("@type", "mortgage")
                 .WithParameter("@skip", (page - 1) * pageSize)
                 .WithParameter("@take", pageSize);
 
@@ -1313,7 +1315,7 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during cross-service verification for request {RequestId}", request.Id);
+                _logger.LogError(ex, "Error during cross-service verification for request {RequestId}", request.RequestId);
                 request.Status = MortgageRequestStatus.UnderReview;
                 request.StatusReason = "Cross-service verification unavailable - under manual review";
                 request.MissingRequirements = string.Empty;

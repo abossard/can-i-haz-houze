@@ -1,7 +1,7 @@
 # Partition Key Update Summary
 
 ## Overview
-Updated all Cosmos DB container configurations and entity models to use `/owner` as the partition key instead of `/pk`. This ensures consistency across all services and proper partitioning based on the user/owner field.
+Updated all Cosmos DB container configurations and entity models to use `/owner` as the partition key instead of `/pk`. This ensures consistency across all services and proper partitioning based on the user/owner field. Also resolved JSON serialization conflicts in the MortgageApprover service.
 
 ## Changes Made
 
@@ -31,10 +31,24 @@ Updated all Cosmos DB container configurations and entity models to use `/owner`
 ### 4. MortgageApprover (`CanIHazHouze.MortgageApprover/Program.cs`)
 - **Entity Model Changes:**
   - Changed `MortgageRequest.pk` property to `MortgageRequest.owner`
+  - **JSON Serialization Fix:** Renamed `MortgageRequest.Id` to `MortgageRequest.RequestId` to avoid conflict with `id` property
   - Updated entity creation to set `owner = userName` instead of `pk = userName`
+  - Added `System.Text.Json.Serialization` using directive
+  - Updated all references from `.Id` to `.RequestId`
   
 - **Query Changes:**
   - Updated queries to use `c.owner = @userName` instead of `c.pk = @userName`
+  - Updated query to use `c.RequestId = @requestId` instead of `c.Id = @requestId`
+
+## JSON Serialization Issue Resolution
+**Problem:** The `MortgageRequest` class had both `id` (lowercase, for Cosmos DB) and `Id` (uppercase, for business logic) properties, causing System.Text.Json to throw a property name collision error.
+
+**Solution:** Renamed the business logic property from `Id` to `RequestId` to follow the same pattern as other services:
+- DocumentService: `id` + `DocumentId`
+- LedgerService: `id` + `TransactionId`
+- MortgageApprover: `id` + `RequestId` (fixed)
+
+This approach avoids JSON serialization conflicts without requiring custom JsonPropertyName attributes.
 
 ## Partition Key Strategy
 - **Partition Key Path:** `/owner`
