@@ -41,12 +41,12 @@ public class LedgerServiceTests
         Assert.Equal(account.CreatedAt, account.LastUpdatedAt);
 
         // Verify account is stored in database
-        var storedAccount = await context.Accounts.FirstOrDefaultAsync(a => a.Owner == owner);
+        var storedAccount = await context.Accounts.FirstOrDefaultAsync(a => a.Owner == owner, TestContext.Current.CancellationToken);
         Assert.NotNull(storedAccount);
         Assert.Equal(account.Balance, storedAccount.Balance);
 
         // Verify initial transaction is created
-        var transactions = await context.Transactions.Where(t => t.Owner == owner).ToListAsync();
+        var transactions = await context.Transactions.Where(t => t.Owner == owner).ToListAsync(TestContext.Current.CancellationToken);
         Assert.Single(transactions);
         Assert.Equal(account.Balance, transactions[0].Amount);
         Assert.Equal("Initial account balance", transactions[0].Description);
@@ -93,7 +93,7 @@ public class LedgerServiceTests
         // Verify transaction is recorded
         var transactions = await context.Transactions
             .Where(t => t.Owner == owner && t.Description == "Test deposit")
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
         Assert.Single(transactions);
         Assert.Equal(addAmount, transactions[0].Amount);
         Assert.Equal(updatedAccount.Balance, transactions[0].BalanceAfter);
@@ -205,7 +205,7 @@ public class LedgerServiceTests
         // We'll just verify the reset transaction was created
         var transactions = await context.Transactions
             .Where(t => t.Owner == owner && t.Description.Contains("Account reset"))
-            .ToListAsync();
+            .ToListAsync(TestContext.Current.CancellationToken);
         Assert.Single(transactions);
     }
 
