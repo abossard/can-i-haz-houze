@@ -436,7 +436,7 @@ public record BalanceUpdateRequest(
 public class AccountEntity
 {
     public string id { get; set; } = string.Empty; // Cosmos DB id property  
-    public string pk { get; set; } = string.Empty; // Partition key (username)
+    public string owner { get; set; } = string.Empty; // Partition key (username)
     public string Owner { get; set; } = string.Empty;
     public decimal Balance { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -447,7 +447,7 @@ public class AccountEntity
 public class TransactionEntity
 {
     public string id { get; set; } = string.Empty; // Cosmos DB id property
-    public string pk { get; set; } = string.Empty; // Partition key (username)
+    public string owner { get; set; } = string.Empty; // Partition key (username)
     public Guid TransactionId { get; set; }
     public string Owner { get; set; } = string.Empty;
     public decimal Amount { get; set; }
@@ -505,7 +505,7 @@ public class LedgerServiceImpl : ILedgerService
             var account = new AccountEntity
             {
                 id = $"account:{owner}",
-                pk = owner,
+                owner = owner,
                 Owner = owner,
                 Balance = initialBalance,
                 CreatedAt = now,
@@ -519,7 +519,7 @@ public class LedgerServiceImpl : ILedgerService
             var initialTransaction = new TransactionEntity
             {
                 id = $"transaction:{Guid.NewGuid()}",
-                pk = owner,
+                owner = owner,
                 TransactionId = Guid.NewGuid(),
                 Owner = owner,
                 Amount = initialBalance,
@@ -575,7 +575,7 @@ public class LedgerServiceImpl : ILedgerService
             var transaction = new TransactionEntity
             {
                 id = $"transaction:{Guid.NewGuid()}",
-                pk = owner,
+                owner = owner,
                 TransactionId = Guid.NewGuid(),
                 Owner = owner,
                 Amount = amount,
@@ -608,7 +608,7 @@ public class LedgerServiceImpl : ILedgerService
         try
         {
             var query = new QueryDefinition(
-                "SELECT * FROM c WHERE c.pk = @owner AND c.Type = @type ORDER BY c.CreatedAt DESC OFFSET @skip LIMIT @take")
+                "SELECT * FROM c WHERE c.owner = @owner AND c.Type = @type ORDER BY c.CreatedAt DESC OFFSET @skip LIMIT @take")
                 .WithParameter("@owner", owner)
                 .WithParameter("@type", "transaction")
                 .WithParameter("@skip", skip)
@@ -663,7 +663,7 @@ public class LedgerServiceImpl : ILedgerService
             var transaction = new TransactionEntity
             {
                 id = $"transaction:{Guid.NewGuid()}",
-                pk = owner,
+                owner = owner,
                 TransactionId = Guid.NewGuid(),
                 Owner = owner,
                 Amount = newBalance,

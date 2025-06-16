@@ -2,22 +2,24 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 // Add Azure Cosmos DB with emulator for local development
 // Using the new Linux-based emulator that supports Apple Silicon
+#pragma warning disable ASPIRECOSMOSDB001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 var cosmos = builder.AddAzureCosmosDB("cosmos")
-    .RunAsEmulator(emulator =>
+    .RunAsPreviewEmulator(emulator =>
     {
-        emulator.WithLifetime(ContainerLifetime.Persistent)
-                .WithDataVolume() // Persist data across container restarts
-                .WithImageTag("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview");
+        emulator.WithLifetime(ContainerLifetime.Persistent);
+        emulator.WithDataVolume();
+        emulator.WithDataExplorer();
+
     });
+#pragma warning restore ASPIRECOSMOSDB001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
 // Create shared database with separate containers for each service
 var houzeDatabase = cosmos.AddCosmosDatabase("houze");
 
 // Add containers with username as partition key for optimal RU sharing
 var documentsContainer = houzeDatabase.AddContainer("documents", "/owner");
-var accountsContainer = houzeDatabase.AddContainer("accounts", "/owner"); 
-var transactionsContainer = houzeDatabase.AddContainer("transactions", "/owner");
-var mortgageContainer = houzeDatabase.AddContainer("mortgageRequests", "/userName");
+var ledgersContainer = houzeDatabase.AddContainer("ledgers", "/owner"); 
+var mortgagesContainer = houzeDatabase.AddContainer("mortgages", "/owner");
 
 var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>("documentservice")
     .WithReference(cosmos) // Reference the cosmos resource instead of container

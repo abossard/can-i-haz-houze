@@ -955,7 +955,7 @@ public class MortgageStorageOptions
 public class MortgageRequest
 {
     public string id { get; set; } = string.Empty; // Cosmos DB id property
-    public string pk { get; set; } = string.Empty; // Partition key (username)
+    public string owner { get; set; } = string.Empty; // Partition key (username)
     public Guid Id { get; set; }
     public string UserName { get; set; } = string.Empty;
     public MortgageRequestStatus Status { get; set; } = MortgageRequestStatus.Pending;
@@ -1022,7 +1022,7 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         try
         {
             var query = new QueryDefinition(
-                "SELECT * FROM c WHERE c.pk = @userName AND c.Type = @type")
+                "SELECT * FROM c WHERE c.owner = @userName AND c.Type = @type")
                 .WithParameter("@userName", userName)
                 .WithParameter("@type", "mortgage-request");
 
@@ -1044,7 +1044,7 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         var mortgageRequest = new MortgageRequest
         {
             id = $"mortgage:{Guid.NewGuid()}",
-            pk = userName,
+            owner = userName,
             Id = Guid.NewGuid(),
             UserName = userName,
             Status = MortgageRequestStatus.Pending,
@@ -1089,7 +1089,7 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         try
         {
             var query = new QueryDefinition(
-                "SELECT * FROM c WHERE c.pk = @userName AND c.Type = @type")
+                "SELECT * FROM c WHERE c.owner = @userName AND c.Type = @type")
                 .WithParameter("@userName", userName)
                 .WithParameter("@type", "mortgage-request");
 

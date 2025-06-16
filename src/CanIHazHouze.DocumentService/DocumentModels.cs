@@ -18,7 +18,7 @@ public record DocumentMeta(Guid Id, string Owner, List<string> Tags, string File
 public class DocumentEntity
 {
     public string id { get; set; } = string.Empty; // Cosmos DB id property
-    public string pk { get; set; } = string.Empty; // Partition key (username)
+    public string owner { get; set; } = string.Empty; // Partition key (username)
     public Guid DocumentId { get; set; }
     public string Owner { get; set; } = string.Empty;
     public List<string> Tags { get; set; } = new();
@@ -75,7 +75,7 @@ public class DocumentServiceImpl : IDocumentService
         var entity = new DocumentEntity
         {
             id = id.ToString(),
-            pk = owner, // Use username as partition key
+            owner = owner, // Use username as partition key
             DocumentId = id,
             Owner = owner,
             Tags = tags,
@@ -110,7 +110,7 @@ public class DocumentServiceImpl : IDocumentService
         try
         {
             var query = new QueryDefinition(
-                "SELECT * FROM c WHERE c.pk = @owner AND c.Type = @type ORDER BY c.UploadedAt DESC")
+                "SELECT * FROM c WHERE c.owner = @owner AND c.Type = @type ORDER BY c.UploadedAt DESC")
                 .WithParameter("@owner", owner)
                 .WithParameter("@type", "document");
 
