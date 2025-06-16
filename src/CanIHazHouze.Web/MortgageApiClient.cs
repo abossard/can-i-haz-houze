@@ -128,6 +128,72 @@ public class MortgageApiClient
         }
     }
 
+    public async Task<CrossServiceVerificationResultDto?> VerifyMortgageRequestAsync(Guid requestId)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"/mortgage-requests/{requestId}/verify", null);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<CrossServiceVerificationResultDto>(json, GetJsonSerializerOptions());
+            }
+            
+            _logger.LogWarning("Failed to verify mortgage request {RequestId}. Status: {StatusCode}", requestId, response.StatusCode);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verifying mortgage request {RequestId}", requestId);
+            return null;
+        }
+    }
+
+    public async Task<MortgageRequestDto?> RefreshMortgageRequestStatusAsync(Guid requestId)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"/mortgage-requests/{requestId}/refresh-status", null);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<MortgageRequestDto>(json, GetJsonSerializerOptions());
+            }
+            
+            _logger.LogWarning("Failed to refresh mortgage request status {RequestId}. Status: {StatusCode}", requestId, response.StatusCode);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing mortgage request status {RequestId}", requestId);
+            return null;
+        }
+    }
+
+    public async Task<VerificationStatusDto?> GetVerificationStatusAsync(Guid requestId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/mortgage-requests/{requestId}/verification-status");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<VerificationStatusDto>(json, GetJsonSerializerOptions());
+            }
+            
+            _logger.LogWarning("Failed to get verification status for request {RequestId}. Status: {StatusCode}", requestId, response.StatusCode);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting verification status for request {RequestId}", requestId);
+            return null;
+        }
+    }
+
     private static JsonSerializerOptions GetJsonSerializerOptions()
     {
         return new JsonSerializerOptions
@@ -148,4 +214,93 @@ public class MortgageRequestDto
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public Dictionary<string, object> RequestData { get; set; } = new();
+}
+
+public class CrossServiceVerificationResultDto
+{
+    public DocumentVerificationResultDto DocumentVerification { get; set; } = new();
+    public FinancialVerificationResultDto FinancialVerification { get; set; } = new();
+    public bool AllVerificationsPassed { get; set; }
+    public List<string> FailureReasons { get; set; } = new();
+    public Dictionary<string, object> AdditionalData { get; set; } = new();
+    public List<ServiceErrorDto> ServiceErrors { get; set; } = new();
+}
+
+public class ServiceErrorDto
+{
+    public string ServiceName { get; set; } = string.Empty;
+    public string ErrorMessage { get; set; } = string.Empty;
+    public string? Details { get; set; }
+    public DateTime ErrorTime { get; set; }
+    public bool IsConnectivityError { get; set; }
+}
+
+public class DocumentVerificationResultDto
+{
+    public string UserName { get; set; } = string.Empty;
+    public List<VerifiedDocumentDto> Documents { get; set; } = new();
+    public bool HasIncomeDocuments { get; set; }
+    public bool HasCreditReport { get; set; }
+    public bool HasEmploymentVerification { get; set; }
+    public bool HasPropertyAppraisal { get; set; }
+    public bool AllDocumentsVerified { get; set; }
+}
+
+public class VerifiedDocumentDto
+{
+    public string DocumentType { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public bool IsVerified { get; set; }
+    public DateTime UploadedAt { get; set; }
+    public DateTime? VerifiedAt { get; set; }
+}
+
+public class FinancialVerificationResultDto
+{
+    public string UserName { get; set; } = string.Empty;
+    public bool AccountExists { get; set; }
+    public decimal CurrentBalance { get; set; }
+    public decimal AverageMonthlyIncome { get; set; }
+    public bool HasSufficientFunds { get; set; }
+    public bool IncomeConsistent { get; set; }
+    public decimal DebtToIncomeRatio { get; set; }
+}
+
+public class VerificationStatusDto
+{
+    public Guid RequestId { get; set; }
+    public string UserName { get; set; } = string.Empty;
+    public string CurrentStatus { get; set; } = string.Empty;
+    public string StatusReason { get; set; } = string.Empty;
+    public DocumentVerificationSummaryDto DocumentVerification { get; set; } = new();
+    public FinancialVerificationSummaryDto FinancialVerification { get; set; } = new();
+    public CrossServiceVerificationSummaryDto CrossServiceVerification { get; set; } = new();
+}
+
+public class DocumentVerificationSummaryDto
+{
+    public bool AllDocumentsVerified { get; set; }
+    public bool HasIncomeDocuments { get; set; }
+    public bool HasCreditReport { get; set; }
+    public bool HasEmploymentVerification { get; set; }
+    public bool HasPropertyAppraisal { get; set; }
+    public int DocumentCount { get; set; }
+}
+
+public class FinancialVerificationSummaryDto
+{
+    public bool AccountExists { get; set; }
+    public decimal CurrentBalance { get; set; }
+    public bool HasSufficientFunds { get; set; }
+    public bool IncomeConsistent { get; set; }
+}
+
+public class CrossServiceVerificationSummaryDto
+{
+    public bool AllVerificationsPassed { get; set; }
+    public List<string> FailureReasons { get; set; } = new();
+    public DateTime VerificationDate { get; set; }
+    public List<ServiceErrorDto> ServiceErrors { get; set; } = new();
+    public bool HasServiceErrors { get; set; }
+    public int ConnectivityErrors { get; set; }
 }

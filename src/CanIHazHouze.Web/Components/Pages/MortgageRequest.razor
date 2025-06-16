@@ -239,6 +239,112 @@ else
             
             <hr />
             
+            <!-- Cross-Service Verification Section -->
+            <div class="card mb-3 border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🔄 Cross-Service Verification</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Verify your mortgage application by checking documents and financial information across all connected services.
+                    </p>
+                    
+                    @if (verificationStatus != null)
+                    {
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>📄 Document Verification</h6>
+                                <ul class="list-unstyled">
+                                    <li><i class="@(verificationStatus.DocumentVerification.AllDocumentsVerified ? "text-success" : "text-danger")">@(verificationStatus.DocumentVerification.AllDocumentsVerified ? "✓" : "✗")</i> All Documents Verified</li>
+                                    <li><i class="@(verificationStatus.DocumentVerification.HasIncomeDocuments ? "text-success" : "text-warning")">@(verificationStatus.DocumentVerification.HasIncomeDocuments ? "✓" : "⚠")</i> Income Documents</li>
+                                    <li><i class="@(verificationStatus.DocumentVerification.HasCreditReport ? "text-success" : "text-warning")">@(verificationStatus.DocumentVerification.HasCreditReport ? "✓" : "⚠")</i> Credit Report</li>
+                                    <li><i class="@(verificationStatus.DocumentVerification.HasEmploymentVerification ? "text-success" : "text-warning")">@(verificationStatus.DocumentVerification.HasEmploymentVerification ? "✓" : "⚠")</i> Employment Verification</li>
+                                    <li><i class="@(verificationStatus.DocumentVerification.HasPropertyAppraisal ? "text-success" : "text-warning")">@(verificationStatus.DocumentVerification.HasPropertyAppraisal ? "✓" : "⚠")</i> Property Appraisal</li>
+                                </ul>
+                                <small class="text-muted">Total Documents: @verificationStatus.DocumentVerification.DocumentCount</small>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>💰 Financial Verification</h6>
+                                <ul class="list-unstyled">
+                                    <li><i class="@(verificationStatus.FinancialVerification.AccountExists ? "text-success" : "text-danger")">@(verificationStatus.FinancialVerification.AccountExists ? "✓" : "✗")</i> Account Exists</li>
+                                    <li><i class="@(verificationStatus.FinancialVerification.HasSufficientFunds ? "text-success" : "text-warning")">@(verificationStatus.FinancialVerification.HasSufficientFunds ? "✓" : "⚠")</i> Sufficient Funds</li>
+                                    <li><i class="@(verificationStatus.FinancialVerification.IncomeConsistent ? "text-success" : "text-warning")">@(verificationStatus.FinancialVerification.IncomeConsistent ? "✓" : "⚠")</i> Income Consistent</li>
+                                </ul>
+                                <small class="text-muted">Current Balance: @verificationStatus.FinancialVerification.CurrentBalance.ToString("C")</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <div class="alert @(verificationStatus.CrossServiceVerification.AllVerificationsPassed ? "alert-success" : "alert-warning")" role="alert">
+                                <strong>Overall Verification Status:</strong> 
+                                @(verificationStatus.CrossServiceVerification.AllVerificationsPassed ? "✅ All verifications passed" : "⚠️ Some verifications failed")
+                                
+                                @if (verificationStatus.CrossServiceVerification.FailureReasons.Any())
+                                {
+                                    <ul class="mt-2 mb-0">
+                                        @foreach (var reason in verificationStatus.CrossServiceVerification.FailureReasons)
+                                        {
+                                            <li>@reason</li>
+                                        }
+                                    </ul>
+                                }
+                            </div>
+                            
+                            @if (verificationStatus.CrossServiceVerification.HasServiceErrors)
+                            {
+                                <div class="alert alert-danger" role="alert">
+                                    <strong>🚨 Service Errors (@verificationStatus.CrossServiceVerification.ServiceErrors.Count):</strong>
+                                    @if (verificationStatus.CrossServiceVerification.ConnectivityErrors > 0)
+                                    {
+                                        <div class="mt-2">
+                                            <strong>Connectivity Issues:</strong> @verificationStatus.CrossServiceVerification.ConnectivityErrors service(s) unavailable
+                                        </div>
+                                    }
+                                    <ul class="mt-2 mb-0">
+                                        @foreach (var error in verificationStatus.CrossServiceVerification.ServiceErrors)
+                                        {
+                                            <li>
+                                                <strong>@error.ServiceName:</strong> @error.ErrorMessage
+                                                @if (error.IsConnectivityError)
+                                                {
+                                                    <span class="badge bg-danger ms-1">Connection Error</span>
+                                                }
+                                                @if (!string.IsNullOrEmpty(error.Details))
+                                                {
+                                                    <br><small class="text-muted">Details: @error.Details</small>
+                                                }
+                                                <br><small class="text-muted">Time: @error.ErrorTime.ToString("HH:mm:ss")</small>
+                                            </li>
+                                        }
+                                    </ul>
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            💡 <strong>Tip:</strong> Service errors may be temporary. Try refreshing or running verification again.
+                                        </small>
+                                    </div>
+                                </div>
+                            }
+                            
+                            <small class="text-muted">Last checked: @verificationStatus.CrossServiceVerification.VerificationDate.ToString("yyyy-MM-dd HH:mm:ss")</small>
+                        </div>
+                    }
+                    
+                    <div class="d-flex gap-2 mt-3">
+                        <button class="btn btn-info" @onclick="RunCrossServiceVerification" disabled="@isProcessing">
+                            @(isProcessing ? "Verifying..." : "🔍 Run Verification")
+                        </button>
+                        <button class="btn btn-secondary" @onclick="RefreshStatus" disabled="@isProcessing">
+                            @(isProcessing ? "Refreshing..." : "🔄 Refresh Status")
+                        </button>
+                        <button class="btn btn-outline-info" @onclick="GetVerificationStatus" disabled="@isProcessing">
+                            @(isProcessing ? "Loading..." : "📊 Check Status")
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <hr />
+            
             <div class="d-flex gap-2">
                 <button class="btn btn-secondary" @onclick="RefreshRequest" disabled="@isProcessing">
                     @(isProcessing ? "Refreshing..." : "Refresh Status")
@@ -308,6 +414,7 @@ else
     private string errorMessage = string.Empty;
     private string successMessage = string.Empty;
     private bool isProcessing = false;
+    private VerificationStatusDto? verificationStatus;
 
     // Form models for structured input
     private readonly IncomeForm incomeForm = new();
@@ -692,16 +799,135 @@ else
         }
     }
 
+    private async Task RunCrossServiceVerification()
+    {
+        if (existingRequest == null) return;
+
+        isProcessing = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var verificationResult = await MortgageApi.VerifyMortgageRequestAsync(existingRequest.Id);
+            if (verificationResult != null)
+            {
+                if (verificationResult.AllVerificationsPassed)
+                {
+                    successMessage = "✅ Cross-service verification completed successfully!";
+                }
+                else
+                {
+                    var errorCount = verificationResult.ServiceErrors.Count;
+                    var connectivityErrors = verificationResult.ServiceErrors.Count(e => e.IsConnectivityError);
+                    
+                    if (connectivityErrors > 0)
+                    {
+                        successMessage = $"⚠️ Verification completed with {connectivityErrors} connectivity error(s). Issues: {string.Join(", ", verificationResult.FailureReasons)}";
+                    }
+                    else
+                    {
+                        successMessage = $"⚠️ Verification completed with issues: {string.Join(", ", verificationResult.FailureReasons)}";
+                    }
+                }
+                
+                // Refresh the request to get updated status
+                await RefreshRequest();
+                
+                // Get detailed verification status
+                await GetVerificationStatus();
+            }
+            else
+            {
+                errorMessage = "Failed to run cross-service verification. The service may be unavailable.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error running cross-service verification");
+            errorMessage = $"An error occurred while running cross-service verification: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task RefreshStatus()
+    {
+        if (existingRequest == null) return;
+
+        isProcessing = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var updatedRequest = await MortgageApi.RefreshMortgageRequestStatusAsync(existingRequest.Id);
+            if (updatedRequest != null)
+            {
+                existingRequest = updatedRequest;
+                successMessage = "Request status refreshed with latest cross-service verification.";
+                
+                // Also refresh verification status
+                await GetVerificationStatus();
+            }
+            else
+            {
+                errorMessage = "Failed to refresh request status.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error refreshing request status");
+            errorMessage = "An error occurred while refreshing the request status.";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task GetVerificationStatus()
+    {
+        if (existingRequest == null) return;
+
+        isProcessing = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            verificationStatus = await MortgageApi.GetVerificationStatusAsync(existingRequest.Id);
+            if (verificationStatus != null)
+            {
+                successMessage = "Verification status loaded successfully.";
+            }
+            else
+            {
+                errorMessage = "Failed to get verification status.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error getting verification status");
+            errorMessage = "An error occurred while getting verification status.";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
     private void SelectRequest(MortgageRequestDto request)
     {
         existingRequest = request;
         successMessage = $"Selected mortgage request for {request.UserName}";
         errorMessage = string.Empty;
+        verificationStatus = null; // Clear previous verification status
     }
 
     private void ClearSelection()
     {
         existingRequest = null;
+        verificationStatus = null;
         successMessage = "Selection cleared. You can now create a new request.";
         errorMessage = string.Empty;
     }

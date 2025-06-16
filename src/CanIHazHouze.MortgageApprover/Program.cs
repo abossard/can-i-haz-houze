@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 /*
  * CanIHazHouze Mortgage Approver Service
@@ -93,6 +94,16 @@ builder.Services.AddDbContext<MortgageDbContext>(options =>
 
 // Add mortgage approval service
 builder.Services.AddScoped<IMortgageApprovalService, MortgageApprovalServiceImpl>();
+
+// Add HTTP clients for inter-service communication with proper Aspire service discovery
+builder.Services.AddHttpClient<DocumentVerificationService>();
+
+builder.Services.AddHttpClient<LedgerVerificationService>();
+
+// Register verification services with proper scoping
+builder.Services.AddScoped<IDocumentVerificationService, DocumentVerificationService>();
+builder.Services.AddScoped<ILedgerVerificationService, LedgerVerificationService>();
+builder.Services.AddScoped<ICrossServiceVerificationService, CrossServiceVerificationService>();
 
 var app = builder.Build();
 
@@ -243,6 +254,130 @@ app.MapGet("/mortgage-requests", async (
 .WithName("GetMortgageRequests")
 .WithOpenApi()
 .WithTags("MortgageRequests");
+
+// Cross-Service Verification API endpoints
+app.MapPost("/mortgage-requests/{requestId:guid}/verify", async (
+    Guid requestId,
+    IMortgageApprovalService mortgageService,
+    ICrossServiceVerificationService crossServiceVerification) =>
+{
+    try
+    {
+        var mortgageRequest = await mortgageService.GetMortgageRequestAsync(requestId);
+        if (mortgageRequest == null)
+            return Results.NotFound();
+
+        var verificationResult = await crossServiceVerification.VerifyMortgageRequirementsAsync(
+            mortgageRequest.UserName, mortgageRequest.RequestData);
+        
+        return Results.Ok(verificationResult);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error performing cross-service verification for request {RequestId}", requestId);
+        return Results.Problem("An error occurred while performing cross-service verification.");
+    }
+})
+.WithName("VerifyMortgageRequest")
+.WithOpenApi()
+.WithTags("MortgageRequests")
+.WithSummary("Trigger cross-service verification for a mortgage request")
+.WithDescription("Manually triggers document and financial verification through external services.");
+
+app.MapPost("/mortgage-requests/{requestId:guid}/refresh-status", async (
+    Guid requestId,
+    IMortgageApprovalService mortgageService) =>
+{
+    try
+    {
+        var mortgageRequest = await mortgageService.GetMortgageRequestAsync(requestId);
+        if (mortgageRequest == null)
+            return Results.NotFound();
+
+        // Trigger re-evaluation by updating with current data (this forces status evaluation)
+        var updatedRequest = await mortgageService.UpdateMortgageDataAsync(requestId, new Dictionary<string, object>());
+        
+        return updatedRequest != null ? Results.Ok(updatedRequest) : Results.NotFound();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error refreshing status for request {RequestId}", requestId);
+        return Results.Problem("An error occurred while refreshing the request status.");
+    }
+})
+.WithName("RefreshMortgageRequestStatus")
+.WithOpenApi()
+.WithTags("MortgageRequests")
+.WithSummary("Refresh mortgage request status")
+.WithDescription("Re-evaluates the mortgage request status including cross-service verification.");
+
+app.MapGet("/mortgage-requests/{requestId:guid}/verification-status", async (
+    Guid requestId,
+    IMortgageApprovalService mortgageService,
+    ICrossServiceVerificationService crossServiceVerification) =>
+{
+    try
+    {
+        var mortgageRequest = await mortgageService.GetMortgageRequestAsync(requestId);
+        if (mortgageRequest == null)
+            return Results.NotFound();
+
+        var verificationResult = await crossServiceVerification.VerifyMortgageRequirementsAsync(
+            mortgageRequest.UserName, mortgageRequest.RequestData);
+
+        var statusInfo = new
+        {
+            RequestId = requestId,
+            UserName = mortgageRequest.UserName,
+            CurrentStatus = mortgageRequest.Status.ToString(),
+            StatusReason = mortgageRequest.StatusReason,
+            DocumentVerification = new
+            {
+                AllDocumentsVerified = verificationResult.DocumentVerification.AllDocumentsVerified,
+                HasIncomeDocuments = verificationResult.DocumentVerification.HasIncomeDocuments,
+                HasCreditReport = verificationResult.DocumentVerification.HasCreditReport,
+                HasEmploymentVerification = verificationResult.DocumentVerification.HasEmploymentVerification,
+                HasPropertyAppraisal = verificationResult.DocumentVerification.HasPropertyAppraisal,
+                DocumentCount = verificationResult.DocumentVerification.Documents.Count
+            },
+            FinancialVerification = new
+            {
+                verificationResult.FinancialVerification.AccountExists,
+                verificationResult.FinancialVerification.CurrentBalance,
+                verificationResult.FinancialVerification.HasSufficientFunds,
+                verificationResult.FinancialVerification.IncomeConsistent
+            },
+            CrossServiceVerification = new
+            {
+                verificationResult.AllVerificationsPassed,
+                FailureReasons = verificationResult.FailureReasons,
+                VerificationDate = DateTime.UtcNow,
+                ServiceErrors = verificationResult.ServiceErrors.Select(e => new
+                {
+                    e.ServiceName,
+                    e.ErrorMessage,
+                    e.Details,
+                    e.ErrorTime,
+                    e.IsConnectivityError
+                }).ToList(),
+                HasServiceErrors = verificationResult.ServiceErrors.Any(),
+                ConnectivityErrors = verificationResult.ServiceErrors.Count(e => e.IsConnectivityError)
+            }
+        };
+        
+        return Results.Ok(statusInfo);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error getting verification status for request {RequestId}", requestId);
+        return Results.Problem("An error occurred while getting verification status.");
+    }
+})
+.WithName("GetMortgageVerificationStatus")
+.WithOpenApi()
+.WithTags("MortgageRequests")
+.WithSummary("Get detailed verification status")
+.WithDescription("Returns detailed information about document and financial verification status.");
 
 app.Run();
 
@@ -430,6 +565,385 @@ public class MortgagePropertyDataDto
     public bool AppraisalCompleted { get; set; }
 }
 
+// Cross-Service Integration Models and Services
+// ============================================
+
+/// <summary>
+/// Document verification result from the Document Service
+/// </summary>
+public class DocumentVerificationResult
+{
+    public string UserName { get; set; } = string.Empty;
+    public List<VerifiedDocument> Documents { get; set; } = new();
+    public bool HasIncomeDocuments { get; set; }
+    public bool HasCreditReport { get; set; }
+    public bool HasEmploymentVerification { get; set; }
+    public bool HasPropertyAppraisal { get; set; }
+    public bool AllDocumentsVerified => Documents.All(d => d.IsVerified);
+}
+
+public class VerifiedDocument
+{
+    public string DocumentType { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public bool IsVerified { get; set; }
+    public DateTime UploadedAt { get; set; }
+    public DateTime? VerifiedAt { get; set; }
+}
+
+/// <summary>
+/// Financial verification result from the Ledger Service
+/// </summary>
+public class FinancialVerificationResult
+{
+    public string UserName { get; set; } = string.Empty;
+    public bool AccountExists { get; set; }
+    public decimal CurrentBalance { get; set; }
+    public decimal AverageMonthlyIncome { get; set; }
+    public List<TransactionSummary> RecentTransactions { get; set; } = new();
+    public bool HasSufficientFunds { get; set; }
+    public bool IncomeConsistent { get; set; }
+    public decimal DebtToIncomeRatio { get; set; }
+}
+
+public class TransactionSummary
+{
+    public DateTime Date { get; set; }
+    public decimal Amount { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Combined verification result for mortgage approval
+/// </summary>
+public class CrossServiceVerificationResult
+{
+    public DocumentVerificationResult DocumentVerification { get; set; } = new();
+    public FinancialVerificationResult FinancialVerification { get; set; } = new();
+    public bool AllVerificationsPassed { get; set; }
+    public List<string> FailureReasons { get; set; } = new();
+    public Dictionary<string, object> AdditionalData { get; set; } = new();
+    public List<ServiceError> ServiceErrors { get; set; } = new();
+}
+
+/// <summary>
+/// Service error information for detailed error reporting
+/// </summary>
+public class ServiceError
+{
+    public string ServiceName { get; set; } = string.Empty;
+    public string ErrorMessage { get; set; } = string.Empty;
+    public string? Details { get; set; }
+    public DateTime ErrorTime { get; set; } = DateTime.UtcNow;
+    public bool IsConnectivityError { get; set; }
+}
+
+// Service Interfaces
+// =================
+
+/// <summary>
+/// Interface for verifying documents through the Document Service
+/// </summary>
+public interface IDocumentVerificationService
+{
+    Task<DocumentVerificationResult> GetDocumentVerificationAsync(string userName);
+    Task<bool> HasRequiredDocumentsAsync(string userName);
+}
+
+/// <summary>
+/// Interface for verifying financial data through the Ledger Service
+/// </summary>
+public interface ILedgerVerificationService
+{
+    Task<FinancialVerificationResult> GetFinancialVerificationAsync(string userName);
+    Task<bool> HasSufficientFundsAsync(string userName, decimal requiredAmount);
+}
+
+/// <summary>
+/// Interface for cross-service verification coordination
+/// </summary>
+public interface ICrossServiceVerificationService
+{
+    Task<CrossServiceVerificationResult> VerifyMortgageRequirementsAsync(string userName, Dictionary<string, object> mortgageData);
+}
+
+// Service Implementations
+// ======================
+
+/// <summary>
+/// Service for communicating with the Document Service
+/// </summary>
+public class DocumentVerificationService : IDocumentVerificationService
+{
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<DocumentVerificationService> _logger;
+
+    public DocumentVerificationService(HttpClient httpClient, ILogger<DocumentVerificationService> logger)
+    {
+        _httpClient = httpClient;
+        _logger = logger;
+    }
+
+    public async Task<DocumentVerificationResult> GetDocumentVerificationAsync(string userName)
+    {
+        try
+        {
+            _logger.LogInformation("Requesting document verification for user {UserName}", userName);
+            _logger.LogInformation("Document service base address: {BaseAddress}", _httpClient.BaseAddress);
+            
+            var response = await _httpClient.GetAsync($"https+http://documentservice/documents/user/{userName}/verification");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var result = System.Text.Json.JsonSerializer.Deserialize<DocumentVerificationResult>(content, 
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                
+                _logger.LogInformation("Document verification completed for user {UserName}: {AllVerified}", 
+                    userName, result?.AllDocumentsVerified);
+                
+                return result ?? new DocumentVerificationResult { UserName = userName };
+            }
+            else
+            {
+                _logger.LogWarning("Document service returned {StatusCode} for user {UserName}", 
+                    response.StatusCode, userName);
+                return new DocumentVerificationResult { UserName = userName };
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP request error getting document verification for user {UserName}. BaseAddress: {BaseAddress}", 
+                userName, _httpClient.BaseAddress);
+            return new DocumentVerificationResult { UserName = userName };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting document verification for user {UserName}. BaseAddress: {BaseAddress}", 
+                userName, _httpClient.BaseAddress);
+            return new DocumentVerificationResult { UserName = userName };
+        }
+    }
+
+    public async Task<bool> HasRequiredDocumentsAsync(string userName)
+    {
+        var verification = await GetDocumentVerificationAsync(userName);
+        return verification.HasIncomeDocuments && 
+               verification.HasCreditReport && 
+               verification.HasEmploymentVerification && 
+               verification.HasPropertyAppraisal;
+    }
+}
+
+/// <summary>
+/// Service for communicating with the Ledger Service
+/// </summary>
+public class LedgerVerificationService : ILedgerVerificationService
+{
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<LedgerVerificationService> _logger;
+
+    public LedgerVerificationService(HttpClient httpClient, ILogger<LedgerVerificationService> logger)
+    {
+        _httpClient = httpClient;
+        _logger = logger;
+    }
+
+    public async Task<FinancialVerificationResult> GetFinancialVerificationAsync(string userName)
+    {
+        try
+        {
+            _logger.LogInformation("Requesting financial verification for user {UserName}", userName);
+            _logger.LogInformation("Ledger service base address: {BaseAddress}", _httpClient.BaseAddress);
+            
+            // Get account information
+            var accountResponse = await _httpClient.GetAsync($"https+http://ledgerservice/accounts/{userName}");
+            
+            if (accountResponse.IsSuccessStatusCode)
+            {
+                var accountContent = await accountResponse.Content.ReadAsStringAsync();
+                var accountData = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(accountContent,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new Dictionary<string, object>();
+                
+                var result = new FinancialVerificationResult
+                {
+                    UserName = userName,
+                    AccountExists = true,
+                    CurrentBalance = GetDecimalValue(accountData, "balance"),
+                    HasSufficientFunds = GetDecimalValue(accountData, "balance") >= 10000m, // Minimum for down payment
+                    IncomeConsistent = true // Simplified logic for now
+                };
+                
+                _logger.LogInformation("Financial verification completed for user {UserName}: Balance {Balance}", 
+                    userName, result.CurrentBalance);
+                
+                return result;
+            }
+            else
+            {
+                _logger.LogWarning("Ledger service returned {StatusCode} for user {UserName}", 
+                    accountResponse.StatusCode, userName);
+                return new FinancialVerificationResult { UserName = userName };
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP request error getting financial verification for user {UserName}. BaseAddress: {BaseAddress}", 
+                userName, _httpClient.BaseAddress);
+            return new FinancialVerificationResult { UserName = userName };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting financial verification for user {UserName}. BaseAddress: {BaseAddress}", 
+                userName, _httpClient.BaseAddress);
+            return new FinancialVerificationResult { UserName = userName };
+        }
+    }
+
+    public async Task<bool> HasSufficientFundsAsync(string userName, decimal requiredAmount)
+    {
+        var verification = await GetFinancialVerificationAsync(userName);
+        return verification.CurrentBalance >= requiredAmount;
+    }
+
+    private decimal GetDecimalValue(Dictionary<string, object> data, string key)
+    {
+        if (data.TryGetValue(key, out var value) && decimal.TryParse(value?.ToString(), out var result))
+            return result;
+        return 0;
+    }
+}
+
+/// <summary>
+/// Service for coordinating cross-service verification
+/// </summary>
+public class CrossServiceVerificationService : ICrossServiceVerificationService
+{
+    private readonly IDocumentVerificationService _documentService;
+    private readonly ILedgerVerificationService _ledgerService;
+    private readonly ILogger<CrossServiceVerificationService> _logger;
+
+    public CrossServiceVerificationService(
+        IDocumentVerificationService documentService,
+        ILedgerVerificationService ledgerService,
+        ILogger<CrossServiceVerificationService> logger)
+    {
+        _documentService = documentService;
+        _ledgerService = ledgerService;
+        _logger = logger;
+    }
+
+    public async Task<CrossServiceVerificationResult> VerifyMortgageRequirementsAsync(string userName, Dictionary<string, object> mortgageData)
+    {
+        _logger.LogInformation("Starting cross-service verification for user {UserName}", userName);
+        
+        var result = new CrossServiceVerificationResult();
+        var failureReasons = new List<string>();
+        var serviceErrors = new List<ServiceError>();
+
+        try
+        {
+            // Get document verification
+            try
+            {
+                result.DocumentVerification = await _documentService.GetDocumentVerificationAsync(userName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during document verification for user {UserName}", userName);
+                serviceErrors.Add(new ServiceError
+                {
+                    ServiceName = "DocumentService",
+                    ErrorMessage = "Document verification service unavailable",
+                    Details = ex.Message,
+                    IsConnectivityError = ex is HttpRequestException
+                });
+                failureReasons.Add("Document service unavailable");
+            }
+            
+            // Get financial verification
+            try
+            {
+                result.FinancialVerification = await _ledgerService.GetFinancialVerificationAsync(userName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during financial verification for user {UserName}", userName);
+                serviceErrors.Add(new ServiceError
+                {
+                    ServiceName = "LedgerService",
+                    ErrorMessage = "Financial verification service unavailable",
+                    Details = ex.Message,
+                    IsConnectivityError = ex is HttpRequestException
+                });
+                failureReasons.Add("Financial service unavailable");
+            }
+
+            // Check document requirements
+            if (!result.DocumentVerification.AllDocumentsVerified)
+            {
+                failureReasons.Add("Document verification incomplete");
+            }
+
+            // Check financial requirements
+            if (!result.FinancialVerification.AccountExists)
+            {
+                failureReasons.Add("No financial account found");
+            }
+
+            // Cross-validate mortgage data with external services
+            var loanAmount = GetDecimalValue(mortgageData, MortgageDataFields.Property.LoanAmount) ?? 
+                           GetDecimalValue(mortgageData, MortgageDataFields.Legacy.LoanAmount);
+            
+            if (loanAmount.HasValue)
+            {
+                var requiredDownPayment = loanAmount.Value * 0.20m; // 20% down payment
+                if (result.FinancialVerification.CurrentBalance < requiredDownPayment)
+                {
+                    failureReasons.Add($"Insufficient funds for down payment. Required: {requiredDownPayment:C}, Available: {result.FinancialVerification.CurrentBalance:C}");
+                }
+            }
+
+            // Store additional cross-service data
+            result.AdditionalData["document_verification_date"] = DateTime.UtcNow;
+            result.AdditionalData["financial_verification_date"] = DateTime.UtcNow;
+            result.AdditionalData["cross_service_verification"] = true;
+            result.AdditionalData["service_errors_count"] = serviceErrors.Count;
+
+            result.FailureReasons = failureReasons;
+            result.ServiceErrors = serviceErrors;
+            result.AllVerificationsPassed = failureReasons.Count == 0;
+
+            _logger.LogInformation("Cross-service verification completed for user {UserName}: {Passed}, Errors: {ErrorCount}", 
+                userName, result.AllVerificationsPassed, serviceErrors.Count);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during cross-service verification for user {UserName}", userName);
+            result.FailureReasons.Add("Cross-service verification failed due to technical error");
+            result.ServiceErrors.Add(new ServiceError
+            {
+                ServiceName = "CrossServiceVerification",
+                ErrorMessage = "Cross-service verification system error",
+                Details = ex.Message,
+                IsConnectivityError = false
+            });
+            result.AllVerificationsPassed = false;
+            return result;
+        }
+    }
+
+    private decimal? GetDecimalValue(Dictionary<string, object> data, string key)
+    {
+        if (data.TryGetValue(key, out var value) && decimal.TryParse(value?.ToString(), out var result))
+            return result;
+        return null;
+    }
+}
+
 // Configuration options
 public class MortgageStorageOptions
 {
@@ -503,11 +1017,16 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
 {
     private readonly MortgageDbContext _context;
     private readonly ILogger<MortgageApprovalServiceImpl> _logger;
+    private readonly ICrossServiceVerificationService _crossServiceVerification;
 
-    public MortgageApprovalServiceImpl(MortgageDbContext context, ILogger<MortgageApprovalServiceImpl> logger)
+    public MortgageApprovalServiceImpl(
+        MortgageDbContext context, 
+        ILogger<MortgageApprovalServiceImpl> logger,
+        ICrossServiceVerificationService crossServiceVerification)
     {
         _context = context;
         _logger = logger;
+        _crossServiceVerification = crossServiceVerification;
     }
 
     public async Task<MortgageRequest> CreateMortgageRequestAsync(string userName)
@@ -565,8 +1084,8 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         mortgageRequest.RequestData = currentData;
         mortgageRequest.UpdatedAt = DateTime.UtcNow;
 
-        // Evaluate status based on the updated data
-        EvaluateRequestStatus(mortgageRequest);
+        // Evaluate status based on the updated data (includes cross-service verification)
+        await EvaluateRequestStatusAsync(mortgageRequest);
 
         await _context.SaveChangesAsync();
 
@@ -605,10 +1124,10 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
     }
 
     /// <summary>
-    /// Evaluates the mortgage request status based on available data
+    /// Evaluates the mortgage request status based on available data and cross-service verification
     /// </summary>
     /// <param name="request">The mortgage request to evaluate</param>
-    private void EvaluateRequestStatus(MortgageRequest request)
+    private async Task EvaluateRequestStatusAsync(MortgageRequest request)
     {
         var data = request.RequestData;
         var missingRequirements = new List<string>();
@@ -639,41 +1158,77 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
 
         if (missingRequirements.Count == 0)
         {
-            // All basic requirements met - perform approval logic
-            var income = GetValueAsDecimal(data, MortgageDataFields.Income.Annual) ?? 
-                        GetValueAsDecimal(data, MortgageDataFields.Legacy.AnnualIncome);
-            var creditScore = GetValueAsInt(data, MortgageDataFields.Credit.Score);
-            var loanAmount = GetValueAsDecimal(data, MortgageDataFields.Property.LoanAmount) ?? 
-                           GetValueAsDecimal(data, MortgageDataFields.Legacy.LoanAmount);
-
-            if (income > 0 && creditScore > 0 && loanAmount > 0)
+            // All basic requirements met - perform cross-service verification
+            try
             {
-                // Calculate debt-to-income ratio (monthly loan payment vs monthly income)
-                var monthlyIncome = income / 12;
-                // Assume 30-year mortgage at 7% interest for payment calculation
-                var monthlyPayment = CalculateMonthlyMortgagePayment(loanAmount.Value, 0.07m, 30);
-                var debtToIncomeRatio = monthlyPayment / monthlyIncome;
+                var crossServiceResult = await _crossServiceVerification.VerifyMortgageRequirementsAsync(request.UserName, data);
                 
-                if (creditScore >= 650 && debtToIncomeRatio <= 0.43m)
+                // Merge cross-service data into mortgage request
+                foreach (var kvp in crossServiceResult.AdditionalData)
                 {
-                    request.Status = MortgageRequestStatus.Approved;
-                    request.StatusReason = $"Application approved - Credit score: {creditScore}, DTI ratio: {debtToIncomeRatio:P2}";
+                    data[kvp.Key] = kvp.Value;
+                }
+                request.RequestData = data;
+
+                if (!crossServiceResult.AllVerificationsPassed)
+                {
+                    request.Status = MortgageRequestStatus.Rejected;
+                    request.StatusReason = $"Cross-service verification failed: {string.Join(", ", crossServiceResult.FailureReasons)}";
                     request.MissingRequirements = string.Empty;
+                    return;
+                }
+
+                // Perform financial approval logic
+                var income = GetValueAsDecimal(data, MortgageDataFields.Income.Annual) ?? 
+                            GetValueAsDecimal(data, MortgageDataFields.Legacy.AnnualIncome);
+                var creditScore = GetValueAsInt(data, MortgageDataFields.Credit.Score);
+                var loanAmount = GetValueAsDecimal(data, MortgageDataFields.Property.LoanAmount) ?? 
+                               GetValueAsDecimal(data, MortgageDataFields.Legacy.LoanAmount);
+
+                if (income > 0 && creditScore > 0 && loanAmount > 0)
+                {
+                    // Calculate debt-to-income ratio (monthly loan payment vs monthly income)
+                    var monthlyIncome = income / 12;
+                    // Assume 30-year mortgage at 7% interest for payment calculation
+                    var monthlyPayment = CalculateMonthlyMortgagePayment(loanAmount.Value, 0.07m, 30);
+                    var debtToIncomeRatio = monthlyPayment / monthlyIncome;
+                    
+                    // Enhanced approval criteria including cross-service verification
+                    bool creditScoreOk = creditScore >= 650;
+                    bool dtiOk = debtToIncomeRatio <= 0.43m;
+                    bool documentsOk = crossServiceResult.DocumentVerification.AllDocumentsVerified;
+                    bool financialsOk = crossServiceResult.FinancialVerification.HasSufficientFunds;
+                    
+                    if (creditScoreOk && dtiOk && documentsOk && financialsOk)
+                    {
+                        request.Status = MortgageRequestStatus.Approved;
+                        request.StatusReason = $"Application approved - Credit: {creditScore}, DTI: {debtToIncomeRatio:P2}, Documents: Verified, Funds: Sufficient";
+                        request.MissingRequirements = string.Empty;
+                    }
+                    else
+                    {
+                        request.Status = MortgageRequestStatus.Rejected;
+                        var reasons = new List<string>();
+                        if (!creditScoreOk) reasons.Add($"Credit score too low ({creditScore} < 650)");
+                        if (!dtiOk) reasons.Add($"Debt-to-income ratio too high ({debtToIncomeRatio:P2} > 43%)");
+                        if (!documentsOk) reasons.Add("Document verification incomplete");
+                        if (!financialsOk) reasons.Add("Insufficient funds for down payment");
+                        request.StatusReason = $"Application rejected: {string.Join(", ", reasons)}";
+                        request.MissingRequirements = string.Empty;
+                    }
                 }
                 else
                 {
-                    request.Status = MortgageRequestStatus.Rejected;
-                    var reasons = new List<string>();
-                    if (creditScore < 650) reasons.Add($"Credit score too low ({creditScore} < 650)");
-                    if (debtToIncomeRatio > 0.43m) reasons.Add($"Debt-to-income ratio too high ({debtToIncomeRatio:P2} > 43%)");
-                    request.StatusReason = $"Application rejected: {string.Join(", ", reasons)}";
+                    request.Status = MortgageRequestStatus.UnderReview;
+                    request.StatusReason = "Cross-service verification passed - under manual review for missing financial data";
                     request.MissingRequirements = string.Empty;
                 }
             }
-            else
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error during cross-service verification for request {RequestId}", request.Id);
                 request.Status = MortgageRequestStatus.UnderReview;
-                request.StatusReason = "All documents received - under manual review for missing financial data";
+                request.StatusReason = "Cross-service verification unavailable - under manual review";
                 request.MissingRequirements = string.Empty;
             }
         }

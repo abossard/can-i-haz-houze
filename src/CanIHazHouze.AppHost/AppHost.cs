@@ -7,7 +7,11 @@ var ledgerService = builder.AddProject<Projects.CanIHazHouze_LedgerService>("led
     .WithHttpHealthCheck("/health");
 
 var mortgageService = builder.AddProject<Projects.CanIHazHouze_MortgageApprover>("mortgageapprover")
-    .WithHttpHealthCheck("/health");
+    .WithHttpHealthCheck("/health")
+    .WithReference(documentService)     // ← Added this
+    .WithReference(ledgerService)       // ← Added this
+    .WaitFor(documentService)           // ← Added this
+    .WaitFor(ledgerService);            // ← Added this
 
 builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")
     .WithExternalHttpEndpoints()
