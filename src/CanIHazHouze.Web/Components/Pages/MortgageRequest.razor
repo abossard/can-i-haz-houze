@@ -92,45 +92,148 @@ else
             
             <hr />
             
-            <h5>Add Sample Data</h5>
-            <div class="row">
-                <div class="col-md-3">
-                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("income_verification", "verified"))" disabled="@isProcessing">
-                        Add Income Verification
-                    </button>
+            <h5>Add Mortgage Requirements</h5>
+            <p class="text-muted">Complete the forms below to provide the required mortgage application data. Each section contains structured fields for specific requirement types.</p>
+            
+            <!-- Income Verification -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">📊 Income Verification</h6>
                 </div>
-                <div class="col-md-3">
-                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("credit_report", "obtained"))" disabled="@isProcessing">
-                        Add Credit Report
-                    </button>
-                </div>
-                <div class="col-md-3">
-                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("credit_score", 720))" disabled="@isProcessing">
-                        Add Credit Score (720)
-                    </button>
-                </div>
-                <div class="col-md-3">
-                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("annual_income", 75000))" disabled="@isProcessing">
-                        Add Annual Income ($75,000)
-                    </button>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label class="form-label">Annual Income ($)</label>
+                            <input type="number" class="form-control" @bind="incomeForm.AnnualIncome" placeholder="75000" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Employment Type</label>
+                            <select class="form-control" @bind="incomeForm.EmploymentType">
+                                <option value="">Select...</option>
+                                <option value="full-time">Full-time</option>
+                                <option value="part-time">Part-time</option>
+                                <option value="contract">Contract</option>
+                                <option value="self-employed">Self-employed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Years Employed</label>
+                            <input type="number" class="form-control" @bind="incomeForm.YearsEmployed" placeholder="3" min="0" step="0.5" />
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <button class="btn btn-primary btn-sm" @onclick="SubmitIncomeVerification" disabled="@isProcessing">
+                            Submit Income Verification
+                        </button>
+                    </div>
                 </div>
             </div>
-            
-            <div class="row mt-2">
-                <div class="col-md-4">
-                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("employment_verification", "verified"))" disabled="@isProcessing">
-                        Add Employment Verification
-                    </button>
+
+            <!-- Credit Report -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">💳 Credit Report</h6>
                 </div>
-                <div class="col-md-4">
-                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("property_appraisal", "completed"))" disabled="@isProcessing">
-                        Add Property Appraisal
-                    </button>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label class="form-label">Credit Score</label>
+                            <input type="number" class="form-control" @bind="creditForm.CreditScore" placeholder="720" min="300" max="850" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Report Date</label>
+                            <input type="date" class="form-control" @bind="creditForm.ReportDate" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Outstanding Debts ($)</label>
+                            <input type="number" class="form-control" @bind="creditForm.OutstandingDebts" placeholder="15000" min="0" />
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <button class="btn btn-primary btn-sm" @onclick="SubmitCreditReport" disabled="@isProcessing">
+                            Submit Credit Report
+                        </button>
+                    </div>
                 </div>
-                <div class="col-md-4">
-                    <button class="btn btn-outline-primary btn-sm" @onclick="@(() => AddSampleData("loan_amount", 250000))" disabled="@isProcessing">
-                        Add Loan Amount ($250,000)
-                    </button>
+            </div>
+
+            <!-- Employment Verification -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">🏢 Employment Verification</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Employer Name</label>
+                            <input type="text" class="form-control" @bind="employmentForm.EmployerName" placeholder="ABC Corporation" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Job Title</label>
+                            <input type="text" class="form-control" @bind="employmentForm.JobTitle" placeholder="Software Developer" />
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Monthly Salary ($)</label>
+                            <input type="number" class="form-control" @bind="employmentForm.MonthlySalary" placeholder="6250" min="0" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <input type="checkbox" @bind="employmentForm.IsVerified" /> Employment Verified
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <button class="btn btn-primary btn-sm" @onclick="SubmitEmploymentVerification" disabled="@isProcessing">
+                            Submit Employment Verification
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Property Appraisal -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">🏠 Property Appraisal</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label class="form-label">Property Value ($)</label>
+                            <input type="number" class="form-control" @bind="propertyForm.PropertyValue" placeholder="325000" min="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Loan Amount ($)</label>
+                            <input type="number" class="form-control" @bind="propertyForm.LoanAmount" placeholder="250000" min="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Property Type</label>
+                            <select class="form-control" @bind="propertyForm.PropertyType">
+                                <option value="">Select...</option>
+                                <option value="single-family">Single Family</option>
+                                <option value="condo">Condominium</option>
+                                <option value="townhouse">Townhouse</option>
+                                <option value="multi-family">Multi-family</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-md-6">
+                            <label class="form-label">Appraisal Date</label>
+                            <input type="date" class="form-control" @bind="propertyForm.AppraisalDate" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <input type="checkbox" @bind="propertyForm.AppraisalCompleted" /> Appraisal Completed
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <button class="btn btn-primary btn-sm" @onclick="SubmitPropertyAppraisal" disabled="@isProcessing">
+                            Submit Property Appraisal
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -206,14 +309,224 @@ else
     private string successMessage = string.Empty;
     private bool isProcessing = false;
 
+    // Form models for structured input
+    private readonly IncomeForm incomeForm = new();
+    private readonly CreditForm creditForm = new();
+    private readonly EmploymentForm employmentForm = new();
+    private readonly PropertyForm propertyForm = new();
+
     public class NewRequestModel
     {
         public string UserName { get; set; } = string.Empty;
     }
 
+    public class IncomeForm
+    {
+        public decimal? AnnualIncome { get; set; }
+        public string EmploymentType { get; set; } = string.Empty;
+        public decimal? YearsEmployed { get; set; }
+    }
+
+    public class CreditForm
+    {
+        public int? CreditScore { get; set; }
+        public DateTime? ReportDate { get; set; }
+        public decimal? OutstandingDebts { get; set; }
+    }
+
+    public class EmploymentForm
+    {
+        public string EmployerName { get; set; } = string.Empty;
+        public string JobTitle { get; set; } = string.Empty;
+        public decimal? MonthlySalary { get; set; }
+        public bool IsVerified { get; set; }
+    }
+
+    public class PropertyForm
+    {
+        public decimal? PropertyValue { get; set; }
+        public decimal? LoanAmount { get; set; }
+        public string PropertyType { get; set; } = string.Empty;
+        public DateTime? AppraisalDate { get; set; }
+        public bool AppraisalCompleted { get; set; }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         await LoadAllRequests();
+    }
+
+    private async Task SubmitIncomeVerification()
+    {
+        if (existingRequest == null) return;
+
+        if (!incomeForm.AnnualIncome.HasValue || incomeForm.AnnualIncome <= 0)
+        {
+            errorMessage = "Please enter a valid annual income greater than $0.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(incomeForm.EmploymentType))
+        {
+            errorMessage = "Please select an employment type.";
+            return;
+        }
+
+        var data = new Dictionary<string, object>
+        {
+            ["income_annual"] = incomeForm.AnnualIncome.Value,
+            ["income_employment_type"] = incomeForm.EmploymentType,
+            ["income_years_employed"] = incomeForm.YearsEmployed ?? 0
+        };
+
+        await SubmitFormData(data, "Income Verification");
+        
+        // Clear form on success
+        if (string.IsNullOrEmpty(errorMessage))
+        {
+            incomeForm.AnnualIncome = null;
+            incomeForm.EmploymentType = string.Empty;
+            incomeForm.YearsEmployed = null;
+        }
+    }
+
+    private async Task SubmitCreditReport()
+    {
+        if (existingRequest == null) return;
+
+        if (!creditForm.CreditScore.HasValue || creditForm.CreditScore < 300 || creditForm.CreditScore > 850)
+        {
+            errorMessage = "Please enter a valid credit score (300-850).";
+            return;
+        }
+
+        var data = new Dictionary<string, object>
+        {
+            ["credit_score"] = creditForm.CreditScore.Value,
+            ["credit_report_date"] = creditForm.ReportDate?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"),
+            ["credit_outstanding_debts"] = creditForm.OutstandingDebts ?? 0
+        };
+
+        await SubmitFormData(data, "Credit Report");
+        
+        // Clear form on success
+        if (string.IsNullOrEmpty(errorMessage))
+        {
+            creditForm.CreditScore = null;
+            creditForm.ReportDate = null;
+            creditForm.OutstandingDebts = null;
+        }
+    }
+
+    private async Task SubmitEmploymentVerification()
+    {
+        if (existingRequest == null) return;
+
+        if (string.IsNullOrWhiteSpace(employmentForm.EmployerName) || string.IsNullOrWhiteSpace(employmentForm.JobTitle))
+        {
+            errorMessage = "Please enter employer name and job title.";
+            return;
+        }
+
+        var data = new Dictionary<string, object>
+        {
+            ["employment_employer"] = employmentForm.EmployerName,
+            ["employment_job_title"] = employmentForm.JobTitle,
+            ["employment_monthly_salary"] = employmentForm.MonthlySalary ?? 0,
+            ["employment_verified"] = employmentForm.IsVerified
+        };
+
+        await SubmitFormData(data, "Employment Verification");
+        
+        // Clear form on success
+        if (string.IsNullOrEmpty(errorMessage))
+        {
+            employmentForm.EmployerName = string.Empty;
+            employmentForm.JobTitle = string.Empty;
+            employmentForm.MonthlySalary = null;
+            employmentForm.IsVerified = false;
+        }
+    }
+
+    private async Task SubmitPropertyAppraisal()
+    {
+        if (existingRequest == null) return;
+
+        if (!propertyForm.PropertyValue.HasValue || propertyForm.PropertyValue <= 0)
+        {
+            errorMessage = "Please enter a valid property value greater than $0.";
+            return;
+        }
+
+        if (!propertyForm.LoanAmount.HasValue || propertyForm.LoanAmount <= 0)
+        {
+            errorMessage = "Please enter a valid loan amount greater than $0.";
+            return;
+        }
+
+        if (propertyForm.LoanAmount > propertyForm.PropertyValue)
+        {
+            errorMessage = "Loan amount cannot exceed property value.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(propertyForm.PropertyType))
+        {
+            errorMessage = "Please select a property type.";
+            return;
+        }
+
+        var data = new Dictionary<string, object>
+        {
+            ["property_value"] = propertyForm.PropertyValue.Value,
+            ["property_loan_amount"] = propertyForm.LoanAmount.Value,
+            ["property_type"] = propertyForm.PropertyType,
+            ["property_appraisal_date"] = propertyForm.AppraisalDate?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"),
+            ["property_appraisal_completed"] = propertyForm.AppraisalCompleted
+        };
+
+        await SubmitFormData(data, "Property Appraisal");
+        
+        // Clear form on success
+        if (string.IsNullOrEmpty(errorMessage))
+        {
+            propertyForm.PropertyValue = null;
+            propertyForm.LoanAmount = null;
+            propertyForm.PropertyType = string.Empty;
+            propertyForm.AppraisalDate = null;
+            propertyForm.AppraisalCompleted = false;
+        }
+    }
+
+    private async Task SubmitFormData(Dictionary<string, object> data, string formType)
+    {
+        if (existingRequest == null) return;
+
+        isProcessing = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var result = await MortgageApi.UpdateMortgageDataAsync(existingRequest.Id, data);
+            if (result != null)
+            {
+                existingRequest = result;
+                successMessage = $"{formType} submitted successfully. Status may have changed.";
+            }
+            else
+            {
+                errorMessage = $"Failed to submit {formType}.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error submitting {FormType}", formType);
+            errorMessage = $"An error occurred while submitting {formType}.";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
     }
 
     private async Task CreateRequest()

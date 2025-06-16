@@ -20,12 +20,44 @@ The MortgageApprover service is a new microservice added to the CanIHazHouze app
 - **Rejected**: Criteria not met, request rejected
 
 ### Built-in Evaluation Logic
-The service includes basic evaluation logic that assesses:
-- Income verification
-- Credit score (minimum 650)
-- Employment verification  
-- Property appraisal
-- Debt-to-income ratio (maximum 43%)
+The service includes comprehensive evaluation logic that assesses:
+
+#### Required Data Categories
+1. **Income Verification** - Annual income, employment type, years employed
+2. **Credit Report** - Credit score, report date, outstanding debts  
+3. **Employment Verification** - Employer details, job title, salary, verification status
+4. **Property Appraisal** - Property value, loan amount, property type, appraisal completion
+
+#### Approval Criteria
+- **Credit Score**: Minimum 650 required
+- **Debt-to-Income Ratio**: Maximum 43% (calculated using 30-year mortgage at 7% interest)
+- **Data Completeness**: All four requirement categories must have data present
+
+#### Structured Data Fields
+The service supports the following structured data fields:
+
+**Income Fields:**
+- `income_annual` (decimal) - Annual income in dollars
+- `income_employment_type` (string) - full-time, part-time, contract, self-employed
+- `income_years_employed` (decimal) - Years of employment (supports decimals)
+
+**Credit Fields:**
+- `credit_score` (int) - Credit score (300-850 range)
+- `credit_report_date` (string) - ISO date format
+- `credit_outstanding_debts` (decimal) - Outstanding debts in dollars
+
+**Employment Fields:**
+- `employment_employer` (string) - Employer name
+- `employment_job_title` (string) - Job title
+- `employment_monthly_salary` (decimal) - Monthly salary in dollars
+- `employment_verified` (bool) - Verification status
+
+**Property Fields:**
+- `property_value` (decimal) - Appraised property value in dollars
+- `property_loan_amount` (decimal) - Requested loan amount
+- `property_type` (string) - single-family, condo, townhouse, multi-family
+- `property_appraisal_date` (string) - ISO date format
+- `property_appraisal_completed` (bool) - Appraisal completion status
 
 ## Architecture
 
@@ -88,6 +120,105 @@ Uses .NET Aspire service discovery with the name `mortgageapprover`
 - Ports: HTTP 5295, HTTPS 7295
 - Environment: Development configuration with detailed logging
 
+## Typed Data Models
+
+The service provides strongly typed DTOs for validation and documentation:
+
+### MortgageIncomeDataDto
+```csharp
+public class MortgageIncomeDataDto
+{
+    [Range(0, double.MaxValue)]
+    public decimal AnnualIncome { get; set; }
+    
+    [RegularExpression("^(full-time|part-time|contract|self-employed)$")]
+    public string EmploymentType { get; set; }
+    
+    [Range(0, 50)]
+    public decimal YearsEmployed { get; set; }
+}
+```
+
+### MortgageCreditDataDto
+```csharp
+public class MortgageCreditDataDto
+{
+    [Range(300, 850)]
+    public int CreditScore { get; set; }
+    
+    public DateTime ReportDate { get; set; }
+    
+    [Range(0, double.MaxValue)]
+    public decimal OutstandingDebts { get; set; }
+}
+```
+
+### MortgageEmploymentDataDto
+```csharp
+public class MortgageEmploymentDataDto
+{
+    [StringLength(200)]
+    public string EmployerName { get; set; }
+    
+    [StringLength(200)]
+    public string JobTitle { get; set; }
+    
+    [Range(0, double.MaxValue)]
+    public decimal MonthlySalary { get; set; }
+    
+    public bool IsVerified { get; set; }
+}
+```
+
+### MortgagePropertyDataDto
+```csharp
+public class MortgagePropertyDataDto
+{
+    [Range(0, double.MaxValue)]
+    public decimal PropertyValue { get; set; }
+    
+    [Range(0, double.MaxValue)]
+    public decimal LoanAmount { get; set; }
+    
+    [RegularExpression("^(single-family|condo|townhouse|multi-family)$")]
+    public string PropertyType { get; set; }
+    
+    public DateTime AppraisalDate { get; set; }
+    
+    public bool AppraisalCompleted { get; set; }
+}
+```
+
+## Field Reference
+
+### MortgageDataFields Class
+The service provides a constants class for field key management:
+
+```csharp
+// Income fields
+MortgageDataFields.Income.Annual = "income_annual"
+MortgageDataFields.Income.EmploymentType = "income_employment_type"
+MortgageDataFields.Income.YearsEmployed = "income_years_employed"
+
+// Credit fields  
+MortgageDataFields.Credit.Score = "credit_score"
+MortgageDataFields.Credit.ReportDate = "credit_report_date"
+MortgageDataFields.Credit.OutstandingDebts = "credit_outstanding_debts"
+
+// Employment fields
+MortgageDataFields.Employment.Employer = "employment_employer"
+MortgageDataFields.Employment.JobTitle = "employment_job_title"
+MortgageDataFields.Employment.MonthlySalary = "employment_monthly_salary"
+MortgageDataFields.Employment.Verified = "employment_verified"
+
+// Property fields
+MortgageDataFields.Property.Value = "property_value"
+MortgageDataFields.Property.LoanAmount = "property_loan_amount"
+MortgageDataFields.Property.Type = "property_type"
+MortgageDataFields.Property.AppraisalDate = "property_appraisal_date"
+MortgageDataFields.Property.AppraisalCompleted = "property_appraisal_completed"
+```
+
 ## Usage Examples
 
 ### Creating a Request
@@ -100,19 +231,28 @@ Content-Type: application/json
 }
 ```
 
-### Adding Data
+### Adding Structured Data
 ```http
 PUT /mortgage-requests/{id}/data
 Content-Type: application/json
 
 {
   "data": {
-    "income_verification": "verified",
-    "annual_income": 75000,
+    "income_annual": 75000,
+    "income_employment_type": "full-time",
+    "income_years_employed": 3.5,
     "credit_score": 720,
-    "employment_verification": "verified",
-    "property_appraisal": "completed",
-    "loan_amount": 250000
+    "credit_report_date": "2024-01-15",
+    "credit_outstanding_debts": 15000,
+    "employment_employer": "ABC Corporation",
+    "employment_job_title": "Software Developer",
+    "employment_monthly_salary": 6250,
+    "employment_verified": true,
+    "property_value": 325000,
+    "property_loan_amount": 250000,
+    "property_type": "single-family",
+    "property_appraisal_date": "2024-01-10",
+    "property_appraisal_completed": true
   }
 }
 ```

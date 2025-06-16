@@ -3,6 +3,60 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
+/*
+ * CanIHazHouze Mortgage Approver Service
+ * 
+ * This service manages mortgage applications with structured data collection and automated approval logic.
+ * 
+ * Data Structure Overview:
+ * ======================
+ * 
+ * Mortgage requests store additional data in a flexible JSON structure (RequestData property).
+ * The following data fields are recognized and used in the approval evaluation:
+ * 
+ * Income Verification Fields:
+ * - income_annual: Annual income in dollars (decimal)
+ * - income_employment_type: Employment type (string: full-time, part-time, contract, self-employed)
+ * - income_years_employed: Years of employment (decimal, supports partial years)
+ * 
+ * Credit Report Fields:
+ * - credit_score: Credit score (int, range 300-850)
+ * - credit_report_date: Date of credit report (string, ISO format)
+ * - credit_outstanding_debts: Outstanding debts in dollars (decimal)
+ * 
+ * Employment Verification Fields:
+ * - employment_employer: Name of current employer (string)
+ * - employment_job_title: Current job title (string)
+ * - employment_monthly_salary: Monthly salary in dollars (decimal)
+ * - employment_verified: Whether employment has been verified (bool)
+ * 
+ * Property Appraisal Fields:
+ * - property_value: Appraised property value in dollars (decimal)
+ * - property_loan_amount: Requested loan amount in dollars (decimal)
+ * - property_type: Type of property (string: single-family, condo, townhouse, multi-family)
+ * - property_appraisal_date: Date of property appraisal (string, ISO format)
+ * - property_appraisal_completed: Whether appraisal has been completed (bool)
+ * 
+ * Approval Logic:
+ * ==============
+ * 
+ * 1. All four requirement categories must have data present
+ * 2. Credit score must be >= 650
+ * 3. Debt-to-income ratio (monthly payment / monthly income) must be <= 43%
+ * 4. Monthly payment is calculated using standard 30-year mortgage at 7% interest
+ * 
+ * Status Flow:
+ * ===========
+ * 
+ * Pending -> RequiresAdditionalInfo -> UnderReview -> Approved/Rejected
+ * 
+ * - Pending: Initial state when request is created
+ * - RequiresAdditionalInfo: Missing one or more requirement categories
+ * - UnderReview: All requirements present but insufficient financial data for auto-approval
+ * - Approved: Meets all automated approval criteria
+ * - Rejected: Fails automated approval criteria (low credit score or high DTI ratio)
+ */
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
@@ -196,6 +250,186 @@ app.Run();
 public record CreateMortgageRequestDto(string UserName);
 public record UpdateMortgageDataDto(Dictionary<string, object> Data);
 
+/// <summary>
+/// Typed data models for mortgage requirement fields
+/// These models represent the structured data that can be stored in a mortgage request
+/// </summary>
+public static class MortgageDataFields
+{
+    /// <summary>
+    /// Income verification related data fields
+    /// </summary>
+    public static class Income
+    {
+        /// <summary>Key: income_annual - Annual income in dollars (decimal)</summary>
+        public const string Annual = "income_annual";
+        
+        /// <summary>Key: income_employment_type - Type of employment (string: full-time, part-time, contract, self-employed)</summary>
+        public const string EmploymentType = "income_employment_type";
+        
+        /// <summary>Key: income_years_employed - Years of employment (decimal, supports half years)</summary>
+        public const string YearsEmployed = "income_years_employed";
+    }
+
+    /// <summary>
+    /// Credit report related data fields
+    /// </summary>
+    public static class Credit
+    {
+        /// <summary>Key: credit_score - Credit score (int, range 300-850)</summary>
+        public const string Score = "credit_score";
+        
+        /// <summary>Key: credit_report_date - Date of credit report (string, ISO date format)</summary>
+        public const string ReportDate = "credit_report_date";
+        
+        /// <summary>Key: credit_outstanding_debts - Outstanding debts in dollars (decimal)</summary>
+        public const string OutstandingDebts = "credit_outstanding_debts";
+    }
+
+    /// <summary>
+    /// Employment verification related data fields
+    /// </summary>
+    public static class Employment
+    {
+        /// <summary>Key: employment_employer - Name of current employer (string)</summary>
+        public const string Employer = "employment_employer";
+        
+        /// <summary>Key: employment_job_title - Current job title (string)</summary>
+        public const string JobTitle = "employment_job_title";
+        
+        /// <summary>Key: employment_monthly_salary - Monthly salary in dollars (decimal)</summary>
+        public const string MonthlySalary = "employment_monthly_salary";
+        
+        /// <summary>Key: employment_verified - Whether employment has been verified (bool)</summary>
+        public const string Verified = "employment_verified";
+    }
+
+    /// <summary>
+    /// Property appraisal related data fields
+    /// </summary>
+    public static class Property
+    {
+        /// <summary>Key: property_value - Appraised property value in dollars (decimal)</summary>
+        public const string Value = "property_value";
+        
+        /// <summary>Key: property_loan_amount - Requested loan amount in dollars (decimal)</summary>
+        public const string LoanAmount = "property_loan_amount";
+        
+        /// <summary>Key: property_type - Type of property (string: single-family, condo, townhouse, multi-family)</summary>
+        public const string Type = "property_type";
+        
+        /// <summary>Key: property_appraisal_date - Date of property appraisal (string, ISO date format)</summary>
+        public const string AppraisalDate = "property_appraisal_date";
+        
+        /// <summary>Key: property_appraisal_completed - Whether appraisal has been completed (bool)</summary>
+        public const string AppraisalCompleted = "property_appraisal_completed";
+    }
+
+    /// <summary>
+    /// Legacy field keys for backward compatibility
+    /// </summary>
+    public static class Legacy
+    {
+        /// <summary>Legacy key for income verification flag</summary>
+        public const string IncomeVerification = "income_verification";
+        
+        /// <summary>Legacy key for credit report flag</summary>
+        public const string CreditReport = "credit_report";
+        
+        /// <summary>Legacy key for property appraisal flag</summary>
+        public const string PropertyAppraisal = "property_appraisal";
+        
+        /// <summary>Legacy key for employment verification flag</summary>
+        public const string EmploymentVerification = "employment_verification";
+        
+        /// <summary>Legacy key for annual income</summary>
+        public const string AnnualIncome = "annual_income";
+        
+        /// <summary>Legacy key for loan amount</summary>
+        public const string LoanAmount = "loan_amount";
+    }
+}
+
+/// <summary>
+/// Strongly typed data transfer objects for mortgage requirement data
+/// These DTOs can be used for validation and documentation purposes
+/// </summary>
+public class MortgageIncomeDataDto
+{
+    /// <summary>Annual income in dollars</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Annual income must be positive")]
+    public decimal AnnualIncome { get; set; }
+
+    /// <summary>Type of employment</summary>
+    [Required]
+    [RegularExpression("^(full-time|part-time|contract|self-employed)$", 
+        ErrorMessage = "Employment type must be one of: full-time, part-time, contract, self-employed")]
+    public string EmploymentType { get; set; } = string.Empty;
+
+    /// <summary>Years of employment (supports decimals for partial years)</summary>
+    [Range(0, 50, ErrorMessage = "Years employed must be between 0 and 50")]
+    public decimal YearsEmployed { get; set; }
+}
+
+public class MortgageCreditDataDto
+{
+    /// <summary>Credit score (300-850 range)</summary>
+    [Range(300, 850, ErrorMessage = "Credit score must be between 300 and 850")]
+    public int CreditScore { get; set; }
+
+    /// <summary>Date of credit report</summary>
+    [Required]
+    public DateTime ReportDate { get; set; }
+
+    /// <summary>Outstanding debts in dollars</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Outstanding debts must be positive")]
+    public decimal OutstandingDebts { get; set; }
+}
+
+public class MortgageEmploymentDataDto
+{
+    /// <summary>Name of current employer</summary>
+    [Required]
+    [StringLength(200, ErrorMessage = "Employer name cannot exceed 200 characters")]
+    public string EmployerName { get; set; } = string.Empty;
+
+    /// <summary>Current job title</summary>
+    [Required]
+    [StringLength(200, ErrorMessage = "Job title cannot exceed 200 characters")]
+    public string JobTitle { get; set; } = string.Empty;
+
+    /// <summary>Monthly salary in dollars</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Monthly salary must be positive")]
+    public decimal MonthlySalary { get; set; }
+
+    /// <summary>Whether employment has been verified</summary>
+    public bool IsVerified { get; set; }
+}
+
+public class MortgagePropertyDataDto
+{
+    /// <summary>Appraised property value in dollars</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Property value must be positive")]
+    public decimal PropertyValue { get; set; }
+
+    /// <summary>Requested loan amount in dollars</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Loan amount must be positive")]
+    public decimal LoanAmount { get; set; }
+
+    /// <summary>Type of property</summary>
+    [Required]
+    [RegularExpression("^(single-family|condo|townhouse|multi-family)$", 
+        ErrorMessage = "Property type must be one of: single-family, condo, townhouse, multi-family")]
+    public string PropertyType { get; set; } = string.Empty;
+
+    /// <summary>Date of property appraisal</summary>
+    [Required]
+    public DateTime AppraisalDate { get; set; }
+
+    /// <summary>Whether appraisal has been completed</summary>
+    public bool AppraisalCompleted { get; set; }
+}
+
 // Configuration options
 public class MortgageStorageOptions
 {
@@ -370,39 +604,60 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Evaluates the mortgage request status based on available data
+    /// </summary>
+    /// <param name="request">The mortgage request to evaluate</param>
     private void EvaluateRequestStatus(MortgageRequest request)
     {
         var data = request.RequestData;
         var missingRequirements = new List<string>();
 
-        // Basic evaluation logic - this will be expanded later when you add specific data fields
-        if (!data.ContainsKey("income_verification"))
+        // Check for required income data
+        bool hasIncomeData = data.ContainsKey(MortgageDataFields.Income.Annual) || 
+                           data.ContainsKey(MortgageDataFields.Legacy.IncomeVerification);
+        if (!hasIncomeData)
             missingRequirements.Add("Income verification");
-        
-        if (!data.ContainsKey("credit_report"))
+
+        // Check for required credit data
+        bool hasCreditData = data.ContainsKey(MortgageDataFields.Credit.Score) || 
+                           data.ContainsKey(MortgageDataFields.Legacy.CreditReport);
+        if (!hasCreditData)
             missingRequirements.Add("Credit report");
-        
-        if (!data.ContainsKey("property_appraisal"))
+
+        // Check for required property data
+        bool hasPropertyData = data.ContainsKey(MortgageDataFields.Property.Value) || 
+                             data.ContainsKey(MortgageDataFields.Legacy.PropertyAppraisal);
+        if (!hasPropertyData)
             missingRequirements.Add("Property appraisal");
-        
-        if (!data.ContainsKey("employment_verification"))
+
+        // Check for required employment data
+        bool hasEmploymentData = data.ContainsKey(MortgageDataFields.Employment.Employer) || 
+                               data.ContainsKey(MortgageDataFields.Legacy.EmploymentVerification);
+        if (!hasEmploymentData)
             missingRequirements.Add("Employment verification");
 
         if (missingRequirements.Count == 0)
         {
             // All basic requirements met - perform approval logic
-            var income = GetValueAsDecimal(data, "annual_income");
-            var creditScore = GetValueAsInt(data, "credit_score");
-            var loanAmount = GetValueAsDecimal(data, "loan_amount");
+            var income = GetValueAsDecimal(data, MortgageDataFields.Income.Annual) ?? 
+                        GetValueAsDecimal(data, MortgageDataFields.Legacy.AnnualIncome);
+            var creditScore = GetValueAsInt(data, MortgageDataFields.Credit.Score);
+            var loanAmount = GetValueAsDecimal(data, MortgageDataFields.Property.LoanAmount) ?? 
+                           GetValueAsDecimal(data, MortgageDataFields.Legacy.LoanAmount);
 
             if (income > 0 && creditScore > 0 && loanAmount > 0)
             {
-                var debtToIncomeRatio = loanAmount / (income * 12); // Simple calculation
+                // Calculate debt-to-income ratio (monthly loan payment vs monthly income)
+                var monthlyIncome = income / 12;
+                // Assume 30-year mortgage at 7% interest for payment calculation
+                var monthlyPayment = CalculateMonthlyMortgagePayment(loanAmount.Value, 0.07m, 30);
+                var debtToIncomeRatio = monthlyPayment / monthlyIncome;
                 
                 if (creditScore >= 650 && debtToIncomeRatio <= 0.43m)
                 {
                     request.Status = MortgageRequestStatus.Approved;
-                    request.StatusReason = "Application approved - all criteria met";
+                    request.StatusReason = $"Application approved - Credit score: {creditScore}, DTI ratio: {debtToIncomeRatio:P2}";
                     request.MissingRequirements = string.Empty;
                 }
                 else
@@ -418,7 +673,7 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
             else
             {
                 request.Status = MortgageRequestStatus.UnderReview;
-                request.StatusReason = "All documents received - under manual review";
+                request.StatusReason = "All documents received - under manual review for missing financial data";
                 request.MissingRequirements = string.Empty;
             }
         }
@@ -430,16 +685,47 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         }
     }
 
-    private decimal GetValueAsDecimal(Dictionary<string, object> data, string key)
+    /// <summary>
+    /// Calculates monthly mortgage payment using standard amortization formula
+    /// </summary>
+    /// <param name="principal">Loan amount</param>
+    /// <param name="annualRate">Annual interest rate (as decimal, e.g., 0.07 for 7%)</param>
+    /// <param name="years">Loan term in years</param>
+    /// <returns>Monthly payment amount</returns>
+    private decimal CalculateMonthlyMortgagePayment(decimal principal, decimal annualRate, int years)
+    {
+        if (annualRate == 0) return principal / (years * 12); // No interest
+        
+        var monthlyRate = annualRate / 12;
+        var numberOfPayments = years * 12;
+        
+        // M = P * [r(1+r)^n] / [(1+r)^n - 1]
+        var monthlyRateCompounded = (decimal)Math.Pow((double)(1 + monthlyRate), numberOfPayments);
+        return principal * (monthlyRate * monthlyRateCompounded) / (monthlyRateCompounded - 1);
+    }
+
+    /// <summary>
+    /// Safely retrieves a decimal value from the data dictionary
+    /// </summary>
+    /// <param name="data">Data dictionary</param>
+    /// <param name="key">Key to lookup</param>
+    /// <returns>Decimal value if found and parseable, null otherwise</returns>
+    private decimal? GetValueAsDecimal(Dictionary<string, object> data, string key)
     {
         if (data.TryGetValue(key, out var value))
         {
             if (decimal.TryParse(value?.ToString(), out var result))
                 return result;
         }
-        return 0;
+        return null;
     }
 
+    /// <summary>
+    /// Safely retrieves an integer value from the data dictionary
+    /// </summary>
+    /// <param name="data">Data dictionary</param>
+    /// <param name="key">Key to lookup</param>
+    /// <returns>Integer value if found and parseable, 0 otherwise</returns>
     private int GetValueAsInt(Dictionary<string, object> data, string key)
     {
         if (data.TryGetValue(key, out var value))
