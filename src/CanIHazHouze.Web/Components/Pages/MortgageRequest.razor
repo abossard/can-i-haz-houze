@@ -530,14 +530,20 @@ else
         {
             PopulateFormsFromRequestData();
             UpdateFormCollapseState();
+            StateHasChanged(); // Force UI update
         }
     }
 
     private void PopulateFormsFromRequestData()
     {
-        if (existingRequest?.RequestData == null) return;
+        if (existingRequest?.RequestData == null) 
+        {
+            Logger.LogWarning("PopulateFormsFromRequestData called but RequestData is null");
+            return;
+        }
 
         var data = existingRequest.RequestData;
+        Logger.LogInformation("Populating forms with {Count} data items: {Keys}", data.Count, string.Join(", ", data.Keys));
 
         try
         {
@@ -693,31 +699,48 @@ else
     private void UpdateFormCollapseState()
     {
         // Collapse forms that have been submitted
-        formCollapseState[nameof(incomeForm)] = !HasIncomeData();
-        formCollapseState[nameof(creditForm)] = !HasCreditData();
-        formCollapseState[nameof(employmentForm)] = !HasEmploymentData();
-        formCollapseState[nameof(propertyForm)] = !HasPropertyData();
+        var incomeSubmitted = HasIncomeData();
+        var creditSubmitted = HasCreditData();
+        var employmentSubmitted = HasEmploymentData();
+        var propertySubmitted = HasPropertyData();
+        
+        Logger.LogInformation("Form submission status - Income: {Income}, Credit: {Credit}, Employment: {Employment}, Property: {Property}", 
+            incomeSubmitted, creditSubmitted, employmentSubmitted, propertySubmitted);
+        
+        formCollapseState[nameof(incomeForm)] = !incomeSubmitted;
+        formCollapseState[nameof(creditForm)] = !creditSubmitted;
+        formCollapseState[nameof(employmentForm)] = !employmentSubmitted;
+        formCollapseState[nameof(propertyForm)] = !propertySubmitted;
     }
 
     // Data checking methods
     private bool HasIncomeData()
     {
-        return existingRequest?.RequestData?.ContainsKey("income_annual") == true;
+        var hasData = existingRequest?.RequestData?.ContainsKey("income_annual") == true;
+        Logger.LogInformation("HasIncomeData: {HasData} (RequestData keys: {Keys})", 
+            hasData, existingRequest?.RequestData?.Keys != null ? string.Join(", ", existingRequest.RequestData.Keys) : "null");
+        return hasData;
     }
 
     private bool HasCreditData()
     {
-        return existingRequest?.RequestData?.ContainsKey("credit_score") == true;
+        var hasData = existingRequest?.RequestData?.ContainsKey("credit_score") == true;
+        Logger.LogInformation("HasCreditData: {HasData}", hasData);
+        return hasData;
     }
 
     private bool HasEmploymentData()
     {
-        return existingRequest?.RequestData?.ContainsKey("employment_employer") == true;
+        var hasData = existingRequest?.RequestData?.ContainsKey("employment_employer") == true;
+        Logger.LogInformation("HasEmploymentData: {HasData}", hasData);
+        return hasData;
     }
 
     private bool HasPropertyData()
     {
-        return existingRequest?.RequestData?.ContainsKey("property_value") == true;
+        var hasData = existingRequest?.RequestData?.ContainsKey("property_value") == true;
+        Logger.LogInformation("HasPropertyData: {HasData}", hasData);
+        return hasData;
     }
 
     // Collapse management methods
@@ -971,6 +994,7 @@ else
                 existingRequest = result;
                 PopulateFormsFromRequestData(); // Refresh form data
                 UpdateFormCollapseState(); // Update collapse state
+                StateHasChanged(); // Force UI update
                 successMessage = "Request status updated.";
             }
         }
@@ -1066,6 +1090,8 @@ else
                 if (updatedRequest != null)
                 {
                     existingRequest = updatedRequest;
+                    PopulateFormsFromRequestData(); // Re-populate forms
+                    UpdateFormCollapseState(); // Update collapse state
                     successMessage = "Requests loaded and selected request refreshed.";
                 }
                 else
@@ -1328,6 +1354,7 @@ else
         existingRequest = request;
         PopulateFormsFromRequestData(); // Populate forms with data
         UpdateFormCollapseState(); // Update collapse state
+        StateHasChanged(); // Force UI update
         successMessage = $"Selected mortgage request for {request.UserName}";
         errorMessage = string.Empty;
         verificationStatus = null; // Clear previous verification status

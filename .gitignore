@@ -486,3 +486,4 @@ $RECYCLE.BIN/
 *.db
 .gitignore
 DevUserDocs/
+*.pdf

@@ -230,6 +230,7 @@ public class MortgageApiClient
         return new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
         };
     }
@@ -245,7 +246,32 @@ public class MortgageRequestDto
     public string MissingRequirements { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-    public Dictionary<string, object> RequestData { get; set; } = new();
+    
+    // Handle the JSON string to Dictionary conversion
+    public string RequestDataJson { get; set; } = "{}";
+    
+    [System.Text.Json.Serialization.JsonIgnore]
+    public Dictionary<string, object> RequestData
+    {
+        get
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(RequestDataJson))
+                    return new Dictionary<string, object>();
+                    
+                return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(RequestDataJson) ?? new Dictionary<string, object>();
+            }
+            catch
+            {
+                return new Dictionary<string, object>();
+            }
+        }
+        set
+        {
+            RequestDataJson = System.Text.Json.JsonSerializer.Serialize(value);
+        }
+    }
 }
 
 public class CrossServiceVerificationResultDto
