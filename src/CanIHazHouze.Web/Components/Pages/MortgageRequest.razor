@@ -1,12 +1,22 @@
 @page "/mortgage"
 @using CanIHazHouze.Web
 @using Microsoft.AspNetCore.Components.Forms
+@using System.Text.Json
 @inject MortgageApiClient MortgageApi
 @inject DocumentApiClient DocumentApi
 @inject ILogger<MortgageRequest> Logger
 @rendermode @(new InteractiveServerRenderMode())
 
 <PageTitle>Mortgage Request</PageTitle>
+
+<style>
+    .collapsible-header {
+        transition: background-color 0.2s ease;
+    }
+    .collapsible-header:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+    }
+</style>
 
 <h1>Mortgage Request Application</h1>
 
@@ -99,10 +109,19 @@ else
             
             <!-- Income Verification -->
             <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0">📊 Income Verification</h6>
+                <div class="card-header collapsible-header" @onclick="() => ToggleFormCollapse(nameof(incomeForm))" style="cursor: pointer;">
+                    <h6 class="mb-0 d-flex justify-content-between align-items-center">
+                        <span>📊 Income Verification</span>
+                        <div>
+                            @if (HasIncomeData())
+                            {
+                                <span class="badge bg-success me-2">✓ Submitted</span>
+                            }
+                            <i class="@(GetCollapseIcon(nameof(incomeForm)))"></i>
+                        </div>
+                    </h6>
                 </div>
-                <div class="card-body">
+                <div class="card-body collapse @(GetCollapseClass(nameof(incomeForm)))" id="@($"collapse-{nameof(incomeForm)}")">
                     <div class="row">
                         <div class="col-md-4">
                             <label class="form-label">Annual Income ($)</label>
@@ -125,7 +144,7 @@ else
                     </div>
                     <div class="mt-2">
                         <button class="btn btn-primary btn-sm" @onclick="SubmitIncomeVerification" disabled="@isProcessing">
-                            Submit Income Verification
+                            @(HasIncomeData() ? "Update Income Verification" : "Submit Income Verification")
                         </button>
                     </div>
                 </div>
@@ -133,10 +152,19 @@ else
 
             <!-- Credit Report -->
             <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0">💳 Credit Report</h6>
+                <div class="card-header collapsible-header" @onclick="() => ToggleFormCollapse(nameof(creditForm))" style="cursor: pointer;">
+                    <h6 class="mb-0 d-flex justify-content-between align-items-center">
+                        <span>💳 Credit Report</span>
+                        <div>
+                            @if (HasCreditData())
+                            {
+                                <span class="badge bg-success me-2">✓ Submitted</span>
+                            }
+                            <i class="@(GetCollapseIcon(nameof(creditForm)))"></i>
+                        </div>
+                    </h6>
                 </div>
-                <div class="card-body">
+                <div class="card-body collapse @(GetCollapseClass(nameof(creditForm)))" id="@($"collapse-{nameof(creditForm)}")">
                     <div class="row">
                         <div class="col-md-4">
                             <label class="form-label">Credit Score</label>
@@ -153,7 +181,7 @@ else
                     </div>
                     <div class="mt-2">
                         <button class="btn btn-primary btn-sm" @onclick="SubmitCreditReport" disabled="@isProcessing">
-                            Submit Credit Report
+                            @(HasCreditData() ? "Update Credit Report" : "Submit Credit Report")
                         </button>
                     </div>
                 </div>
@@ -161,10 +189,19 @@ else
 
             <!-- Employment Verification -->
             <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0">🏢 Employment Verification</h6>
+                <div class="card-header collapsible-header" @onclick="() => ToggleFormCollapse(nameof(employmentForm))" style="cursor: pointer;">
+                    <h6 class="mb-0 d-flex justify-content-between align-items-center">
+                        <span>🏢 Employment Verification</span>
+                        <div>
+                            @if (HasEmploymentData())
+                            {
+                                <span class="badge bg-success me-2">✓ Submitted</span>
+                            }
+                            <i class="@(GetCollapseIcon(nameof(employmentForm)))"></i>
+                        </div>
+                    </h6>
                 </div>
-                <div class="card-body">
+                <div class="card-body collapse @(GetCollapseClass(nameof(employmentForm)))" id="@($"collapse-{nameof(employmentForm)}")">
                     <div class="row">
                         <div class="col-md-6">
                             <label class="form-label">Employer Name</label>
@@ -188,7 +225,7 @@ else
                     </div>
                     <div class="mt-2">
                         <button class="btn btn-primary btn-sm" @onclick="SubmitEmploymentVerification" disabled="@isProcessing">
-                            Submit Employment Verification
+                            @(HasEmploymentData() ? "Update Employment Verification" : "Submit Employment Verification")
                         </button>
                     </div>
                 </div>
@@ -196,10 +233,19 @@ else
 
             <!-- Property Appraisal -->
             <div class="card mb-3">
-                <div class="card-header">
-                    <h6 class="mb-0">🏠 Property Appraisal</h6>
+                <div class="card-header collapsible-header" @onclick="() => ToggleFormCollapse(nameof(propertyForm))" style="cursor: pointer;">
+                    <h6 class="mb-0 d-flex justify-content-between align-items-center">
+                        <span>🏠 Property Appraisal</span>
+                        <div>
+                            @if (HasPropertyData())
+                            {
+                                <span class="badge bg-success me-2">✓ Submitted</span>
+                            }
+                            <i class="@(GetCollapseIcon(nameof(propertyForm)))"></i>
+                        </div>
+                    </h6>
                 </div>
-                <div class="card-body">
+                <div class="card-body collapse @(GetCollapseClass(nameof(propertyForm)))" id="@($"collapse-{nameof(propertyForm)}")">
                     <div class="row">
                         <div class="col-md-4">
                             <label class="form-label">Property Value ($)</label>
@@ -233,7 +279,7 @@ else
                     </div>
                     <div class="mt-2">
                         <button class="btn btn-primary btn-sm" @onclick="SubmitPropertyAppraisal" disabled="@isProcessing">
-                            Submit Property Appraisal
+                            @(HasPropertyData() ? "Update Property Appraisal" : "Submit Property Appraisal")
                         </button>
                     </div>
                 </div>
@@ -421,6 +467,15 @@ else
     private bool isProcessing = false;
     private VerificationStatusDto? verificationStatus;
 
+    // Form collapse state
+    private readonly Dictionary<string, bool> formCollapseState = new()
+    {
+        [nameof(incomeForm)] = true,     // Show by default
+        [nameof(creditForm)] = true,     // Show by default
+        [nameof(employmentForm)] = true, // Show by default
+        [nameof(propertyForm)] = true    // Show by default
+    };
+
     // Form models for structured input
     private readonly IncomeForm incomeForm = new();
     private readonly CreditForm creditForm = new();
@@ -468,6 +523,224 @@ else
         await LoadAllRequests();
     }
 
+    protected override void OnParametersSet()
+    {
+        // Prefill forms with existing data when mortgage request is loaded
+        if (existingRequest != null)
+        {
+            PopulateFormsFromRequestData();
+            UpdateFormCollapseState();
+        }
+    }
+
+    private void PopulateFormsFromRequestData()
+    {
+        if (existingRequest?.RequestData == null) return;
+
+        var data = existingRequest.RequestData;
+
+        try
+        {
+            // Populate income form
+            if (data.TryGetValue("income_annual", out var annualIncome))
+                incomeForm.AnnualIncome = ConvertToDecimal(annualIncome);
+            if (data.TryGetValue("income_employment_type", out var empType))
+                incomeForm.EmploymentType = ConvertToString(empType);
+            if (data.TryGetValue("income_years_employed", out var yearsEmp))
+                incomeForm.YearsEmployed = ConvertToDecimal(yearsEmp);
+
+            // Populate credit form
+            if (data.TryGetValue("credit_score", out var creditScore))
+                creditForm.CreditScore = ConvertToInt(creditScore);
+            if (data.TryGetValue("credit_report_date", out var creditDate))
+                creditForm.ReportDate = ConvertToDateTime(creditDate);
+            if (data.TryGetValue("credit_outstanding_debts", out var debts))
+                creditForm.OutstandingDebts = ConvertToDecimal(debts);
+
+            // Populate employment form
+            if (data.TryGetValue("employment_employer", out var employer))
+                employmentForm.EmployerName = ConvertToString(employer);
+            if (data.TryGetValue("employment_job_title", out var jobTitle))
+                employmentForm.JobTitle = ConvertToString(jobTitle);
+            if (data.TryGetValue("employment_monthly_salary", out var monthlySalary))
+                employmentForm.MonthlySalary = ConvertToDecimal(monthlySalary);
+            if (data.TryGetValue("employment_verified", out var empVerified))
+                employmentForm.IsVerified = ConvertToBoolean(empVerified);
+
+            // Populate property form
+            if (data.TryGetValue("property_value", out var propValue))
+                propertyForm.PropertyValue = ConvertToDecimal(propValue);
+            if (data.TryGetValue("property_loan_amount", out var loanAmount))
+                propertyForm.LoanAmount = ConvertToDecimal(loanAmount);
+            if (data.TryGetValue("property_type", out var propType))
+                propertyForm.PropertyType = ConvertToString(propType);
+            if (data.TryGetValue("property_appraisal_date", out var appraisalDate))
+                propertyForm.AppraisalDate = ConvertToDateTime(appraisalDate);
+            if (data.TryGetValue("property_appraisal_completed", out var appraisalCompleted))
+                propertyForm.AppraisalCompleted = ConvertToBoolean(appraisalCompleted);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error populating forms from request data");
+            errorMessage = "Error loading existing form data.";
+        }
+    }
+
+    // Helper methods to safely convert JsonElement or other object types
+    private decimal? ConvertToDecimal(object? value)
+    {
+        if (value == null) return null;
+        
+        if (value is JsonElement jsonElement)
+        {
+            return jsonElement.ValueKind switch
+            {
+                JsonValueKind.Number => jsonElement.GetDecimal(),
+                JsonValueKind.String when decimal.TryParse(jsonElement.GetString(), out var result) => result,
+                _ => null
+            };
+        }
+        
+        if (decimal.TryParse(value.ToString(), out var parsed))
+            return parsed;
+            
+        return null;
+    }
+
+    private int? ConvertToInt(object? value)
+    {
+        if (value == null) return null;
+        
+        if (value is JsonElement jsonElement)
+        {
+            return jsonElement.ValueKind switch
+            {
+                JsonValueKind.Number => jsonElement.GetInt32(),
+                JsonValueKind.String when int.TryParse(jsonElement.GetString(), out var result) => result,
+                _ => null
+            };
+        }
+        
+        if (int.TryParse(value.ToString(), out var parsed))
+            return parsed;
+            
+        return null;
+    }
+
+    private string ConvertToString(object? value)
+    {
+        if (value == null) return string.Empty;
+        
+        if (value is JsonElement jsonElement)
+        {
+            return jsonElement.ValueKind switch
+            {
+                JsonValueKind.String => jsonElement.GetString() ?? string.Empty,
+                JsonValueKind.Number => jsonElement.ToString(),
+                JsonValueKind.True => "true",
+                JsonValueKind.False => "false",
+                _ => string.Empty
+            };
+        }
+        
+        return value.ToString() ?? string.Empty;
+    }
+
+    private DateTime? ConvertToDateTime(object? value)
+    {
+        if (value == null) return null;
+        
+        string? dateString = null;
+        
+        if (value is JsonElement jsonElement)
+        {
+            dateString = jsonElement.ValueKind == JsonValueKind.String 
+                ? jsonElement.GetString() 
+                : jsonElement.ToString();
+        }
+        else
+        {
+            dateString = value.ToString();
+        }
+        
+        if (DateTime.TryParse(dateString, out var result))
+            return result;
+            
+        return null;
+    }
+
+    private bool ConvertToBoolean(object? value)
+    {
+        if (value == null) return false;
+        
+        if (value is JsonElement jsonElement)
+        {
+            return jsonElement.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.String => bool.TryParse(jsonElement.GetString(), out var result) && result,
+                _ => false
+            };
+        }
+        
+        if (bool.TryParse(value.ToString(), out var parsed))
+            return parsed;
+            
+        return false;
+    }
+
+    private void UpdateFormCollapseState()
+    {
+        // Collapse forms that have been submitted
+        formCollapseState[nameof(incomeForm)] = !HasIncomeData();
+        formCollapseState[nameof(creditForm)] = !HasCreditData();
+        formCollapseState[nameof(employmentForm)] = !HasEmploymentData();
+        formCollapseState[nameof(propertyForm)] = !HasPropertyData();
+    }
+
+    // Data checking methods
+    private bool HasIncomeData()
+    {
+        return existingRequest?.RequestData?.ContainsKey("income_annual") == true;
+    }
+
+    private bool HasCreditData()
+    {
+        return existingRequest?.RequestData?.ContainsKey("credit_score") == true;
+    }
+
+    private bool HasEmploymentData()
+    {
+        return existingRequest?.RequestData?.ContainsKey("employment_employer") == true;
+    }
+
+    private bool HasPropertyData()
+    {
+        return existingRequest?.RequestData?.ContainsKey("property_value") == true;
+    }
+
+    // Collapse management methods
+    private void ToggleFormCollapse(string formName)
+    {
+        if (formCollapseState.ContainsKey(formName))
+        {
+            formCollapseState[formName] = !formCollapseState[formName];
+        }
+    }
+
+    private string GetCollapseClass(string formName)
+    {
+        return formCollapseState.TryGetValue(formName, out var isExpanded) && isExpanded ? "show" : "";
+    }
+
+    private string GetCollapseIcon(string formName)
+    {
+        return formCollapseState.TryGetValue(formName, out var isExpanded) && isExpanded 
+            ? "fas fa-chevron-up" 
+            : "fas fa-chevron-down";
+    }
+
     private async Task SubmitIncomeVerification()
     {
         if (existingRequest == null) return;
@@ -493,12 +766,11 @@ else
 
         await SubmitFormData(data, "Income Verification");
         
-        // Clear form on success
+        // Update form state and collapse if successful
         if (string.IsNullOrEmpty(errorMessage))
         {
-            incomeForm.AnnualIncome = null;
-            incomeForm.EmploymentType = string.Empty;
-            incomeForm.YearsEmployed = null;
+            UpdateFormCollapseState();
+            // Don't clear form - keep it prefilled for updates
         }
     }
 
@@ -521,12 +793,11 @@ else
 
         await SubmitFormData(data, "Credit Report");
         
-        // Clear form on success
+        // Update form state and collapse if successful
         if (string.IsNullOrEmpty(errorMessage))
         {
-            creditForm.CreditScore = null;
-            creditForm.ReportDate = null;
-            creditForm.OutstandingDebts = null;
+            UpdateFormCollapseState();
+            // Don't clear form - keep it prefilled for updates
         }
     }
 
@@ -550,13 +821,11 @@ else
 
         await SubmitFormData(data, "Employment Verification");
         
-        // Clear form on success
+        // Update form state and collapse if successful
         if (string.IsNullOrEmpty(errorMessage))
         {
-            employmentForm.EmployerName = string.Empty;
-            employmentForm.JobTitle = string.Empty;
-            employmentForm.MonthlySalary = null;
-            employmentForm.IsVerified = false;
+            UpdateFormCollapseState();
+            // Don't clear form - keep it prefilled for updates
         }
     }
 
@@ -599,14 +868,11 @@ else
 
         await SubmitFormData(data, "Property Appraisal");
         
-        // Clear form on success
+        // Update form state and collapse if successful
         if (string.IsNullOrEmpty(errorMessage))
         {
-            propertyForm.PropertyValue = null;
-            propertyForm.LoanAmount = null;
-            propertyForm.PropertyType = string.Empty;
-            propertyForm.AppraisalDate = null;
-            propertyForm.AppraisalCompleted = false;
+            UpdateFormCollapseState();
+            // Don't clear form - keep it prefilled for updates
         }
     }
 
@@ -623,6 +889,7 @@ else
             if (result != null)
             {
                 existingRequest = result;
+                PopulateFormsFromRequestData(); // Refresh form data
                 successMessage = $"{formType} submitted successfully. Status may have changed.";
             }
             else
@@ -691,6 +958,8 @@ else
             if (result != null)
             {
                 existingRequest = result;
+                PopulateFormsFromRequestData(); // Refresh form data
+                UpdateFormCollapseState(); // Update collapse state
                 successMessage = "Request status updated.";
             }
         }
@@ -1026,6 +1295,8 @@ else
     private void SelectRequest(MortgageRequestDto request)
     {
         existingRequest = request;
+        PopulateFormsFromRequestData(); // Populate forms with data
+        UpdateFormCollapseState(); // Update collapse state
         successMessage = $"Selected mortgage request for {request.UserName}";
         errorMessage = string.Empty;
         verificationStatus = null; // Clear previous verification status
