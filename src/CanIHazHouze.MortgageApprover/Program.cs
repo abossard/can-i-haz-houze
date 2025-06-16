@@ -1,9 +1,10 @@
-using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using Scalar.AspNetCore;
+using System.ComponentModel.DataAnnotations;
+using System.Net;
+using Microsoft.Azure.Cosmos;
 
 /*
  * CanIHazHouze Mortgage Approver Service
@@ -91,18 +92,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.Configure<MortgageStorageOptions>(
     builder.Configuration.GetSection("MortgageStorage"));
 
-// Add Entity Framework with SQLite
-builder.Services.AddDbContext<MortgageDbContext>(options =>
-{
-    var storageOptions = builder.Configuration.GetSection("MortgageStorage").Get<MortgageStorageOptions>() 
-                         ?? new MortgageStorageOptions();
-    
-    // Ensure the base directory exists
-    Directory.CreateDirectory(storageOptions.BaseDirectory);
-    
-    var dbPath = Path.Combine(storageOptions.BaseDirectory, "mortgage.db");
-    options.UseSqlite($"Data Source={dbPath}");
-});
+// Add Azure Cosmos DB using Aspire
+builder.AddAzureCosmosClient("cosmos");
 
 // Add mortgage approval service
 builder.Services.AddScoped<IMortgageApprovalService, MortgageApprovalServiceImpl>();
@@ -118,13 +109,6 @@ builder.Services.AddScoped<ILedgerVerificationService, LedgerVerificationService
 builder.Services.AddScoped<ICrossServiceVerificationService, CrossServiceVerificationService>();
 
 var app = builder.Build();
-
-// Ensure database is created and migrated
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<MortgageDbContext>();
-    context.Database.EnsureCreated();
-}
 
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
@@ -970,6 +954,8 @@ public class MortgageStorageOptions
 // Domain Models
 public class MortgageRequest
 {
+    public string id { get; set; } = string.Empty; // Cosmos DB id property
+    public string pk { get; set; } = string.Empty; // Partition key (username)
     public Guid Id { get; set; }
     public string UserName { get; set; } = string.Empty;
     public MortgageRequestStatus Status { get; set; } = MortgageRequestStatus.Pending;
@@ -978,6 +964,7 @@ public class MortgageRequest
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public string RequestDataJson { get; set; } = "{}"; // Store additional data as JSON
+    public string Type { get; set; } = "mortgage-request"; // Document type discriminator
     
     // Navigation property for additional data
     public Dictionary<string, object> RequestData
@@ -996,28 +983,6 @@ public enum MortgageRequestStatus
     RequiresAdditionalInfo
 }
 
-// Database Context
-public class MortgageDbContext : DbContext
-{
-    public MortgageDbContext(DbContextOptions<MortgageDbContext> options) : base(options) { }
-
-    public DbSet<MortgageRequest> MortgageRequests { get; set; }
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<MortgageRequest>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.UserName).IsUnique(); // Ensure one request per user
-            entity.Property(e => e.UserName).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.StatusReason).HasMaxLength(500);
-            entity.Property(e => e.MissingRequirements).HasMaxLength(1000);
-            entity.Property(e => e.RequestDataJson).HasColumnType("TEXT");
-            entity.Ignore(e => e.RequestData); // Don't map the computed property
-        });
-    }
-}
-
 // Service Interface
 public interface IMortgageApprovalService
 {
@@ -1032,18 +997,20 @@ public interface IMortgageApprovalService
 // Service Implementation
 public class MortgageApprovalServiceImpl : IMortgageApprovalService
 {
-    private readonly MortgageDbContext _context;
+    private readonly CosmosClient _cosmosClient;
     private readonly ILogger<MortgageApprovalServiceImpl> _logger;
     private readonly ICrossServiceVerificationService _crossServiceVerification;
+    private readonly Microsoft.Azure.Cosmos.Container _container;
 
     public MortgageApprovalServiceImpl(
-        MortgageDbContext context, 
+        CosmosClient cosmosClient, 
         ILogger<MortgageApprovalServiceImpl> logger,
         ICrossServiceVerificationService crossServiceVerification)
     {
-        _context = context;
+        _cosmosClient = cosmosClient;
         _logger = logger;
         _crossServiceVerification = crossServiceVerification;
+        _container = _cosmosClient.GetContainer("houze", "mortgages");
     }
 
     public async Task<MortgageRequest> CreateMortgageRequestAsync(string userName)
@@ -1052,25 +1019,43 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
             throw new ArgumentException("Username cannot be empty", nameof(userName));
 
         // Check if user already has a request
-        var existingRequest = await _context.MortgageRequests
-            .FirstOrDefaultAsync(r => r.UserName == userName);
+        try
+        {
+            var query = new QueryDefinition(
+                "SELECT * FROM c WHERE c.pk = @userName AND c.Type = @type")
+                .WithParameter("@userName", userName)
+                .WithParameter("@type", "mortgage-request");
 
-        if (existingRequest != null)
-            throw new InvalidOperationException($"User {userName} already has an existing mortgage request");
+            var iterator = _container.GetItemQueryIterator<MortgageRequest>(query);
+            if (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                if (response.Count > 0)
+                {
+                    throw new InvalidOperationException($"User {userName} already has an existing mortgage request");
+                }
+            }
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            // No existing request found, proceed with creation
+        }
 
         var mortgageRequest = new MortgageRequest
         {
+            id = $"mortgage:{Guid.NewGuid()}",
+            pk = userName,
             Id = Guid.NewGuid(),
             UserName = userName,
             Status = MortgageRequestStatus.Pending,
             StatusReason = "Application submitted - awaiting documentation",
             MissingRequirements = "Income verification, Credit report, Property appraisal, Employment verification",
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = DateTime.UtcNow,
+            Type = "mortgage-request"
         };
 
-        _context.MortgageRequests.Add(mortgageRequest);
-        await _context.SaveChangesAsync();
+        await _container.CreateItemAsync(mortgageRequest, new PartitionKey(userName));
 
         _logger.LogInformation("Created mortgage request {RequestId} for user {UserName}", mortgageRequest.Id, userName);
         return mortgageRequest;
@@ -1078,66 +1063,151 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
 
     public async Task<MortgageRequest?> GetMortgageRequestAsync(Guid requestId)
     {
-        return await _context.MortgageRequests.FindAsync(requestId);
+        try
+        {
+            var query = new QueryDefinition(
+                "SELECT * FROM c WHERE c.Id = @requestId AND c.Type = @type")
+                .WithParameter("@requestId", requestId)
+                .WithParameter("@type", "mortgage-request");
+
+            var iterator = _container.GetItemQueryIterator<MortgageRequest>(query);
+            if (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                return response.FirstOrDefault();
+            }
+            return null;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
     }
 
     public async Task<MortgageRequest?> GetMortgageRequestByUserAsync(string userName)
     {
-        return await _context.MortgageRequests
-            .FirstOrDefaultAsync(r => r.UserName == userName);
+        try
+        {
+            var query = new QueryDefinition(
+                "SELECT * FROM c WHERE c.pk = @userName AND c.Type = @type")
+                .WithParameter("@userName", userName)
+                .WithParameter("@type", "mortgage-request");
+
+            var iterator = _container.GetItemQueryIterator<MortgageRequest>(query);
+            if (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                return response.FirstOrDefault();
+            }
+            return null;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
     }
 
     public async Task<MortgageRequest?> UpdateMortgageDataAsync(Guid requestId, Dictionary<string, object> newData)
     {
-        var mortgageRequest = await _context.MortgageRequests.FindAsync(requestId);
-        if (mortgageRequest == null) return null;
-
-        // Merge new data with existing data
-        var currentData = mortgageRequest.RequestData;
-        foreach (var kvp in newData)
+        try
         {
-            currentData[kvp.Key] = kvp.Value;
+            // First find the mortgage request
+            var mortgageRequest = await GetMortgageRequestAsync(requestId);
+            if (mortgageRequest == null) return null;
+
+            // Merge new data with existing data
+            var currentData = mortgageRequest.RequestData;
+            foreach (var kvp in newData)
+            {
+                currentData[kvp.Key] = kvp.Value;
+            }
+            mortgageRequest.RequestData = currentData;
+            mortgageRequest.UpdatedAt = DateTime.UtcNow;
+
+            // Evaluate status based on the updated data (includes cross-service verification)
+            await EvaluateRequestStatusAsync(mortgageRequest);
+
+            // Update the document in Cosmos DB
+            await _container.ReplaceItemAsync(mortgageRequest, mortgageRequest.id, new PartitionKey(mortgageRequest.UserName));
+
+            _logger.LogInformation("Updated mortgage request {RequestId} with new data. Status: {Status}", 
+                requestId, mortgageRequest.Status);
+            
+            return mortgageRequest;
         }
-        mortgageRequest.RequestData = currentData;
-        mortgageRequest.UpdatedAt = DateTime.UtcNow;
-
-        // Evaluate status based on the updated data (includes cross-service verification)
-        await EvaluateRequestStatusAsync(mortgageRequest);
-
-        await _context.SaveChangesAsync();
-
-        _logger.LogInformation("Updated mortgage request {RequestId} with new data. Status: {Status}", 
-            requestId, mortgageRequest.Status);
-        
-        return mortgageRequest;
+        catch (CosmosException ex)
+        {
+            _logger.LogError(ex, "Error updating mortgage request {RequestId}", requestId);
+            throw;
+        }
     }
 
     public async Task<bool> DeleteMortgageRequestAsync(Guid requestId)
     {
-        var mortgageRequest = await _context.MortgageRequests.FindAsync(requestId);
-        if (mortgageRequest == null) return false;
+        try
+        {
+            var mortgageRequest = await GetMortgageRequestAsync(requestId);
+            if (mortgageRequest == null) return false;
 
-        _context.MortgageRequests.Remove(mortgageRequest);
-        await _context.SaveChangesAsync();
+            await _container.DeleteItemAsync<MortgageRequest>(mortgageRequest.id, new PartitionKey(mortgageRequest.UserName));
 
-        _logger.LogInformation("Deleted mortgage request {RequestId}", requestId);
-        return true;
+            _logger.LogInformation("Deleted mortgage request {RequestId}", requestId);
+            return true;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+        catch (CosmosException ex)
+        {
+            _logger.LogError(ex, "Error deleting mortgage request {RequestId}", requestId);
+            throw;
+        }
     }
 
     public async Task<IEnumerable<MortgageRequest>> GetMortgageRequestsAsync(int page, int pageSize, string? status)
     {
-        var query = _context.MortgageRequests.AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<MortgageRequestStatus>(status, true, out var statusEnum))
+        try
         {
-            query = query.Where(r => r.Status == statusEnum);
-        }
+            var queryBuilder = "SELECT * FROM c WHERE c.Type = @type";
+            var queryDefinition = new QueryDefinition(queryBuilder)
+                .WithParameter("@type", "mortgage-request");
 
-        return await query
-            .OrderByDescending(r => r.UpdatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+            if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<MortgageRequestStatus>(status, true, out var statusEnum))
+            {
+                queryBuilder += " AND c.Status = @status";
+                queryDefinition = new QueryDefinition(queryBuilder)
+                    .WithParameter("@type", "mortgage-request")
+                    .WithParameter("@status", statusEnum.ToString());
+            }
+
+            queryBuilder += " ORDER BY c.UpdatedAt DESC OFFSET @skip LIMIT @take";
+            queryDefinition = new QueryDefinition(queryBuilder)
+                .WithParameter("@type", "mortgage-request")
+                .WithParameter("@skip", (page - 1) * pageSize)
+                .WithParameter("@take", pageSize);
+
+            if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<MortgageRequestStatus>(status, true, out statusEnum))
+            {
+                queryDefinition = queryDefinition.WithParameter("@status", statusEnum.ToString());
+            }
+
+            var iterator = _container.GetItemQueryIterator<MortgageRequest>(queryDefinition);
+            var requests = new List<MortgageRequest>();
+
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                requests.AddRange(response);
+            }
+
+            return requests;
+        }
+        catch (CosmosException ex)
+        {
+            _logger.LogError(ex, "Error retrieving mortgage requests");
+            throw;
+        }
     }
 
     /// <summary>

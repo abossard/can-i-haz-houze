@@ -1,9 +1,10 @@
-using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel;
+using System.Net;
+using Microsoft.Azure.Cosmos;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,30 +32,13 @@ builder.Services.AddOpenApi();
 builder.Services.Configure<LedgerStorageOptions>(
     builder.Configuration.GetSection("LedgerStorage"));
 
-// Add Entity Framework with SQLite
-builder.Services.AddDbContext<LedgerDbContext>(options =>
-{
-    var storageOptions = builder.Configuration.GetSection("LedgerStorage").Get<LedgerStorageOptions>() 
-                         ?? new LedgerStorageOptions();
-    
-    // Ensure the base directory exists
-    Directory.CreateDirectory(storageOptions.BaseDirectory);
-    
-    var dbPath = Path.Combine(storageOptions.BaseDirectory, "ledger.db");
-    options.UseSqlite($"Data Source={dbPath}");
-});
+// Add Azure Cosmos DB using Aspire
+builder.AddAzureCosmosClient("cosmos");
 
 // Add ledger service
 builder.Services.AddScoped<ILedgerService, LedgerServiceImpl>();
 
 var app = builder.Build();
-
-// Ensure database is created
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<LedgerDbContext>();
-    context.Database.EnsureCreated();
-}
 
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
@@ -451,53 +435,26 @@ public record BalanceUpdateRequest(
 
 public class AccountEntity
 {
+    public string id { get; set; } = string.Empty; // Cosmos DB id property  
+    public string pk { get; set; } = string.Empty; // Partition key (username)
     public string Owner { get; set; } = string.Empty;
     public decimal Balance { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset LastUpdatedAt { get; set; }
+    public string Type { get; set; } = "account"; // Document type discriminator
 }
 
 public class TransactionEntity
 {
-    public Guid Id { get; set; }
+    public string id { get; set; } = string.Empty; // Cosmos DB id property
+    public string pk { get; set; } = string.Empty; // Partition key (username)
+    public Guid TransactionId { get; set; }
     public string Owner { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public decimal BalanceAfter { get; set; }
     public string Description { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
-}
-
-// Database context
-public class LedgerDbContext : DbContext
-{
-    public LedgerDbContext(DbContextOptions<LedgerDbContext> options) : base(options) { }
-    
-    public DbSet<AccountEntity> Accounts { get; set; }
-    public DbSet<TransactionEntity> Transactions { get; set; }
-    
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<AccountEntity>(entity =>
-        {
-            entity.HasKey(e => e.Owner);
-            entity.Property(e => e.Owner).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.Balance).HasPrecision(18, 2);
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.Property(e => e.LastUpdatedAt).IsRequired();
-        });
-
-        modelBuilder.Entity<TransactionEntity>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.Owner).IsRequired().HasMaxLength(100);
-            entity.Property(e => e.Amount).HasPrecision(18, 2);
-            entity.Property(e => e.BalanceAfter).HasPrecision(18, 2);
-            entity.Property(e => e.Description).IsRequired().HasMaxLength(500);
-            entity.Property(e => e.CreatedAt).IsRequired();
-            entity.HasIndex(e => e.Owner);
-            entity.HasIndex(e => new { e.Owner, e.CreatedAt });
-        });
-    }
+    public string Type { get; set; } = "transaction"; // Document type discriminator
 }
 
 // Service interface and implementation
@@ -511,16 +468,18 @@ public interface ILedgerService
 
 public class LedgerServiceImpl : ILedgerService
 {
-    private readonly LedgerDbContext _context;
+    private readonly CosmosClient _cosmosClient;
     private readonly LedgerStorageOptions _options;
     private readonly ILogger<LedgerServiceImpl> _logger;
     private readonly Random _random = new();
+    private readonly Microsoft.Azure.Cosmos.Container _container;
 
-    public LedgerServiceImpl(LedgerDbContext context, IOptions<LedgerStorageOptions> options, ILogger<LedgerServiceImpl> logger)
+    public LedgerServiceImpl(CosmosClient cosmosClient, IOptions<LedgerStorageOptions> options, ILogger<LedgerServiceImpl> logger)
     {
-        _context = context;
+        _cosmosClient = cosmosClient;
         _options = options.Value;
         _logger = logger;
+        _container = _cosmosClient.GetContainer("houze", "ledgers");
     }
 
     public async Task<AccountInfo> GetAccountAsync(string owner)
@@ -528,40 +487,54 @@ public class LedgerServiceImpl : ILedgerService
         if (string.IsNullOrWhiteSpace(owner))
             throw new ArgumentException("Owner cannot be null or empty", nameof(owner));
 
-        var account = await _context.Accounts.FirstOrDefaultAsync(a => a.Owner == owner);
-        
-        if (account is null)
+        try
+        {
+            var response = await _container.ReadItemAsync<AccountEntity>(
+                id: $"account:{owner}",
+                partitionKey: new PartitionKey(owner));
+            
+            var account = response.Resource;
+            return new AccountInfo(account.Owner, account.Balance, account.CreatedAt, account.LastUpdatedAt);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
             // Create new account with random initial balance
             var initialBalance = GenerateRandomInitialBalance();
-            account = new AccountEntity
+            var now = DateTimeOffset.UtcNow;
+            
+            var account = new AccountEntity
             {
+                id = $"account:{owner}",
+                pk = owner,
                 Owner = owner,
                 Balance = initialBalance,
-                CreatedAt = DateTimeOffset.UtcNow,
-                LastUpdatedAt = DateTimeOffset.UtcNow
+                CreatedAt = now,
+                LastUpdatedAt = now,
+                Type = "account"
             };
 
-            _context.Accounts.Add(account);
+            await _container.CreateItemAsync(account, new PartitionKey(owner));
 
             // Add initial transaction
             var initialTransaction = new TransactionEntity
             {
-                Id = Guid.NewGuid(),
+                id = $"transaction:{Guid.NewGuid()}",
+                pk = owner,
+                TransactionId = Guid.NewGuid(),
                 Owner = owner,
                 Amount = initialBalance,
                 BalanceAfter = initialBalance,
                 Description = "Initial account balance",
-                CreatedAt = account.CreatedAt
+                CreatedAt = now,
+                Type = "transaction"
             };
 
-            _context.Transactions.Add(initialTransaction);
-            await _context.SaveChangesAsync();
+            await _container.CreateItemAsync(initialTransaction, new PartitionKey(owner));
 
             _logger.LogInformation("Created new account for owner {Owner} with initial balance {Balance:C}", owner, initialBalance);
+            
+            return new AccountInfo(account.Owner, account.Balance, account.CreatedAt, account.LastUpdatedAt);
         }
-
-        return new AccountInfo(account.Owner, account.Balance, account.CreatedAt, account.LastUpdatedAt);
     }
 
     public async Task<AccountInfo> UpdateBalanceAsync(string owner, decimal amount, string description)
@@ -577,37 +550,52 @@ public class LedgerServiceImpl : ILedgerService
 
         // Get or create account
         var accountInfo = await GetAccountAsync(owner);
-        var account = await _context.Accounts.FirstOrDefaultAsync(a => a.Owner == owner);
         
-        if (account is null)
-            throw new InvalidOperationException("Account should exist after GetAccountAsync");
-
-        // Update balance
-        var newBalance = account.Balance + amount;
-        
-        if (newBalance < 0)
-            throw new ArgumentException("Insufficient funds. Current balance is " + account.Balance.ToString("C"));
-
-        account.Balance = newBalance;
-        account.LastUpdatedAt = DateTimeOffset.UtcNow;
-
-        // Add transaction record
-        var transaction = new TransactionEntity
+        try
         {
-            Id = Guid.NewGuid(),
-            Owner = owner,
-            Amount = amount,
-            BalanceAfter = newBalance,
-            Description = description,
-            CreatedAt = account.LastUpdatedAt
-        };
+            var response = await _container.ReadItemAsync<AccountEntity>(
+                id: $"account:{owner}",
+                partitionKey: new PartitionKey(owner));
+            
+            var account = response.Resource;
+            
+            // Update balance
+            var newBalance = account.Balance + amount;
+            
+            if (newBalance < 0)
+                throw new ArgumentException("Insufficient funds. Current balance is " + account.Balance.ToString("C"));
 
-        _context.Transactions.Add(transaction);
-        await _context.SaveChangesAsync();
+            account.Balance = newBalance;
+            account.LastUpdatedAt = DateTimeOffset.UtcNow;
 
-        _logger.LogInformation("Updated balance for owner {Owner}: {Amount:C} -> {NewBalance:C}", owner, amount, newBalance);
+            // Update account
+            await _container.ReplaceItemAsync(account, account.id, new PartitionKey(owner));
 
-        return new AccountInfo(account.Owner, account.Balance, account.CreatedAt, account.LastUpdatedAt);
+            // Add transaction record
+            var transaction = new TransactionEntity
+            {
+                id = $"transaction:{Guid.NewGuid()}",
+                pk = owner,
+                TransactionId = Guid.NewGuid(),
+                Owner = owner,
+                Amount = amount,
+                BalanceAfter = newBalance,
+                Description = description,
+                CreatedAt = account.LastUpdatedAt,
+                Type = "transaction"
+            };
+
+            await _container.CreateItemAsync(transaction, new PartitionKey(owner));
+
+            _logger.LogInformation("Updated balance for owner {Owner}: {Amount:C} -> {NewBalance:C}", owner, amount, newBalance);
+
+            return new AccountInfo(account.Owner, account.Balance, account.CreatedAt, account.LastUpdatedAt);
+        }
+        catch (CosmosException ex)
+        {
+            _logger.LogError(ex, "Error updating balance for owner {Owner}", owner);
+            throw;
+        }
     }
 
     public async Task<IEnumerable<TransactionInfo>> GetTransactionsAsync(string owner, int skip = 0, int take = 50)
@@ -617,18 +605,37 @@ public class LedgerServiceImpl : ILedgerService
 
         take = Math.Min(take, 1000); // Limit to prevent excessive data transfer
 
-        // First get all transactions for the owner, then order on client side
-        var transactions = await _context.Transactions
-            .Where(t => t.Owner == owner)
-            .ToListAsync();
+        try
+        {
+            var query = new QueryDefinition(
+                "SELECT * FROM c WHERE c.pk = @owner AND c.Type = @type ORDER BY c.CreatedAt DESC OFFSET @skip LIMIT @take")
+                .WithParameter("@owner", owner)
+                .WithParameter("@type", "transaction")
+                .WithParameter("@skip", skip)
+                .WithParameter("@take", take);
 
-        // Order by CreatedAt on client side and apply pagination
-        var orderedTransactions = transactions
-            .OrderByDescending(t => t.CreatedAt)
-            .Skip(skip)
-            .Take(take);
+            var iterator = _container.GetItemQueryIterator<TransactionEntity>(query);
+            var transactions = new List<TransactionEntity>();
 
-        return orderedTransactions.Select(t => new TransactionInfo(t.Id, t.Owner, t.Amount, t.BalanceAfter, t.Description, t.CreatedAt));
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                transactions.AddRange(response);
+            }
+
+            return transactions.Select(t => new TransactionInfo(
+                t.TransactionId, 
+                t.Owner, 
+                t.Amount, 
+                t.BalanceAfter, 
+                t.Description, 
+                t.CreatedAt));
+        }
+        catch (CosmosException ex)
+        {
+            _logger.LogError(ex, "Error retrieving transactions for owner {Owner}", owner);
+            throw;
+        }
     }
 
     public async Task<AccountInfo> ResetAccountAsync(string owner)
@@ -636,40 +643,52 @@ public class LedgerServiceImpl : ILedgerService
         if (string.IsNullOrWhiteSpace(owner))
             throw new ArgumentException("Owner cannot be null or empty", nameof(owner));
 
-        var account = await _context.Accounts.FirstOrDefaultAsync(a => a.Owner == owner);
-        
-        if (account is null)
+        try
+        {
+            var response = await _container.ReadItemAsync<AccountEntity>(
+                id: $"account:{owner}",
+                partitionKey: new PartitionKey(owner));
+            
+            var account = response.Resource;
+            
+            // Generate new random balance
+            var newBalance = GenerateRandomInitialBalance();
+            account.Balance = newBalance;
+            account.LastUpdatedAt = DateTimeOffset.UtcNow;
+
+            // Update account
+            await _container.ReplaceItemAsync(account, account.id, new PartitionKey(owner));
+
+            // Add reset transaction
+            var transaction = new TransactionEntity
+            {
+                id = $"transaction:{Guid.NewGuid()}",
+                pk = owner,
+                TransactionId = Guid.NewGuid(),
+                Owner = owner,
+                Amount = newBalance,
+                BalanceAfter = newBalance,
+                Description = $"Account reset to {newBalance:C}",
+                CreatedAt = account.LastUpdatedAt,
+                Type = "transaction"
+            };
+
+            await _container.CreateItemAsync(transaction, new PartitionKey(owner));
+
+            _logger.LogInformation("Reset account for owner {Owner} to new balance {Balance:C}", owner, newBalance);
+
+            return new AccountInfo(account.Owner, account.Balance, account.CreatedAt, account.LastUpdatedAt);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
             // If account doesn't exist, create it
             return await GetAccountAsync(owner);
         }
-
-        // Generate new random balance
-        var newBalance = GenerateRandomInitialBalance();
-        account.Balance = newBalance;
-        account.LastUpdatedAt = DateTimeOffset.UtcNow;
-
-        // Add reset transaction
-        var transaction = new TransactionEntity
+        catch (CosmosException ex)
         {
-            Id = Guid.NewGuid(),
-            Owner = owner,
-            Amount = newBalance - account.Balance + newBalance, // This will be the difference to reach newBalance
-            BalanceAfter = newBalance,
-            Description = "Account reset with new random balance",
-            CreatedAt = account.LastUpdatedAt
-        };
-
-        // Actually, let's make it simpler - just record the reset as a transaction
-        transaction.Amount = newBalance;
-        transaction.Description = $"Account reset to {newBalance:C}";
-
-        _context.Transactions.Add(transaction);
-        await _context.SaveChangesAsync();
-
-        _logger.LogInformation("Reset account for owner {Owner} to new balance {Balance:C}", owner, newBalance);
-
-        return new AccountInfo(account.Owner, account.Balance, account.CreatedAt, account.LastUpdatedAt);
+            _logger.LogError(ex, "Error resetting account for owner {Owner}", owner);
+            throw;
+        }
     }
 
     private decimal GenerateRandomInitialBalance()

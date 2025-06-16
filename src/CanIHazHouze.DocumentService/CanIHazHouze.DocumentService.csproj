@@ -8,11 +8,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CanIHazHouze.ServiceDefaults\CanIHazHouze.ServiceDefaults.csproj" />
-  </ItemGroup>
-  <ItemGroup>
+  </ItemGroup>  <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.2" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.2" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.2" />
+    <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="9.3.1" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.4.16" />
   </ItemGroup>
 
