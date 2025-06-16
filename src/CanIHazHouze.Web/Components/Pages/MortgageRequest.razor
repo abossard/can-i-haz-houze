@@ -1,6 +1,8 @@
 @page "/mortgage"
 @using CanIHazHouze.Web
+@using Microsoft.AspNetCore.Components.Forms
 @inject MortgageApiClient MortgageApi
+@inject DocumentApiClient DocumentApi
 @inject ILogger<MortgageRequest> Logger
 @rendermode @(new InteractiveServerRenderMode())
 
@@ -338,6 +340,9 @@ else
                         </button>
                         <button class="btn btn-outline-info" @onclick="GetVerificationStatus" disabled="@isProcessing">
                             @(isProcessing ? "Loading..." : "📊 Check Status")
+                        </button>
+                        <button class="btn btn-warning" @onclick="AddDemoDocuments" disabled="@isProcessing" title="Add demo documents with required tags for testing purposes">
+                            @(isProcessing ? "Adding Documents..." : "🎭 Add Demo Documents")
                         </button>
                     </div>
                 </div>
@@ -913,6 +918,108 @@ else
         finally
         {
             isProcessing = false;
+        }
+    }
+
+    private async Task AddDemoDocuments()
+    {
+        if (existingRequest == null) return;
+
+        isProcessing = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var userName = existingRequest.UserName;
+            
+            // Create demo documents with required tags
+            var documents = new[]
+            {
+                new { fileName = "income_statement.pdf", tags = new[] { "income", "salary", "financial" }, content = "Demo Income Statement Document" },
+                new { fileName = "credit_report.pdf", tags = new[] { "credit", "credit-report", "financial" }, content = "Demo Credit Report Document" },
+                new { fileName = "employment_verification.pdf", tags = new[] { "employment", "verification", "employer" }, content = "Demo Employment Verification Document" },
+                new { fileName = "property_appraisal.pdf", tags = new[] { "appraisal", "property", "valuation" }, content = "Demo Property Appraisal Document" }
+            };
+
+            var successCount = 0;
+            var errors = new List<string>();
+
+            // Create a simple mock IBrowserFile implementation for demo purposes
+            foreach (var doc in documents)
+            {
+                try
+                {
+                    var mockFile = new MockBrowserFile(doc.fileName, doc.content);
+                    var result = await DocumentApi.UploadDocumentAsync(userName, mockFile, doc.tags.ToList());
+                    
+                    if (result != null)
+                    {
+                        successCount++;
+                    }
+                    else
+                    {
+                        errors.Add($"{doc.fileName}: Upload failed");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"{doc.fileName}: {ex.Message}");
+                }
+            }
+
+            if (successCount == documents.Length)
+            {
+                successMessage = $"🎉 Successfully added {successCount} demo documents! All required document types are now available for verification.";
+            }
+            else if (successCount > 0)
+            {
+                successMessage = $"⚠️ Added {successCount} out of {documents.Length} demo documents. Some failed: {string.Join(", ", errors)}";
+            }
+            else
+            {
+                errorMessage = $"❌ Failed to add demo documents. Errors: {string.Join(", ", errors)}";
+            }
+
+            // Refresh verification status after adding documents
+            if (successCount > 0)
+            {
+                await Task.Delay(1000); // Give the service a moment to process
+                await GetVerificationStatus();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error adding demo documents");
+            errorMessage = "An error occurred while adding demo documents.";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    // Mock IBrowserFile implementation for demo purposes
+    private class MockBrowserFile : IBrowserFile
+    {
+        private readonly string _content;
+        
+        public MockBrowserFile(string name, string content)
+        {
+            Name = name;
+            _content = content;
+            Size = System.Text.Encoding.UTF8.GetByteCount(content);
+            LastModified = DateTimeOffset.UtcNow;
+            ContentType = "application/pdf";
+        }
+        
+        public string Name { get; }
+        public DateTimeOffset LastModified { get; }
+        public long Size { get; }
+        public string ContentType { get; }
+
+        public Stream OpenReadStream(long maxAllowedSize = 512000, CancellationToken cancellationToken = default)
+        {
+            return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(_content));
         }
     }
 
