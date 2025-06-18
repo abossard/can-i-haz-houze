@@ -1,7 +1,12 @@
 using CanIHazHouze.Web;
 using CanIHazHouze.Web.Components;
+using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Set default culture to ensure proper currency formatting
+CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("en-US");
+CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("en-US");
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
