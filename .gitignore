@@ -487,3 +487,4 @@ $RECYCLE.BIN/
 .gitignore
 DevUserDocs/
 *.pdf
+.azure
