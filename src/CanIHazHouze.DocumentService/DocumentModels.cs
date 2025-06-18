@@ -103,21 +103,10 @@ public class DocumentServiceImpl : IDocumentService
                 ["documentId"] = id.ToString()
             };
             
-            // Set blob index tags for efficient querying
-            var blobTags = new Dictionary<string, string>
-            {
-                ["owner"] = SanitizeTagValue(owner),
-                ["documentId"] = id.ToString(),
-                ["uploadYear"] = uploadedAt.Year.ToString(),
-                ["fileType"] = Path.GetExtension(originalFileName).TrimStart('.').ToLowerInvariant(),
-                ["contentType"] = file.ContentType ?? "application/octet-stream"
-            };
-            
-            // Upload with metadata and tags
+            // Upload with metadata
             var blobUploadOptions = new BlobUploadOptions
             {
                 Metadata = metadata,
-                Tags = blobTags,
                 HttpHeaders = new BlobHttpHeaders
                 {
                     ContentType = file.ContentType ?? "application/octet-stream"
@@ -333,32 +322,6 @@ public class DocumentServiceImpl : IDocumentService
         // Use virtual directory structure: owner/documentId_fileName
         // Note: owner will be added by the calling method when needed
         return $"{id}_{Path.GetFileName(fileName)}";
-    }
-
-    private static string SanitizeTagValue(string value)
-    {
-        // Azure blob tags have restrictions: alphanumeric, spaces, and some special chars
-        // Must be 1-256 characters, no leading/trailing spaces
-        if (string.IsNullOrWhiteSpace(value))
-            return "unknown";
-            
-        var sanitized = Regex.Replace(value.Trim(), @"[^a-zA-Z0-9\s\-_.]", "_");
-        return sanitized.Length > 256 ? sanitized[..256] : sanitized;
-    }
-
-    public string GetDocumentPath(Guid id, string owner, string fileName)
-    {
-        // Legacy method - now returns blob name for compatibility
-        return GetBlobName(id, fileName);
-    }
-
-    private string Sanitize(string username) =>
-        Regex.Replace(username.Trim().ToLowerInvariant(), @"[^a-z0-9_\-]", "_");
-
-    private string GetUserDir(string owner)
-    {
-        // Legacy method - kept for compatibility but no longer used
-        return Sanitize(owner);
     }
 
     private static DocumentMeta MapToDocumentMeta(DocumentEntity entity)

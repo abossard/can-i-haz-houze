@@ -2,6 +2,10 @@ using Azure.Provisioning.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
+
+var acaEnv = builder.AddAzureContainerAppEnvironment("aca-env")
+                    .WithAzdResourceNaming();
+                    
 // Add Azure Cosmos DB with emulator for local development
 // Using the new Linux-based emulator that supports Apple Silicon
 #pragma warning disable ASPIRECOSMOSDB001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
@@ -58,7 +62,7 @@ var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>(
     .WithReference(cosmos) // Reference the cosmos resource instead of container
     .WithReference(openai) // Add OpenAI reference for document processing
     .WithReference(blobStorage) // Add Blob Storage reference for document file storage
-    .WithRoleAssignments(storage, StorageBuiltInRole.StorageBlobDataOwner) // Grant Storage Blob Data Owner role for blob tags management
+    .WithRoleAssignments(storage, StorageBuiltInRole.StorageBlobDataOwner) // Grant Storage Blob Data Owner role for blob operations
     .WithHttpHealthCheck("/health");
 
 var ledgerService = builder.AddProject<Projects.CanIHazHouze_LedgerService>("ledgerservice")

@@ -15,6 +15,7 @@
     <ProjectReference Include="..\CanIHazHouze.Web\CanIHazHouze.Web.csproj" />
   </ItemGroup>  <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" Version="9.3.1" />
+    <PackageReference Include="Aspire.Hosting.Azure.AppContainers" Version="9.3.1" />
     <PackageReference Include="Aspire.Hosting.Azure.CosmosDB" Version="9.3.1" />
     <PackageReference Include="Aspire.Hosting.Azure.CognitiveServices" Version="9.3.1" />
     <PackageReference Include="Aspire.Hosting.Azure.Storage" Version="9.3.1" />

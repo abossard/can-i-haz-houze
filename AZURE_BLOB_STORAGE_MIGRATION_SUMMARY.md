@@ -20,16 +20,15 @@ Successfully migrated the CanIHazHouze Document Service from local file system s
 
 ### 4. DocumentServiceImpl Overhaul
 - **Constructor**: Now accepts `BlobServiceClient` parameter
-- **Upload**: Files uploaded to Azure Blob Storage with metadata and index tags
+- **Upload**: Files uploaded to Azure Blob Storage with metadata
 - **Delete**: Removes both Cosmos DB record and blob
 - **New Method**: `GetDocumentContentAsync()` for retrieving blob streams
-- **Tags & Metadata**: Rich tagging system for blob organization
+- **Tags & Metadata**: Rich metadata system for blob organization
 
 ### 5. Blob Storage Strategy
 - **Container**: Uses configurable container name (default: "documents")
 - **Naming**: Maintains `{documentId}_{fileName}` pattern
 - **Metadata**: Stores original filename, upload timestamp, owner, document ID
-- **Index Tags**: Enables efficient filtering by owner, document ID, year, file type
 
 ### 6. New API Endpoint
 - **Added**: `GET /documents/{id}/download` endpoint for file downloads
@@ -60,7 +59,6 @@ Successfully migrated the CanIHazHouze Document Service from local file system s
 ### Performance
 - ✅ Parallel upload/download capabilities
 - ✅ CDN integration ready
-- ✅ Efficient blob index tag filtering
 - ✅ Streaming downloads for large files
 
 ### Reliability
@@ -73,7 +71,7 @@ Successfully migrated the CanIHazHouze Document Service from local file system s
 - ✅ Local development with Azurite emulator
 - ✅ Production deployment with real Azure Storage
 - ✅ Consistent configuration via .NET Aspire
-- ✅ Rich metadata and tagging system
+- ✅ Rich metadata system
 
 ## Migration Compatibility
 - ✅ Maintains existing API contracts
