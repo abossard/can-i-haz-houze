@@ -81,8 +81,9 @@ public class DocumentServiceImpl : IDocumentService
             throw new ArgumentException($"File size exceeds maximum allowed size of {_options.MaxFileSizeBytes} bytes", nameof(file));
 
         var id = Guid.NewGuid();
-        var fileName = $"{id}_{Path.GetFileName(file.FileName)}";
-        var blobName = GetBlobName(id, fileName);
+        var originalFileName = Path.GetFileName(file.FileName);
+        var fileName = $"{id}_{originalFileName}";
+        var blobName = GetBlobName(id, originalFileName);
         var uploadedAt = DateTimeOffset.UtcNow;
         
         try
@@ -96,7 +97,7 @@ public class DocumentServiceImpl : IDocumentService
             // Set blob metadata
             var metadata = new Dictionary<string, string>
             {
-                ["originalFileName"] = Path.GetFileName(file.FileName) ?? "",
+                ["originalFileName"] = originalFileName ?? "",
                 ["uploadedAt"] = uploadedAt.ToString("O"),
                 ["owner"] = owner,
                 ["documentId"] = id.ToString()
@@ -108,7 +109,7 @@ public class DocumentServiceImpl : IDocumentService
                 ["owner"] = SanitizeTagValue(owner),
                 ["documentId"] = id.ToString(),
                 ["uploadYear"] = uploadedAt.Year.ToString(),
-                ["fileType"] = Path.GetExtension(file.FileName).TrimStart('.').ToLowerInvariant(),
+                ["fileType"] = Path.GetExtension(originalFileName).TrimStart('.').ToLowerInvariant(),
                 ["contentType"] = file.ContentType ?? "application/octet-stream"
             };
             

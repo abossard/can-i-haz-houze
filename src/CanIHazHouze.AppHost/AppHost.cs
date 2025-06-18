@@ -56,6 +56,7 @@ var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>(
     .WithReference(cosmos) // Reference the cosmos resource instead of container
     .WithReference(openai) // Add OpenAI reference for document processing
     .WithReference(blobStorage) // Add Blob Storage reference for document file storage
+    .WithRoleAssignments(storage, StorageBuiltInRole.StorageBlobDataOwner) // Grant Storage Blob Data Owner role for blob tags management
     .WithHttpHealthCheck("/health");
 
 var ledgerService = builder.AddProject<Projects.CanIHazHouze_LedgerService>("ledgerservice")
