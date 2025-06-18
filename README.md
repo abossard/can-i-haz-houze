@@ -214,6 +214,26 @@ dotnet run --project CanIHazHouze.Web
 - Verify all required services are running
 - Make sure Docker is running (for Cosmos DB emulator)
 
+### Currency Shows "¤" Symbol Instead of "$" 💱
+This happens when the server culture isn't set to US/USD on Azure deployment. The "¤" is a generic currency symbol.
+
+**Quick Fix**: Update your `Program.cs` files to set the culture:
+```csharp
+// Add this after var builder = WebApplication.CreateBuilder(args);
+using System.Globalization;
+
+// Set culture to US for consistent currency formatting
+var culture = new CultureInfo("en-US");
+CultureInfo.DefaultThreadCurrentCulture = culture;
+CultureInfo.DefaultThreadCurrentUICulture = culture;
+```
+
+**Alternative**: Use explicit formatting in Razor components:
+```csharp
+// Instead of: @amount.ToString("C")
+// Use: @amount.ToString("C", CultureInfo.CreateSpecificCulture("en-US"))
+```
+
 ### Azure OpenAI Connection Issues 🔌
 - Verify your endpoint URL doesn't have trailing slashes
 - Check your API key is valid and has proper permissions

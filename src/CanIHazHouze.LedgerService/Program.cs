@@ -46,11 +46,8 @@ app.UseExceptionHandler();
 // Use CORS
 app.UseCors();
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-    app.MapScalarApiReference();
-}
+app.MapOpenApi();
+app.MapScalarApiReference();
 
 // Health check endpoint
 app.MapGet("/health", () => Results.Ok("Healthy"))
