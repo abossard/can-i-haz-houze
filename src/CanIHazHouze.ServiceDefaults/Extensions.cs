@@ -167,6 +167,16 @@ public static class Extensions
                         containerAppName ?? "null", containerAppEnvDnsSuffix ?? "null");
                 }
 
+                // Remove health check endpoints from OpenAPI spec
+                var pathsToRemove = document.Paths.Keys
+                    .Where(path => path.StartsWith(HealthEndpointPath) || path.StartsWith(AlivenessEndpointPath))
+                    .ToList();
+
+                foreach (var path in pathsToRemove)
+                {
+                    document.Paths.Remove(path);
+                }
+
                 return Task.CompletedTask;
             });
         });
