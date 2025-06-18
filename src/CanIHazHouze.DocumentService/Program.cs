@@ -860,8 +860,6 @@ app.MapGet("/documents/user/{owner}/verification", async (string owner, IDocumen
 .Produces(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status500InternalServerError);
 
-app.MapDefaultEndpoints();
-
 // AI-powered document analysis endpoint
 app.MapPost("/documents/{id}/analyze", async (
     Guid id, 

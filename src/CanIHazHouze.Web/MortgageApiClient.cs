@@ -238,8 +238,8 @@ public class MortgageApiClient
 
 public class MortgageRequestDto
 {
-    public Guid RequestId { get; set; }
-    public Guid Id => RequestId; // Backward compatibility property
+    public Guid Id { get; set; }
+    public Guid RequestId => Id; // Backward compatibility property
     public string UserName { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string StatusReason { get; set; } = string.Empty;
@@ -247,31 +247,69 @@ public class MortgageRequestDto
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     
-    // Handle the JSON string to Dictionary conversion
-    public string RequestDataJson { get; set; } = "{}";
+    /// <summary>
+    /// Strongly-typed mortgage request data (new format)
+    /// </summary>
+    public MortgageRequestDataDto RequestData { get; set; } = new();
     
-    [System.Text.Json.Serialization.JsonIgnore]
-    public Dictionary<string, object> RequestData
-    {
-        get
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(RequestDataJson))
-                    return new Dictionary<string, object>();
-                    
-                return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(RequestDataJson) ?? new Dictionary<string, object>();
-            }
-            catch
-            {
-                return new Dictionary<string, object>();
-            }
-        }
-        set
-        {
-            RequestDataJson = System.Text.Json.JsonSerializer.Serialize(value);
-        }
-    }
+    /// <summary>
+    /// Legacy dictionary format for backward compatibility
+    /// </summary>
+    public Dictionary<string, object> RequestDataLegacy { get; set; } = new();
+}
+
+/// <summary>
+/// Strongly-typed mortgage request data model (client-side)
+/// </summary>
+public class MortgageRequestDataDto
+{
+    public MortgageIncomeDataDto Income { get; set; } = new();
+    public MortgageCreditDataDto Credit { get; set; } = new();
+    public MortgageEmploymentDataDto Employment { get; set; } = new();
+    public MortgagePropertyDataDto Property { get; set; } = new();
+}
+
+/// <summary>
+/// Income verification data (client-side)
+/// </summary>
+public class MortgageIncomeDataDto
+{
+    public decimal? AnnualIncome { get; set; }
+    public string EmploymentType { get; set; } = string.Empty;
+    public decimal? YearsEmployed { get; set; }
+}
+
+/// <summary>
+/// Credit report data (client-side)
+/// </summary>
+public class MortgageCreditDataDto
+{
+    public int? Score { get; set; }
+    public DateTime? ReportDate { get; set; }
+    public decimal? OutstandingDebts { get; set; }
+}
+
+/// <summary>
+/// Employment verification data (client-side)
+/// </summary>
+public class MortgageEmploymentDataDto
+{
+    public string EmployerName { get; set; } = string.Empty;
+    public string JobTitle { get; set; } = string.Empty;
+    public decimal? MonthlySalary { get; set; }
+    public bool IsVerified { get; set; }
+}
+
+/// <summary>
+/// Property appraisal data (client-side)
+/// </summary>
+public class MortgagePropertyDataDto
+{
+    public decimal? PropertyValue { get; set; }
+    public decimal? LoanAmount { get; set; }
+    public string PropertyType { get; set; } = string.Empty;
+    public DateTime? AppraisalDate { get; set; }
+    public bool AppraisalCompleted { get; set; }
 }
 
 public class CrossServiceVerificationResultDto

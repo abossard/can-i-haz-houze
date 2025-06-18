@@ -84,13 +84,43 @@ else
                 </div>
                 <div class="col-md-6">
                     <h5>Request Data</h5>
-                    @if (existingRequest.RequestData.Any())
+                    @if (HasAnyData())
                     {
                         <ul class="list-group">
-                            @foreach (var item in existingRequest.RequestData)
+                            @if (existingRequest.RequestData.Income.AnnualIncome.HasValue)
                             {
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span><strong>@item.Key:</strong> @item.Value</span>
+                                    <span><strong>Annual Income:</strong> @existingRequest.RequestData.Income.AnnualIncome.Value.ToString("C")</span>
+                                </li>
+                            }
+                            @if (!string.IsNullOrEmpty(existingRequest.RequestData.Income.EmploymentType))
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span><strong>Employment Type:</strong> @existingRequest.RequestData.Income.EmploymentType</span>
+                                </li>
+                            }
+                            @if (existingRequest.RequestData.Credit.Score.HasValue)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span><strong>Credit Score:</strong> @existingRequest.RequestData.Credit.Score.Value</span>
+                                </li>
+                            }
+                            @if (!string.IsNullOrEmpty(existingRequest.RequestData.Employment.EmployerName))
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span><strong>Employer:</strong> @existingRequest.RequestData.Employment.EmployerName</span>
+                                </li>
+                            }
+                            @if (existingRequest.RequestData.Property.PropertyValue.HasValue)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span><strong>Property Value:</strong> @existingRequest.RequestData.Property.PropertyValue.Value.ToString("C")</span>
+                                </li>
+                            }
+                            @if (existingRequest.RequestData.Property.LoanAmount.HasValue)
+                            {
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span><strong>Loan Amount:</strong> @existingRequest.RequestData.Property.LoanAmount.Value.ToString("C")</span>
                                 </li>
                             }
                         </ul>
@@ -536,54 +566,91 @@ else
 
     private void PopulateFormsFromRequestData()
     {
-        if (existingRequest?.RequestData == null) 
+        if (existingRequest == null) 
         {
-            Logger.LogWarning("PopulateFormsFromRequestData called but RequestData is null");
+            Logger.LogWarning("PopulateFormsFromRequestData called but existingRequest is null");
             return;
         }
 
-        var data = existingRequest.RequestData;
-        Logger.LogInformation("Populating forms with {Count} data items: {Keys}", data.Count, string.Join(", ", data.Keys));
-
         try
         {
-            // Populate income form
-            if (data.TryGetValue("income_annual", out var annualIncome))
-                incomeForm.AnnualIncome = ConvertToDecimal(annualIncome);
-            if (data.TryGetValue("income_employment_type", out var empType))
-                incomeForm.EmploymentType = ConvertToString(empType);
-            if (data.TryGetValue("income_years_employed", out var yearsEmp))
-                incomeForm.YearsEmployed = ConvertToDecimal(yearsEmp);
+            // Try to use strongly-typed data first (new format)
+            if (existingRequest.RequestData != null)
+            {
+                var data = existingRequest.RequestData;
+                Logger.LogInformation("Populating forms with strongly-typed data");
 
-            // Populate credit form
-            if (data.TryGetValue("credit_score", out var creditScore))
-                creditForm.CreditScore = ConvertToInt(creditScore);
-            if (data.TryGetValue("credit_report_date", out var creditDate))
-                creditForm.ReportDate = ConvertToDateTime(creditDate);
-            if (data.TryGetValue("credit_outstanding_debts", out var debts))
-                creditForm.OutstandingDebts = ConvertToDecimal(debts);
+                // Populate income form
+                incomeForm.AnnualIncome = data.Income.AnnualIncome;
+                incomeForm.EmploymentType = data.Income.EmploymentType ?? string.Empty;
+                incomeForm.YearsEmployed = data.Income.YearsEmployed;
 
-            // Populate employment form
-            if (data.TryGetValue("employment_employer", out var employer))
-                employmentForm.EmployerName = ConvertToString(employer);
-            if (data.TryGetValue("employment_job_title", out var jobTitle))
-                employmentForm.JobTitle = ConvertToString(jobTitle);
-            if (data.TryGetValue("employment_monthly_salary", out var monthlySalary))
-                employmentForm.MonthlySalary = ConvertToDecimal(monthlySalary);
-            if (data.TryGetValue("employment_verified", out var empVerified))
-                employmentForm.IsVerified = ConvertToBoolean(empVerified);
+                // Populate credit form
+                creditForm.CreditScore = data.Credit.Score;
+                creditForm.ReportDate = data.Credit.ReportDate;
+                creditForm.OutstandingDebts = data.Credit.OutstandingDebts;
 
-            // Populate property form
-            if (data.TryGetValue("property_value", out var propValue))
-                propertyForm.PropertyValue = ConvertToDecimal(propValue);
-            if (data.TryGetValue("property_loan_amount", out var loanAmount))
-                propertyForm.LoanAmount = ConvertToDecimal(loanAmount);
-            if (data.TryGetValue("property_type", out var propType))
-                propertyForm.PropertyType = ConvertToString(propType);
-            if (data.TryGetValue("property_appraisal_date", out var appraisalDate))
-                propertyForm.AppraisalDate = ConvertToDateTime(appraisalDate);
-            if (data.TryGetValue("property_appraisal_completed", out var appraisalCompleted))
-                propertyForm.AppraisalCompleted = ConvertToBoolean(appraisalCompleted);
+                // Populate employment form
+                employmentForm.EmployerName = data.Employment.EmployerName ?? string.Empty;
+                employmentForm.JobTitle = data.Employment.JobTitle ?? string.Empty;
+                employmentForm.MonthlySalary = data.Employment.MonthlySalary;
+                employmentForm.IsVerified = data.Employment.IsVerified;
+
+                // Populate property form
+                propertyForm.PropertyValue = data.Property.PropertyValue;
+                propertyForm.LoanAmount = data.Property.LoanAmount;
+                propertyForm.PropertyType = data.Property.PropertyType ?? string.Empty;
+                propertyForm.AppraisalDate = data.Property.AppraisalDate;
+                propertyForm.AppraisalCompleted = data.Property.AppraisalCompleted;
+            }
+            // Fallback to legacy format if strongly-typed data is not available
+            else if (existingRequest.RequestDataLegacy != null && existingRequest.RequestDataLegacy.Count > 0)
+            {
+                var data = existingRequest.RequestDataLegacy;
+                Logger.LogInformation("Populating forms with legacy data format ({Count} items)", data.Count);
+
+                // Populate income form
+                if (data.TryGetValue("income_annual", out var annualIncome))
+                    incomeForm.AnnualIncome = ConvertToDecimal(annualIncome);
+                if (data.TryGetValue("income_employment_type", out var empType))
+                    incomeForm.EmploymentType = ConvertToString(empType);
+                if (data.TryGetValue("income_years_employed", out var yearsEmp))
+                    incomeForm.YearsEmployed = ConvertToDecimal(yearsEmp);
+
+                // Populate credit form
+                if (data.TryGetValue("credit_score", out var creditScore))
+                    creditForm.CreditScore = ConvertToInt(creditScore);
+                if (data.TryGetValue("credit_report_date", out var creditDate))
+                    creditForm.ReportDate = ConvertToDateTime(creditDate);
+                if (data.TryGetValue("credit_outstanding_debts", out var debts))
+                    creditForm.OutstandingDebts = ConvertToDecimal(debts);
+
+                // Populate employment form
+                if (data.TryGetValue("employment_employer", out var employer))
+                    employmentForm.EmployerName = ConvertToString(employer);
+                if (data.TryGetValue("employment_job_title", out var jobTitle))
+                    employmentForm.JobTitle = ConvertToString(jobTitle);
+                if (data.TryGetValue("employment_monthly_salary", out var monthlySalary))
+                    employmentForm.MonthlySalary = ConvertToDecimal(monthlySalary);
+                if (data.TryGetValue("employment_verified", out var empVerified))
+                    employmentForm.IsVerified = ConvertToBoolean(empVerified);
+
+                // Populate property form
+                if (data.TryGetValue("property_value", out var propValue))
+                    propertyForm.PropertyValue = ConvertToDecimal(propValue);
+                if (data.TryGetValue("property_loan_amount", out var loanAmount))
+                    propertyForm.LoanAmount = ConvertToDecimal(loanAmount);
+                if (data.TryGetValue("property_type", out var propType))
+                    propertyForm.PropertyType = ConvertToString(propType);
+                if (data.TryGetValue("property_appraisal_date", out var appraisalDate))
+                    propertyForm.AppraisalDate = ConvertToDateTime(appraisalDate);
+                if (data.TryGetValue("property_appraisal_completed", out var appraisalCompleted))
+                    propertyForm.AppraisalCompleted = ConvertToBoolean(appraisalCompleted);
+            }
+            else
+            {
+                Logger.LogInformation("No data available to populate forms");
+            }
         }
         catch (Exception ex)
         {
@@ -714,31 +781,37 @@ else
     }
 
     // Data checking methods
+    private bool HasAnyData()
+    {
+        if (existingRequest?.RequestData == null) return false;
+        
+        return HasIncomeData() || HasCreditData() || HasEmploymentData() || HasPropertyData();
+    }
+    
     private bool HasIncomeData()
     {
-        var hasData = existingRequest?.RequestData?.ContainsKey("income_annual") == true;
-        Logger.LogInformation("HasIncomeData: {HasData} (RequestData keys: {Keys})", 
-            hasData, existingRequest?.RequestData?.Keys != null ? string.Join(", ", existingRequest.RequestData.Keys) : "null");
+        var hasData = existingRequest?.RequestData?.Income?.AnnualIncome.HasValue == true;
+        Logger.LogInformation("HasIncomeData: {HasData}", hasData);
         return hasData;
     }
 
     private bool HasCreditData()
     {
-        var hasData = existingRequest?.RequestData?.ContainsKey("credit_score") == true;
+        var hasData = existingRequest?.RequestData?.Credit?.Score.HasValue == true;
         Logger.LogInformation("HasCreditData: {HasData}", hasData);
         return hasData;
     }
 
     private bool HasEmploymentData()
     {
-        var hasData = existingRequest?.RequestData?.ContainsKey("employment_employer") == true;
+        var hasData = !string.IsNullOrEmpty(existingRequest?.RequestData?.Employment?.EmployerName);
         Logger.LogInformation("HasEmploymentData: {HasData}", hasData);
         return hasData;
     }
 
     private bool HasPropertyData()
     {
-        var hasData = existingRequest?.RequestData?.ContainsKey("property_value") == true;
+        var hasData = existingRequest?.RequestData?.Property?.PropertyValue.HasValue == true;
         Logger.LogInformation("HasPropertyData: {HasData}", hasData);
         return hasData;
     }

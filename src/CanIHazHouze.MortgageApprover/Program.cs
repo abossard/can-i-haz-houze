@@ -10,36 +10,35 @@ using Microsoft.Azure.Cosmos;
 /*
  * CanIHazHouze Mortgage Approver Service
  * 
- * This service manages mortgage applications with structured data collection and automated approval logic.
+ * This service manages mortgage applications with strongly-typed data collection and automated approval logic.
  * 
  * Data Structure Overview:
  * ======================
  * 
- * Mortgage requests store additional data in a flexible JSON structure (RequestData property).
- * The following data fields are recognized and used in the approval evaluation:
+ * Mortgage requests store data using strongly-typed models (RequestData property) containing:
  * 
- * Income Verification Fields:
- * - income_annual: Annual income in dollars (decimal)
- * - income_employment_type: Employment type (string: full-time, part-time, contract, self-employed)
- * - income_years_employed: Years of employment (decimal, supports partial years)
+ * Income Verification Data (MortgageIncomeData):
+ * - AnnualIncome: Annual income in dollars (decimal?)
+ * - EmploymentType: Employment type (string: full-time, part-time, contract, self-employed)
+ * - YearsEmployed: Years of employment (decimal?, supports partial years)
  * 
- * Credit Report Fields:
- * - credit_score: Credit score (int, range 300-850)
- * - credit_report_date: Date of credit report (string, ISO format)
- * - credit_outstanding_debts: Outstanding debts in dollars (decimal)
+ * Credit Report Data (MortgageCreditData):
+ * - Score: Credit score (int?, range 300-850)
+ * - ReportDate: Date of credit report (DateTime?)
+ * - OutstandingDebts: Outstanding debts in dollars (decimal?)
  * 
- * Employment Verification Fields:
- * - employment_employer: Name of current employer (string)
- * - employment_job_title: Current job title (string)
- * - employment_monthly_salary: Monthly salary in dollars (decimal)
- * - employment_verified: Whether employment has been verified (bool)
+ * Employment Verification Data (MortgageEmploymentData):
+ * - EmployerName: Name of current employer (string)
+ * - JobTitle: Current job title (string)
+ * - MonthlySalary: Monthly salary in dollars (decimal?)
+ * - IsVerified: Whether employment has been verified (bool)
  * 
- * Property Appraisal Fields:
- * - property_value: Appraised property value in dollars (decimal)
- * - property_loan_amount: Requested loan amount in dollars (decimal)
- * - property_type: Type of property (string: single-family, condo, townhouse, multi-family)
- * - property_appraisal_date: Date of property appraisal (string, ISO format)
- * - property_appraisal_completed: Whether appraisal has been completed (bool)
+ * Property Appraisal Data (MortgagePropertyData):
+ * - PropertyValue: Appraised property value in dollars (decimal?)
+ * - LoanAmount: Requested loan amount in dollars (decimal?)
+ * - PropertyType: Type of property (string: single-family, condo, townhouse, multi-family)
+ * - AppraisalDate: Date of property appraisal (DateTime?)
+ * - AppraisalCompleted: Whether appraisal has been completed (bool)
  * 
  * Approval Logic:
  * ==============
@@ -48,6 +47,7 @@ using Microsoft.Azure.Cosmos;
  * 2. Credit score must be >= 650
  * 3. Debt-to-income ratio (monthly payment / monthly income) must be <= 43%
  * 4. Monthly payment is calculated using standard 30-year mortgage at 7% interest
+ * 5. Cross-service verification must pass (documents and financial verification)
  * 
  * Status Flow:
  * ===========
@@ -57,8 +57,8 @@ using Microsoft.Azure.Cosmos;
  * - Pending: Initial state when request is created
  * - RequiresAdditionalInfo: Missing one or more requirement categories
  * - UnderReview: All requirements present but insufficient financial data for auto-approval
- * - Approved: Meets all automated approval criteria
- * - Rejected: Fails automated approval criteria (low credit score or high DTI ratio)
+ * - Approved: Meets all automated approval criteria including cross-service verification
+ * - Rejected: Fails automated approval criteria (low credit score, high DTI ratio, or verification failure)
  */
 
 var builder = WebApplication.CreateBuilder(args);
@@ -131,7 +131,8 @@ app.MapPost("/mortgage-requests", async (
     try
     {
         var mortgageRequest = await mortgageService.CreateMortgageRequestAsync(request.UserName);
-        return Results.Created($"/mortgage-requests/{mortgageRequest.RequestId}", mortgageRequest);
+        var dto = MortgageRequestDto.FromDomain(mortgageRequest);
+        return Results.Created($"/mortgage-requests/{mortgageRequest.RequestId}", dto);
     }
     catch (InvalidOperationException ex)
     {
@@ -158,7 +159,10 @@ app.MapGet("/mortgage-requests/{requestId:guid}", async (
     try
     {
         var mortgageRequest = await mortgageService.GetMortgageRequestAsync(requestId);
-        return mortgageRequest != null ? Results.Ok(mortgageRequest) : Results.NotFound();
+        if (mortgageRequest == null) return Results.NotFound();
+        
+        var dto = MortgageRequestDto.FromDomain(mortgageRequest);
+        return Results.Ok(dto);
     }
     catch (Exception ex)
     {
@@ -177,7 +181,10 @@ app.MapGet("/mortgage-requests/user/{userName}", async (
     try
     {
         var mortgageRequest = await mortgageService.GetMortgageRequestByUserAsync(userName);
-        return mortgageRequest != null ? Results.Ok(mortgageRequest) : Results.NotFound();
+        if (mortgageRequest == null) return Results.NotFound();
+        
+        var dto = MortgageRequestDto.FromDomain(mortgageRequest);
+        return Results.Ok(dto);
     }
     catch (Exception ex)
     {
@@ -191,13 +198,16 @@ app.MapGet("/mortgage-requests/user/{userName}", async (
 
 app.MapPut("/mortgage-requests/{requestId:guid}/data", async (
     Guid requestId,
-    [FromBody, Required] UpdateMortgageDataDto updateData,
+    [FromBody, Required] UpdateMortgageDataStrongDto updateData,
     IMortgageApprovalService mortgageService) =>
 {
     try
     {
-        var mortgageRequest = await mortgageService.UpdateMortgageDataAsync(requestId, updateData.Data);
-        return mortgageRequest != null ? Results.Ok(mortgageRequest) : Results.NotFound();
+        var mortgageRequest = await mortgageService.UpdateMortgageDataStrongAsync(requestId, updateData);
+        if (mortgageRequest == null) return Results.NotFound();
+        
+        var dto = MortgageRequestDto.FromDomain(mortgageRequest);
+        return Results.Ok(dto);
     }
     catch (ArgumentException ex)
     {
@@ -211,7 +221,9 @@ app.MapPut("/mortgage-requests/{requestId:guid}/data", async (
 })
 .WithName("UpdateMortgageRequestData")
 .WithOpenApi()
-.WithTags("MortgageRequests");
+.WithTags("MortgageRequests")
+.WithSummary("Update mortgage request with strongly-typed data")
+.WithDescription("Updates mortgage request data using strongly-typed DTOs for better type safety and validation.");
 
 app.MapDelete("/mortgage-requests/{requestId:guid}", async (
     Guid requestId,
@@ -241,7 +253,8 @@ app.MapGet("/mortgage-requests", async (
     try
     {
         var requests = await mortgageService.GetMortgageRequestsAsync(page, pageSize, status);
-        return Results.Ok(requests);
+        var dtos = requests.Select(MortgageRequestDto.FromDomain).ToList();
+        return Results.Ok(dtos);
     }
     catch (Exception ex)
     {
@@ -292,8 +305,9 @@ app.MapPost("/mortgage-requests/{requestId:guid}/refresh-status", async (
         if (mortgageRequest == null)
             return Results.NotFound();
 
-        // Trigger re-evaluation by updating with current data (this forces status evaluation)
-        var updatedRequest = await mortgageService.UpdateMortgageDataAsync(requestId, new Dictionary<string, object>());
+        // Trigger re-evaluation by updating with current strongly-typed data (this forces status evaluation)
+        var emptyUpdate = new UpdateMortgageDataStrongDto();
+        var updatedRequest = await mortgageService.UpdateMortgageDataStrongAsync(requestId, emptyUpdate);
         
         return updatedRequest != null ? Results.Ok(updatedRequest) : Results.NotFound();
     }
@@ -381,186 +395,50 @@ app.Run();
 
 // DTOs for API endpoints
 public record CreateMortgageRequestDto(string UserName);
-public record UpdateMortgageDataDto(Dictionary<string, object> Data);
 
 /// <summary>
-/// Typed data models for mortgage requirement fields
-/// These models represent the structured data that can be stored in a mortgage request
+/// Strongly-typed DTO for updating mortgage data sections
 /// </summary>
-public static class MortgageDataFields
+public class UpdateMortgageDataStrongDto
 {
-    /// <summary>
-    /// Income verification related data fields
-    /// </summary>
-    public static class Income
-    {
-        /// <summary>Key: income_annual - Annual income in dollars (decimal)</summary>
-        public const string Annual = "income_annual";
-        
-        /// <summary>Key: income_employment_type - Type of employment (string: full-time, part-time, contract, self-employed)</summary>
-        public const string EmploymentType = "income_employment_type";
-        
-        /// <summary>Key: income_years_employed - Years of employment (decimal, supports half years)</summary>
-        public const string YearsEmployed = "income_years_employed";
-    }
-
-    /// <summary>
-    /// Credit report related data fields
-    /// </summary>
-    public static class Credit
-    {
-        /// <summary>Key: credit_score - Credit score (int, range 300-850)</summary>
-        public const string Score = "credit_score";
-        
-        /// <summary>Key: credit_report_date - Date of credit report (string, ISO date format)</summary>
-        public const string ReportDate = "credit_report_date";
-        
-        /// <summary>Key: credit_outstanding_debts - Outstanding debts in dollars (decimal)</summary>
-        public const string OutstandingDebts = "credit_outstanding_debts";
-    }
-
-    /// <summary>
-    /// Employment verification related data fields
-    /// </summary>
-    public static class Employment
-    {
-        /// <summary>Key: employment_employer - Name of current employer (string)</summary>
-        public const string Employer = "employment_employer";
-        
-        /// <summary>Key: employment_job_title - Current job title (string)</summary>
-        public const string JobTitle = "employment_job_title";
-        
-        /// <summary>Key: employment_monthly_salary - Monthly salary in dollars (decimal)</summary>
-        public const string MonthlySalary = "employment_monthly_salary";
-        
-        /// <summary>Key: employment_verified - Whether employment has been verified (bool)</summary>
-        public const string Verified = "employment_verified";
-    }
-
-    /// <summary>
-    /// Property appraisal related data fields
-    /// </summary>
-    public static class Property
-    {
-        /// <summary>Key: property_value - Appraised property value in dollars (decimal)</summary>
-        public const string Value = "property_value";
-        
-        /// <summary>Key: property_loan_amount - Requested loan amount in dollars (decimal)</summary>
-        public const string LoanAmount = "property_loan_amount";
-        
-        /// <summary>Key: property_type - Type of property (string: single-family, condo, townhouse, multi-family)</summary>
-        public const string Type = "property_type";
-        
-        /// <summary>Key: property_appraisal_date - Date of property appraisal (string, ISO date format)</summary>
-        public const string AppraisalDate = "property_appraisal_date";
-        
-        /// <summary>Key: property_appraisal_completed - Whether appraisal has been completed (bool)</summary>
-        public const string AppraisalCompleted = "property_appraisal_completed";
-    }
-
-    /// <summary>
-    /// Legacy field keys for backward compatibility
-    /// </summary>
-    public static class Legacy
-    {
-        /// <summary>Legacy key for income verification flag</summary>
-        public const string IncomeVerification = "income_verification";
-        
-        /// <summary>Legacy key for credit report flag</summary>
-        public const string CreditReport = "credit_report";
-        
-        /// <summary>Legacy key for property appraisal flag</summary>
-        public const string PropertyAppraisal = "property_appraisal";
-        
-        /// <summary>Legacy key for employment verification flag</summary>
-        public const string EmploymentVerification = "employment_verification";
-        
-        /// <summary>Legacy key for annual income</summary>
-        public const string AnnualIncome = "annual_income";
-        
-        /// <summary>Legacy key for loan amount</summary>
-        public const string LoanAmount = "loan_amount";
-    }
+    public MortgageIncomeData? Income { get; set; }
+    public MortgageCreditData? Credit { get; set; }
+    public MortgageEmploymentData? Employment { get; set; }
+    public MortgagePropertyData? Property { get; set; }
 }
 
 /// <summary>
-/// Strongly typed data transfer objects for mortgage requirement data
-/// These DTOs can be used for validation and documentation purposes
+/// DTO for API responses with strongly-typed mortgage request data
 /// </summary>
-public class MortgageIncomeDataDto
+public class MortgageRequestDto
 {
-    /// <summary>Annual income in dollars</summary>
-    [Range(0, double.MaxValue, ErrorMessage = "Annual income must be positive")]
-    public decimal AnnualIncome { get; set; }
-
-    /// <summary>Type of employment</summary>
-    [Required]
-    [RegularExpression("^(full-time|part-time|contract|self-employed)$", 
-        ErrorMessage = "Employment type must be one of: full-time, part-time, contract, self-employed")]
-    public string EmploymentType { get; set; } = string.Empty;
-
-    /// <summary>Years of employment (supports decimals for partial years)</summary>
-    [Range(0, 50, ErrorMessage = "Years employed must be between 0 and 50")]
-    public decimal YearsEmployed { get; set; }
-}
-
-public class MortgageCreditDataDto
-{
-    /// <summary>Credit score (300-850 range)</summary>
-    [Range(300, 850, ErrorMessage = "Credit score must be between 300 and 850")]
-    public int CreditScore { get; set; }
-
-    /// <summary>Date of credit report</summary>
-    [Required]
-    public DateTime ReportDate { get; set; }
-
-    /// <summary>Outstanding debts in dollars</summary>
-    [Range(0, double.MaxValue, ErrorMessage = "Outstanding debts must be positive")]
-    public decimal OutstandingDebts { get; set; }
-}
-
-public class MortgageEmploymentDataDto
-{
-    /// <summary>Name of current employer</summary>
-    [Required]
-    [StringLength(200, ErrorMessage = "Employer name cannot exceed 200 characters")]
-    public string EmployerName { get; set; } = string.Empty;
-
-    /// <summary>Current job title</summary>
-    [Required]
-    [StringLength(200, ErrorMessage = "Job title cannot exceed 200 characters")]
-    public string JobTitle { get; set; } = string.Empty;
-
-    /// <summary>Monthly salary in dollars</summary>
-    [Range(0, double.MaxValue, ErrorMessage = "Monthly salary must be positive")]
-    public decimal MonthlySalary { get; set; }
-
-    /// <summary>Whether employment has been verified</summary>
-    public bool IsVerified { get; set; }
-}
-
-public class MortgagePropertyDataDto
-{
-    /// <summary>Appraised property value in dollars</summary>
-    [Range(0, double.MaxValue, ErrorMessage = "Property value must be positive")]
-    public decimal PropertyValue { get; set; }
-
-    /// <summary>Requested loan amount in dollars</summary>
-    [Range(0, double.MaxValue, ErrorMessage = "Loan amount must be positive")]
-    public decimal LoanAmount { get; set; }
-
-    /// <summary>Type of property</summary>
-    [Required]
-    [RegularExpression("^(single-family|condo|townhouse|multi-family)$", 
-        ErrorMessage = "Property type must be one of: single-family, condo, townhouse, multi-family")]
-    public string PropertyType { get; set; } = string.Empty;
-
-    /// <summary>Date of property appraisal</summary>
-    [Required]
-    public DateTime AppraisalDate { get; set; }
-
-    /// <summary>Whether appraisal has been completed</summary>
-    public bool AppraisalCompleted { get; set; }
+    public Guid Id { get; set; }
+    public string UserName { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string StatusReason { get; set; } = string.Empty;
+    public string MissingRequirements { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    
+    /// <summary>
+    /// Strongly-typed mortgage request data
+    /// </summary>
+    public MortgageRequestData RequestData { get; set; } = new();
+    
+    public static MortgageRequestDto FromDomain(MortgageRequest request)
+    {
+        return new MortgageRequestDto
+        {
+            Id = request.RequestId,
+            UserName = request.UserName,
+            Status = request.Status.ToString(),
+            StatusReason = request.StatusReason,
+            MissingRequirements = request.MissingRequirements,
+            CreatedAt = request.CreatedAt,
+            UpdatedAt = request.UpdatedAt,
+            RequestData = request.RequestData
+        };
+    }
 }
 
 // Cross-Service Integration Models and Services
@@ -664,7 +542,7 @@ public interface ILedgerVerificationService
 /// </summary>
 public interface ICrossServiceVerificationService
 {
-    Task<CrossServiceVerificationResult> VerifyMortgageRequirementsAsync(string userName, Dictionary<string, object> mortgageData);
+    Task<CrossServiceVerificationResult> VerifyMortgageRequirementsAsync(string userName, MortgageRequestData mortgageData);
 }
 
 // Service Implementations
@@ -833,7 +711,7 @@ public class CrossServiceVerificationService : ICrossServiceVerificationService
         _logger = logger;
     }
 
-    public async Task<CrossServiceVerificationResult> VerifyMortgageRequirementsAsync(string userName, Dictionary<string, object> mortgageData)
+    public async Task<CrossServiceVerificationResult> VerifyMortgageRequirementsAsync(string userName, MortgageRequestData mortgageData)
     {
         _logger.LogInformation("Starting cross-service verification for user {UserName}", userName);
         
@@ -892,10 +770,9 @@ public class CrossServiceVerificationService : ICrossServiceVerificationService
             }
 
             // Cross-validate mortgage data with external services
-            var loanAmount = GetDecimalValue(mortgageData, MortgageDataFields.Property.LoanAmount) ?? 
-                           GetDecimalValue(mortgageData, MortgageDataFields.Legacy.LoanAmount);
+            var loanAmount = mortgageData.Property.LoanAmount;
             
-            if (loanAmount.HasValue)
+            if (loanAmount.HasValue && loanAmount.Value > 0)
             {
                 var requiredDownPayment = loanAmount.Value * 0.20m; // 20% down payment
                 if (result.FinancialVerification.CurrentBalance < requiredDownPayment)
@@ -934,13 +811,6 @@ public class CrossServiceVerificationService : ICrossServiceVerificationService
             return result;
         }
     }
-
-    private decimal? GetDecimalValue(Dictionary<string, object> data, string key)
-    {
-        if (data.TryGetValue(key, out var value) && decimal.TryParse(value?.ToString(), out var result))
-            return result;
-        return null;
-    }
 }
 
 // Configuration options
@@ -961,16 +831,103 @@ public class MortgageRequest
     public string MissingRequirements { get; set; } = "All required documentation";
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
-    public string RequestDataJson { get; set; } = "{}"; // Store additional data as JSON
     public string Type { get; set; } = "mortgage"; // Document type discriminator
     
-    // Navigation property for additional data
-    [JsonIgnore]
-    public Dictionary<string, object> RequestData
-    {
-        get => System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(RequestDataJson) ?? new Dictionary<string, object>();
-        set => RequestDataJson = System.Text.Json.JsonSerializer.Serialize(value);
-    }
+    // Strongly-typed mortgage data
+    public MortgageRequestData RequestData { get; set; } = new();
+}
+
+/// <summary>
+/// Strongly-typed mortgage request data model
+/// </summary>
+public class MortgageRequestData
+{
+    public MortgageIncomeData Income { get; set; } = new();
+    public MortgageCreditData Credit { get; set; } = new();
+    public MortgageEmploymentData Employment { get; set; } = new();
+    public MortgagePropertyData Property { get; set; } = new();
+}
+
+/// <summary>
+/// Income verification data
+/// </summary>
+public class MortgageIncomeData
+{
+    /// <summary>Annual income in dollars</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Annual income must be positive")]
+    public decimal? AnnualIncome { get; set; }
+
+    /// <summary>Type of employment</summary>
+    [RegularExpression("^(full-time|part-time|contract|self-employed|)$", 
+        ErrorMessage = "Employment type must be one of: full-time, part-time, contract, self-employed")]
+    public string EmploymentType { get; set; } = string.Empty;
+
+    /// <summary>Years of employment (supports decimals for partial years)</summary>
+    [Range(0, 50, ErrorMessage = "Years employed must be between 0 and 50")]
+    public decimal? YearsEmployed { get; set; }
+}
+
+/// <summary>
+/// Credit report data
+/// </summary>
+public class MortgageCreditData
+{
+    /// <summary>Credit score (300-850 range)</summary>
+    [Range(300, 850, ErrorMessage = "Credit score must be between 300 and 850")]
+    public int? Score { get; set; }
+
+    /// <summary>Date of credit report</summary>
+    public DateTime? ReportDate { get; set; }
+
+    /// <summary>Outstanding debts in dollars</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Outstanding debts must be positive")]
+    public decimal? OutstandingDebts { get; set; }
+}
+
+/// <summary>
+/// Employment verification data
+/// </summary>
+public class MortgageEmploymentData
+{
+    /// <summary>Name of current employer</summary>
+    [StringLength(200, ErrorMessage = "Employer name cannot exceed 200 characters")]
+    public string EmployerName { get; set; } = string.Empty;
+
+    /// <summary>Current job title</summary>
+    [StringLength(200, ErrorMessage = "Job title cannot exceed 200 characters")]
+    public string JobTitle { get; set; } = string.Empty;
+
+    /// <summary>Monthly salary in dollars</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Monthly salary must be positive")]
+    public decimal? MonthlySalary { get; set; }
+
+    /// <summary>Whether employment has been verified</summary>
+    public bool IsVerified { get; set; }
+}
+
+/// <summary>
+/// Property appraisal data
+/// </summary>
+public class MortgagePropertyData
+{
+    /// <summary>Appraised property value in dollars</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Property value must be positive")]
+    public decimal? PropertyValue { get; set; }
+
+    /// <summary>Requested loan amount in dollars</summary>
+    [Range(0, double.MaxValue, ErrorMessage = "Loan amount must be positive")]
+    public decimal? LoanAmount { get; set; }
+
+    /// <summary>Type of property</summary>
+    [RegularExpression("^(single-family|condo|townhouse|multi-family|)$", 
+        ErrorMessage = "Property type must be one of: single-family, condo, townhouse, multi-family")]
+    public string PropertyType { get; set; } = string.Empty;
+
+    /// <summary>Date of property appraisal</summary>
+    public DateTime? AppraisalDate { get; set; }
+
+    /// <summary>Whether appraisal has been completed</summary>
+    public bool AppraisalCompleted { get; set; }
 }
 
 public enum MortgageRequestStatus
@@ -988,7 +945,7 @@ public interface IMortgageApprovalService
     Task<MortgageRequest> CreateMortgageRequestAsync(string userName);
     Task<MortgageRequest?> GetMortgageRequestAsync(Guid requestId);
     Task<MortgageRequest?> GetMortgageRequestByUserAsync(string userName);
-    Task<MortgageRequest?> UpdateMortgageDataAsync(Guid requestId, Dictionary<string, object> newData);
+    Task<MortgageRequest?> UpdateMortgageDataStrongAsync(Guid requestId, UpdateMortgageDataStrongDto updateData);
     Task<bool> DeleteMortgageRequestAsync(Guid requestId);
     Task<IEnumerable<MortgageRequest>> GetMortgageRequestsAsync(int page, int pageSize, string? status);
 }
@@ -1106,7 +1063,7 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         }
     }
 
-    public async Task<MortgageRequest?> UpdateMortgageDataAsync(Guid requestId, Dictionary<string, object> newData)
+    public async Task<MortgageRequest?> UpdateMortgageDataStrongAsync(Guid requestId, UpdateMortgageDataStrongDto updateData)
     {
         try
         {
@@ -1114,13 +1071,24 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
             var mortgageRequest = await GetMortgageRequestAsync(requestId);
             if (mortgageRequest == null) return null;
 
-            // Merge new data with existing data
-            var currentData = mortgageRequest.RequestData;
-            foreach (var kvp in newData)
+            // Update the strongly-typed data directly
+            if (updateData.Income != null)
             {
-                currentData[kvp.Key] = kvp.Value;
+                mortgageRequest.RequestData.Income = updateData.Income;
             }
-            mortgageRequest.RequestData = currentData;
+            if (updateData.Credit != null)
+            {
+                mortgageRequest.RequestData.Credit = updateData.Credit;
+            }
+            if (updateData.Employment != null)
+            {
+                mortgageRequest.RequestData.Employment = updateData.Employment;
+            }
+            if (updateData.Property != null)
+            {
+                mortgageRequest.RequestData.Property = updateData.Property;
+            }
+            
             mortgageRequest.UpdatedAt = DateTime.UtcNow;
 
             // Evaluate status based on the updated data (includes cross-service verification)
@@ -1129,14 +1097,14 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
             // Update the document in Cosmos DB
             await _container.ReplaceItemAsync(mortgageRequest, mortgageRequest.id, new PartitionKey(mortgageRequest.UserName));
 
-            _logger.LogInformation("Updated mortgage request {RequestId} with new data. Status: {Status}", 
+            _logger.LogInformation("Updated mortgage request {RequestId} with strongly-typed data. Status: {Status}", 
                 requestId, mortgageRequest.Status);
             
             return mortgageRequest;
         }
         catch (CosmosException ex)
         {
-            _logger.LogError(ex, "Error updating mortgage request {RequestId}", requestId);
+            _logger.LogError(ex, "Error updating mortgage request {RequestId} with strongly-typed data", requestId);
             throw;
         }
     }
@@ -1223,27 +1191,20 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         var data = request.RequestData;
         var missingRequirements = new List<string>();
 
-        // Check for required income data
-        bool hasIncomeData = data.ContainsKey(MortgageDataFields.Income.Annual) || 
-                           data.ContainsKey(MortgageDataFields.Legacy.IncomeVerification);
+        // Check for required data fields using strongly-typed properties
+        bool hasIncomeData = data.Income.AnnualIncome.HasValue;
         if (!hasIncomeData)
             missingRequirements.Add("Income verification");
 
-        // Check for required credit data
-        bool hasCreditData = data.ContainsKey(MortgageDataFields.Credit.Score) || 
-                           data.ContainsKey(MortgageDataFields.Legacy.CreditReport);
+        bool hasCreditData = data.Credit.Score.HasValue;
         if (!hasCreditData)
             missingRequirements.Add("Credit report");
 
-        // Check for required property data
-        bool hasPropertyData = data.ContainsKey(MortgageDataFields.Property.Value) || 
-                             data.ContainsKey(MortgageDataFields.Legacy.PropertyAppraisal);
+        bool hasPropertyData = data.Property.PropertyValue.HasValue && data.Property.LoanAmount.HasValue;
         if (!hasPropertyData)
             missingRequirements.Add("Property appraisal");
 
-        // Check for required employment data
-        bool hasEmploymentData = data.ContainsKey(MortgageDataFields.Employment.Employer) || 
-                               data.ContainsKey(MortgageDataFields.Legacy.EmploymentVerification);
+        bool hasEmploymentData = !string.IsNullOrEmpty(data.Employment.EmployerName);
         if (!hasEmploymentData)
             missingRequirements.Add("Employment verification");
 
@@ -1254,13 +1215,6 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
             {
                 var crossServiceResult = await _crossServiceVerification.VerifyMortgageRequirementsAsync(request.UserName, data);
                 
-                // Merge cross-service data into mortgage request
-                foreach (var kvp in crossServiceResult.AdditionalData)
-                {
-                    data[kvp.Key] = kvp.Value;
-                }
-                request.RequestData = data;
-
                 if (!crossServiceResult.AllVerificationsPassed)
                 {
                     request.Status = MortgageRequestStatus.Rejected;
@@ -1269,23 +1223,21 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
                     return;
                 }
 
-                // Perform financial approval logic
-                var income = GetValueAsDecimal(data, MortgageDataFields.Income.Annual) ?? 
-                            GetValueAsDecimal(data, MortgageDataFields.Legacy.AnnualIncome);
-                var creditScore = GetValueAsInt(data, MortgageDataFields.Credit.Score);
-                var loanAmount = GetValueAsDecimal(data, MortgageDataFields.Property.LoanAmount) ?? 
-                               GetValueAsDecimal(data, MortgageDataFields.Legacy.LoanAmount);
+                // Perform financial approval logic using strongly-typed properties
+                var income = data.Income.AnnualIncome;
+                var creditScore = data.Credit.Score;
+                var loanAmount = data.Property.LoanAmount;
 
-                if (income > 0 && creditScore > 0 && loanAmount > 0)
+                if (income.HasValue && creditScore.HasValue && loanAmount.HasValue && income > 0 && creditScore > 0 && loanAmount > 0)
                 {
                     // Calculate debt-to-income ratio (monthly loan payment vs monthly income)
-                    var monthlyIncome = income / 12;
+                    var monthlyIncome = income.Value / 12;
                     // Assume 30-year mortgage at 7% interest for payment calculation
                     var monthlyPayment = CalculateMonthlyMortgagePayment(loanAmount.Value, 0.07m, 30);
                     var debtToIncomeRatio = monthlyPayment / monthlyIncome;
                     
                     // Enhanced approval criteria including cross-service verification
-                    bool creditScoreOk = creditScore >= 650;
+                    bool creditScoreOk = creditScore.Value >= 650;
                     bool dtiOk = debtToIncomeRatio <= 0.43m;
                     bool documentsOk = crossServiceResult.DocumentVerification.AllDocumentsVerified;
                     bool financialsOk = crossServiceResult.FinancialVerification.HasSufficientFunds;
@@ -1293,14 +1245,14 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
                     if (creditScoreOk && dtiOk && documentsOk && financialsOk)
                     {
                         request.Status = MortgageRequestStatus.Approved;
-                        request.StatusReason = $"Application approved - Credit: {creditScore}, DTI: {debtToIncomeRatio:P2}, Documents: Verified, Funds: Sufficient";
+                        request.StatusReason = $"Application approved - Credit: {creditScore.Value}, DTI: {debtToIncomeRatio:P2}, Documents: Verified, Funds: Sufficient";
                         request.MissingRequirements = string.Empty;
                     }
                     else
                     {
                         request.Status = MortgageRequestStatus.Rejected;
                         var reasons = new List<string>();
-                        if (!creditScoreOk) reasons.Add($"Credit score too low ({creditScore} < 650)");
+                        if (!creditScoreOk) reasons.Add($"Credit score too low ({creditScore.Value} < 650)");
                         if (!dtiOk) reasons.Add($"Debt-to-income ratio too high ({debtToIncomeRatio:P2} > 43%)");
                         if (!documentsOk) reasons.Add("Document verification incomplete");
                         if (!financialsOk) reasons.Add("Insufficient funds for down payment");
@@ -1348,37 +1300,5 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         // M = P * [r(1+r)^n] / [(1+r)^n - 1]
         var monthlyRateCompounded = (decimal)Math.Pow((double)(1 + monthlyRate), numberOfPayments);
         return principal * (monthlyRate * monthlyRateCompounded) / (monthlyRateCompounded - 1);
-    }
-
-    /// <summary>
-    /// Safely retrieves a decimal value from the data dictionary
-    /// </summary>
-    /// <param name="data">Data dictionary</param>
-    /// <param name="key">Key to lookup</param>
-    /// <returns>Decimal value if found and parseable, null otherwise</returns>
-    private decimal? GetValueAsDecimal(Dictionary<string, object> data, string key)
-    {
-        if (data.TryGetValue(key, out var value))
-        {
-            if (decimal.TryParse(value?.ToString(), out var result))
-                return result;
-        }
-        return null;
-    }
-
-    /// <summary>
-    /// Safely retrieves an integer value from the data dictionary
-    /// </summary>
-    /// <param name="data">Data dictionary</param>
-    /// <param name="key">Key to lookup</param>
-    /// <returns>Integer value if found and parseable, 0 otherwise</returns>
-    private int GetValueAsInt(Dictionary<string, object> data, string key)
-    {
-        if (data.TryGetValue(key, out var value))
-        {
-            if (int.TryParse(value?.ToString(), out var result))
-                return result;
-        }
-        return 0;
     }
 }
