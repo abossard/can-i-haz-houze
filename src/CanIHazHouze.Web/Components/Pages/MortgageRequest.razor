@@ -1,7 +1,6 @@
 @page "/mortgage"
 @using CanIHazHouze.Web
 @using Microsoft.AspNetCore.Components.Forms
-@using System.Text.Json
 @inject MortgageApiClient MortgageApi
 @inject DocumentApiClient DocumentApi
 @inject ILogger<MortgageRequest> Logger
@@ -603,53 +602,10 @@ else
                 propertyForm.AppraisalDate = data.Property.AppraisalDate;
                 propertyForm.AppraisalCompleted = data.Property.AppraisalCompleted;
             }
-            // Fallback to legacy format if strongly-typed data is not available
-            else if (existingRequest.RequestDataLegacy != null && existingRequest.RequestDataLegacy.Count > 0)
-            {
-                var data = existingRequest.RequestDataLegacy;
-                Logger.LogInformation("Populating forms with legacy data format ({Count} items)", data.Count);
-
-                // Populate income form
-                if (data.TryGetValue("income_annual", out var annualIncome))
-                    incomeForm.AnnualIncome = ConvertToDecimal(annualIncome);
-                if (data.TryGetValue("income_employment_type", out var empType))
-                    incomeForm.EmploymentType = ConvertToString(empType);
-                if (data.TryGetValue("income_years_employed", out var yearsEmp))
-                    incomeForm.YearsEmployed = ConvertToDecimal(yearsEmp);
-
-                // Populate credit form
-                if (data.TryGetValue("credit_score", out var creditScore))
-                    creditForm.CreditScore = ConvertToInt(creditScore);
-                if (data.TryGetValue("credit_report_date", out var creditDate))
-                    creditForm.ReportDate = ConvertToDateTime(creditDate);
-                if (data.TryGetValue("credit_outstanding_debts", out var debts))
-                    creditForm.OutstandingDebts = ConvertToDecimal(debts);
-
-                // Populate employment form
-                if (data.TryGetValue("employment_employer", out var employer))
-                    employmentForm.EmployerName = ConvertToString(employer);
-                if (data.TryGetValue("employment_job_title", out var jobTitle))
-                    employmentForm.JobTitle = ConvertToString(jobTitle);
-                if (data.TryGetValue("employment_monthly_salary", out var monthlySalary))
-                    employmentForm.MonthlySalary = ConvertToDecimal(monthlySalary);
-                if (data.TryGetValue("employment_verified", out var empVerified))
-                    employmentForm.IsVerified = ConvertToBoolean(empVerified);
-
-                // Populate property form
-                if (data.TryGetValue("property_value", out var propValue))
-                    propertyForm.PropertyValue = ConvertToDecimal(propValue);
-                if (data.TryGetValue("property_loan_amount", out var loanAmount))
-                    propertyForm.LoanAmount = ConvertToDecimal(loanAmount);
-                if (data.TryGetValue("property_type", out var propType))
-                    propertyForm.PropertyType = ConvertToString(propType);
-                if (data.TryGetValue("property_appraisal_date", out var appraisalDate))
-                    propertyForm.AppraisalDate = ConvertToDateTime(appraisalDate);
-                if (data.TryGetValue("property_appraisal_completed", out var appraisalCompleted))
-                    propertyForm.AppraisalCompleted = ConvertToBoolean(appraisalCompleted);
-            }
             else
             {
-                Logger.LogInformation("No data available to populate forms");
+                Logger.LogInformation("No strongly-typed data available, forms will remain empty");
+                // Note: Legacy fallback removed as part of type-safe refactoring
             }
         }
         catch (Exception ex)
@@ -657,110 +613,6 @@ else
             Logger.LogError(ex, "Error populating forms from request data");
             errorMessage = "Error loading existing form data.";
         }
-    }
-
-    // Helper methods to safely convert JsonElement or other object types
-    private decimal? ConvertToDecimal(object? value)
-    {
-        if (value == null) return null;
-        
-        if (value is JsonElement jsonElement)
-        {
-            return jsonElement.ValueKind switch
-            {
-                JsonValueKind.Number => jsonElement.GetDecimal(),
-                JsonValueKind.String when decimal.TryParse(jsonElement.GetString(), out var result) => result,
-                _ => null
-            };
-        }
-        
-        if (decimal.TryParse(value.ToString(), out var parsed))
-            return parsed;
-            
-        return null;
-    }
-
-    private int? ConvertToInt(object? value)
-    {
-        if (value == null) return null;
-        
-        if (value is JsonElement jsonElement)
-        {
-            return jsonElement.ValueKind switch
-            {
-                JsonValueKind.Number => jsonElement.GetInt32(),
-                JsonValueKind.String when int.TryParse(jsonElement.GetString(), out var result) => result,
-                _ => null
-            };
-        }
-        
-        if (int.TryParse(value.ToString(), out var parsed))
-            return parsed;
-            
-        return null;
-    }
-
-    private string ConvertToString(object? value)
-    {
-        if (value == null) return string.Empty;
-        
-        if (value is JsonElement jsonElement)
-        {
-            return jsonElement.ValueKind switch
-            {
-                JsonValueKind.String => jsonElement.GetString() ?? string.Empty,
-                JsonValueKind.Number => jsonElement.ToString(),
-                JsonValueKind.True => "true",
-                JsonValueKind.False => "false",
-                _ => string.Empty
-            };
-        }
-        
-        return value.ToString() ?? string.Empty;
-    }
-
-    private DateTime? ConvertToDateTime(object? value)
-    {
-        if (value == null) return null;
-        
-        string? dateString = null;
-        
-        if (value is JsonElement jsonElement)
-        {
-            dateString = jsonElement.ValueKind == JsonValueKind.String 
-                ? jsonElement.GetString() 
-                : jsonElement.ToString();
-        }
-        else
-        {
-            dateString = value.ToString();
-        }
-        
-        if (DateTime.TryParse(dateString, out var result))
-            return result;
-            
-        return null;
-    }
-
-    private bool ConvertToBoolean(object? value)
-    {
-        if (value == null) return false;
-        
-        if (value is JsonElement jsonElement)
-        {
-            return jsonElement.ValueKind switch
-            {
-                JsonValueKind.True => true,
-                JsonValueKind.False => false,
-                JsonValueKind.String => bool.TryParse(jsonElement.GetString(), out var result) && result,
-                _ => false
-            };
-        }
-        
-        if (bool.TryParse(value.ToString(), out var parsed))
-            return parsed;
-            
-        return false;
     }
 
     private void UpdateFormCollapseState()
@@ -853,14 +705,17 @@ else
             return;
         }
 
-        var data = new Dictionary<string, object>
+        var updateData = new UpdateMortgageDataStrongDto
         {
-            ["income_annual"] = incomeForm.AnnualIncome.Value,
-            ["income_employment_type"] = incomeForm.EmploymentType,
-            ["income_years_employed"] = incomeForm.YearsEmployed ?? 0
+            Income = new MortgageIncomeDataDto
+            {
+                AnnualIncome = incomeForm.AnnualIncome.Value,
+                EmploymentType = incomeForm.EmploymentType,
+                YearsEmployed = incomeForm.YearsEmployed ?? 0
+            }
         };
 
-        await SubmitFormData(data, "Income Verification");
+        await SubmitStrongFormData(updateData, "Income Verification");
         
         // Update form state and collapse if successful
         if (string.IsNullOrEmpty(errorMessage))
@@ -880,14 +735,17 @@ else
             return;
         }
 
-        var data = new Dictionary<string, object>
+        var updateData = new UpdateMortgageDataStrongDto
         {
-            ["credit_score"] = creditForm.CreditScore.Value,
-            ["credit_report_date"] = creditForm.ReportDate?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"),
-            ["credit_outstanding_debts"] = creditForm.OutstandingDebts ?? 0
+            Credit = new MortgageCreditDataDto
+            {
+                Score = creditForm.CreditScore.Value,
+                ReportDate = creditForm.ReportDate ?? DateTime.Now,
+                OutstandingDebts = creditForm.OutstandingDebts ?? 0
+            }
         };
 
-        await SubmitFormData(data, "Credit Report");
+        await SubmitStrongFormData(updateData, "Credit Report");
         
         // Update form state and collapse if successful
         if (string.IsNullOrEmpty(errorMessage))
@@ -907,15 +765,18 @@ else
             return;
         }
 
-        var data = new Dictionary<string, object>
+        var updateData = new UpdateMortgageDataStrongDto
         {
-            ["employment_employer"] = employmentForm.EmployerName,
-            ["employment_job_title"] = employmentForm.JobTitle,
-            ["employment_monthly_salary"] = employmentForm.MonthlySalary ?? 0,
-            ["employment_verified"] = employmentForm.IsVerified
+            Employment = new MortgageEmploymentDataDto
+            {
+                EmployerName = employmentForm.EmployerName,
+                JobTitle = employmentForm.JobTitle,
+                MonthlySalary = employmentForm.MonthlySalary ?? 0,
+                IsVerified = employmentForm.IsVerified
+            }
         };
 
-        await SubmitFormData(data, "Employment Verification");
+        await SubmitStrongFormData(updateData, "Employment Verification");
         
         // Update form state and collapse if successful
         if (string.IsNullOrEmpty(errorMessage))
@@ -953,16 +814,19 @@ else
             return;
         }
 
-        var data = new Dictionary<string, object>
+        var updateData = new UpdateMortgageDataStrongDto
         {
-            ["property_value"] = propertyForm.PropertyValue.Value,
-            ["property_loan_amount"] = propertyForm.LoanAmount.Value,
-            ["property_type"] = propertyForm.PropertyType,
-            ["property_appraisal_date"] = propertyForm.AppraisalDate?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd"),
-            ["property_appraisal_completed"] = propertyForm.AppraisalCompleted
+            Property = new MortgagePropertyDataDto
+            {
+                PropertyValue = propertyForm.PropertyValue.Value,
+                LoanAmount = propertyForm.LoanAmount.Value,
+                PropertyType = propertyForm.PropertyType,
+                AppraisalDate = propertyForm.AppraisalDate ?? DateTime.Now,
+                AppraisalCompleted = propertyForm.AppraisalCompleted
+            }
         };
 
-        await SubmitFormData(data, "Property Appraisal");
+        await SubmitStrongFormData(updateData, "Property Appraisal");
         
         // Update form state and collapse if successful
         if (string.IsNullOrEmpty(errorMessage))
@@ -972,7 +836,7 @@ else
         }
     }
 
-    private async Task SubmitFormData(Dictionary<string, object> data, string formType)
+    private async Task SubmitStrongFormData(UpdateMortgageDataStrongDto updateData, string formType)
     {
         if (existingRequest == null) return;
 
@@ -981,7 +845,7 @@ else
 
         try
         {
-            var result = await MortgageApi.UpdateMortgageDataAsync(existingRequest.Id, data);
+            var result = await MortgageApi.UpdateMortgageDataStrongAsync(existingRequest.Id, updateData);
             if (result != null)
             {
                 existingRequest = result;
@@ -993,10 +857,25 @@ else
                 errorMessage = $"Failed to submit {formType}.";
             }
         }
+        catch (ArgumentException ex)
+        {
+            Logger.LogError(ex, "Validation error submitting {FormType}", formType);
+            errorMessage = $"Validation error: {ex.Message}";
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogError(ex, "HTTP error submitting {FormType}", formType);
+            errorMessage = $"Network error: {ex.Message}";
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogError(ex, "Data error submitting {FormType}", formType);
+            errorMessage = $"Data error: {ex.Message}";
+        }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error submitting {FormType}", formType);
-            errorMessage = $"An error occurred while submitting {formType}.";
+            Logger.LogError(ex, "Unexpected error submitting {FormType}", formType);
+            errorMessage = $"An unexpected error occurred while submitting {formType}.";
         }
         finally
         {
@@ -1107,38 +986,6 @@ else
         {
             Logger.LogError(ex, "Error deleting mortgage request");
             errorMessage = "An error occurred while deleting the request.";
-        }
-        finally
-        {
-            isProcessing = false;
-        }
-    }
-
-    private async Task AddSampleData(string key, object value)
-    {
-        if (existingRequest == null) return;
-
-        isProcessing = true;
-        errorMessage = string.Empty;
-
-        try
-        {
-            var data = new Dictionary<string, object> { [key] = value };
-            var result = await MortgageApi.UpdateMortgageDataAsync(existingRequest.Id, data);
-            if (result != null)
-            {
-                existingRequest = result;
-                successMessage = $"Added {key}: {value}. Status may have changed.";
-            }
-            else
-            {
-                errorMessage = "Failed to update mortgage request data.";
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error updating mortgage request data");
-            errorMessage = "An error occurred while updating the request.";
         }
         finally
         {

@@ -83,12 +83,14 @@ public class MortgageApiClient
         }
     }
 
-    public async Task<MortgageRequestDto?> UpdateMortgageDataAsync(Guid requestId, Dictionary<string, object> data)
+    /// <summary>
+    /// Updates mortgage request data using strongly-typed DTOs
+    /// </summary>
+    public async Task<MortgageRequestDto?> UpdateMortgageDataStrongAsync(Guid requestId, UpdateMortgageDataStrongDto updateData)
     {
         try
         {
-            var request = new { Data = data };
-            var response = await _httpClient.PutAsJsonAsync($"/mortgage-requests/{requestId}/data", request);
+            var response = await _httpClient.PutAsJsonAsync($"/mortgage-requests/{requestId}/data", updateData);
             
             if (response.IsSuccessStatusCode)
             {
@@ -96,13 +98,34 @@ public class MortgageApiClient
                 return JsonSerializer.Deserialize<MortgageRequestDto>(json, GetJsonSerializerOptions());
             }
             
-            _logger.LogWarning("Failed to update mortgage request {RequestId}. Status: {StatusCode}", requestId, response.StatusCode);
-            return null;
+            var errorContent = await response.Content.ReadAsStringAsync();
+            _logger.LogWarning("Failed to update mortgage request {RequestId} with strong typing. Status: {StatusCode}, Content: {Content}", 
+                requestId, response.StatusCode, errorContent);
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                throw new ArgumentException($"Invalid data provided: {errorContent}");
+            }
+            
+            throw new HttpRequestException($"API returned {response.StatusCode}: {errorContent}");
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "JSON serialization/deserialization error when updating mortgage request {RequestId}", requestId);
+            throw new InvalidOperationException("Failed to process mortgage request update", ex);
+        }
+        catch (HttpRequestException)
+        {
+            throw; // Re-throw HTTP exceptions
+        }
+        catch (ArgumentException)
+        {
+            throw; // Re-throw validation exceptions
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating mortgage request {RequestId}", requestId);
-            return null;
+            _logger.LogError(ex, "Unexpected error updating mortgage request {RequestId}", requestId);
+            throw new InvalidOperationException("An unexpected error occurred while updating the mortgage request", ex);
         }
     }
 
@@ -234,6 +257,17 @@ public class MortgageApiClient
             Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
         };
     }
+}
+
+/// <summary>
+/// Strongly-typed DTO for updating mortgage data sections
+/// </summary>
+public class UpdateMortgageDataStrongDto
+{
+    public MortgageIncomeDataDto? Income { get; set; }
+    public MortgageCreditDataDto? Credit { get; set; }
+    public MortgageEmploymentDataDto? Employment { get; set; }
+    public MortgagePropertyDataDto? Property { get; set; }
 }
 
 public class MortgageRequestDto
