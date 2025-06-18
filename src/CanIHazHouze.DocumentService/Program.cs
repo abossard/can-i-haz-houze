@@ -61,6 +61,198 @@ app.MapScalarApiReference();
 
 app.UseStaticFiles(); // optional for serving files
 
+// Base64 document upload endpoint
+app.MapPost("/documents/base64", async (
+    [FromBody] Base64DocumentUploadRequest request,
+    IDocumentService documentService,
+    IDocumentAIService aiService) =>
+{
+    try
+    {
+        // Validate inputs
+        if (string.IsNullOrWhiteSpace(request.Owner))
+        {
+            return Results.BadRequest("Owner parameter is required");
+        }
+        
+        if (string.IsNullOrWhiteSpace(request.Base64Content))
+        {
+            return Results.BadRequest("Base64Content is required");
+        }
+        
+        if (string.IsNullOrWhiteSpace(request.FileName))
+        {
+            return Results.BadRequest("FileName is required");
+        }
+
+        app.Logger.LogInformation("Starting Base64 document upload for owner: {Owner}, file: {FileName}", 
+            request.Owner, request.FileName);
+        
+        // Decode Base64 content
+        byte[] fileBytes;
+        try
+        {
+            fileBytes = Convert.FromBase64String(request.Base64Content);
+        }
+        catch (FormatException)
+        {
+            return Results.BadRequest("Invalid Base64 content format");
+        }
+        
+        if (fileBytes.Length == 0)
+        {
+            return Results.BadRequest("Decoded file content is empty");
+        }        // Create IFormFile from Base64 content
+        var stream = new MemoryStream(fileBytes);
+        var formFile = new FormFile(stream, 0, fileBytes.Length, "file", request.FileName)
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = GetContentTypeFromFileName(request.FileName)
+        };
+        
+        // Local helper function for content type detection
+        static string GetContentTypeFromFileName(string fileName)
+        {
+            var extension = Path.GetExtension(fileName).ToLowerInvariant();
+            return extension switch
+            {
+                ".pdf" => "application/pdf",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                ".txt" => "text/plain",
+                ".json" => "application/json",
+                ".xml" => "application/xml",
+                ".zip" => "application/zip",
+                ".doc" => "application/msword",
+                ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ".xls" => "application/vnd.ms-excel",
+                ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                ".md" => "text/markdown",
+                _ => "application/octet-stream"
+            };
+        }
+        
+        var tagList = request.Tags ?? new List<string>();
+        
+        // If AI tag suggestions are requested, prepare content for analysis
+        string? textForAnalysis = null;
+        if (request.SuggestTags)
+        {
+            var extension = Path.GetExtension(request.FileName).ToLowerInvariant();
+            if (extension == ".txt" || extension == ".md")
+            {
+                try
+                {
+                    textForAnalysis = System.Text.Encoding.UTF8.GetString(fileBytes);
+                    app.Logger.LogInformation("Read {Length} characters from Base64 text file for AI analysis", 
+                        textForAnalysis.Length);
+                }
+                catch (Exception ex)
+                {
+                    app.Logger.LogWarning(ex, "Failed to decode text content for AI analysis, will use filename only");
+                    textForAnalysis = $"Filename: {request.FileName}\nExisting tags: {string.Join(", ", tagList)}";
+                }
+            }
+            else
+            {
+                // For non-text files, use filename and existing tags
+                textForAnalysis = $"Filename: {request.FileName}\nExisting tags: {string.Join(", ", tagList)}";
+            }
+        }
+        
+        var documentMeta = await documentService.UploadDocumentAsync(request.Owner, formFile, tagList);
+        
+        app.Logger.LogInformation("Base64 document uploaded successfully: {DocumentId}", documentMeta.Id);
+        
+        // If AI tag suggestions are requested, generate them using prepared content
+        List<string>? suggestedTags = null;
+        if (request.SuggestTags && !string.IsNullOrEmpty(textForAnalysis))
+        {
+            try
+            {
+                app.Logger.LogInformation("Generating AI tag suggestions for Base64 document: {DocumentId}", 
+                    documentMeta.Id);
+                
+                suggestedTags = await aiService.SuggestTagsAsync(textForAnalysis, tagList, request.MaxSuggestions);
+                app.Logger.LogInformation("Generated {Count} AI tag suggestions", suggestedTags?.Count ?? 0);
+            }
+            catch (Exception ex)
+            {
+                app.Logger.LogWarning(ex, "Failed to generate AI tag suggestions for Base64 document {DocumentId}", 
+                    documentMeta.Id);
+                // Continue without suggestions rather than failing the entire upload
+            }
+        }
+
+        var response = new
+        {
+            Document = documentMeta,
+            AITagSuggestions = suggestedTags,
+            SuggestionsGenerated = suggestedTags?.Any() == true,
+            Message = suggestedTags?.Any() == true 
+                ? "Base64 document uploaded successfully with AI tag suggestions" 
+                : "Base64 document uploaded successfully"
+        };
+        
+        return Results.Created($"/documents/{documentMeta.Id}?owner={request.Owner}", response);
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error uploading Base64 document for owner {Owner}", request.Owner);
+        return Results.Problem("An error occurred while uploading the Base64 document");
+    }
+})
+.WithName("UploadBaseSixtyFourDocument")
+.WithSummary("Upload a document using Base64 encoding")
+.WithDescription("""
+    Uploads a new document using Base64-encoded content instead of multipart form data.
+    
+    **Key Features:**
+    - Accepts Base64-encoded file content in JSON request body
+    - Supports all file formats (images, PDFs, documents, etc.)
+    - Configurable file size limits (applied to decoded content)
+    - Automatic GUID-based unique filename generation
+    - Tag-based organization system
+    - Per-user document isolation
+    - Optional AI-powered tag suggestions during upload
+    
+    **Request Body:**
+    ```json
+    {
+        "owner": "john_doe",
+        "fileName": "report.pdf",
+        "base64Content": "JVBERi0xLjQKJcOkw7zDssOdw6jDr...",
+        "tags": ["expense", "2024"],
+        "suggestTags": true,
+        "maxSuggestions": 5
+    }
+    ```
+    
+    **Use Cases:**
+    - Mobile app uploads where multipart forms are complex
+    - JavaScript/SPA applications with direct file-to-Base64 conversion
+    - API integrations that prefer JSON-only communication
+    - Systems where binary data handling is restricted
+    
+    **Response:**
+    Returns the complete document metadata and optionally AI-suggested tags for user review.
+    """)
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Document Management" }];
+    operation.RequestBody.Description = "Base64 document upload request with encoded file content";
+    return operation;
+})
+.Accepts<Base64DocumentUploadRequest>("application/json")
+.Produces<DocumentMeta>(StatusCodes.Status201Created)
+.Produces<string>(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status500InternalServerError);
+
 // OpenAPI-tagged CRUD endpoints
 app.MapPost("/documents", async (
     [FromForm, Required] string owner,
@@ -934,72 +1126,7 @@ app.MapPut("/documents/{id}/enhance-tags", async (
 .Produces(StatusCodes.Status404NotFound)
 .Produces(StatusCodes.Status500InternalServerError);
 
-// Endpoint to suggest tags for new uploads using AI
-app.MapPost("/documents/suggest-tags", async (
-    [FromBody] SuggestTagsRequest request,
-    IDocumentAIService aiService) =>
-{
-    try
-    {
-        if (string.IsNullOrWhiteSpace(request.TextContent) && string.IsNullOrWhiteSpace(request.FileName))
-        {
-            return Results.BadRequest("Either text content or filename must be provided");
-        }
-
-        var textForAnalysis = !string.IsNullOrWhiteSpace(request.TextContent) 
-            ? request.TextContent 
-            : $"Filename: {request.FileName}";
-
-        var suggestedTags = await aiService.SuggestTagsAsync(
-            textForAnalysis, 
-            request.ExistingTags, 
-            request.MaxTags);
-
-        var result = new
-        {
-            SuggestedTags = suggestedTags,
-            RequestedMaxTags = request.MaxTags,
-            ExistingTags = request.ExistingTags ?? new List<string>(),
-            AnalyzedAt = DateTimeOffset.UtcNow
-        };
-
-        return Results.Ok(result);
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Error suggesting tags");
-        return Results.Problem("An error occurred while suggesting tags");
-    }
-})
-.WithName("SuggestTags")
-.WithSummary("Get AI-suggested tags for document content")
-.WithDescription("""
-    Uses AI to analyze text content or filename and suggest relevant tags for document organization.
-    
-    **Use Cases:**
-    - Tag suggestion before uploading documents
-    - Improving existing document organization
-    - Standardizing tag naming across documents
-    
-    **Request Body:**
-    ```json
-    {
-        "textContent": "Document text to analyze (optional)",
-        "fileName": "document.pdf (optional if textContent provided)",
-        "existingTags": ["tag1", "tag2"] (optional),
-        "maxTags": 5
-    }
-    ```
-    """)
-.WithOpenApi(operation =>
-{
-    operation.Tags = [new() { Name = "AI Document Analysis" }];
-    return operation;
-})
-.Accepts<SuggestTagsRequest>("application/json")
-.Produces(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status400BadRequest)
-.Produces(StatusCodes.Status500InternalServerError);
+app.MapDefaultEndpoints();
 
 app.Run();
 
@@ -1007,23 +1134,6 @@ app.Run();
 public partial class Program { }
 
 // Data models with OpenAPI annotations
-/// <summary>
-/// Document metadata containing all information about an uploaded document
-/// </summary>
-/// <param name="Id">Unique identifier for the document (auto-generated GUID)</param>
-/// <param name="Owner">Username or identifier of the document owner</param>
-/// <param name="Tags">List of tags for document organization and categorization</param>
-/// <param name="FileName">Original filename with GUID prefix for uniqueness</param>
-/// <param name="UploadedAt">Timestamp when the document was uploaded (UTC)</param>
-public record DocumentMeta(
-    [property: Description("Unique identifier for the document")] Guid Id,
-    [property: Description("Username or identifier of the document owner")] string Owner,
-    [property: Description("List of tags for document organization")] List<string> Tags,
-    [property: Description("Filename with unique GUID prefix")] string FileName,
-    [property: Description("Upload timestamp in UTC")] DateTimeOffset UploadedAt
-);
-
-/// <summary>
 /// Request model for AI tag suggestions
 /// </summary>
 /// <param name="TextContent">Text content to analyze for tag suggestions (optional)</param>
@@ -1047,4 +1157,24 @@ public record EnhanceTagsRequest(
     [property: Description("Maximum number of tag suggestions to generate")] int MaxSuggestions = 5
 );
 
+/// <summary>
+/// Request model for Base64 document uploads
+/// </summary>
+/// <param name="Owner">Username or identifier of the document owner</param>
+/// <param name="FileName">Original filename of the document</param>
+/// <param name="Base64Content">Base64-encoded file content</param>
+/// <param name="Tags">Optional list of tags for document organization</param>
+/// <param name="SuggestTags">Whether to generate AI tag suggestions after upload (default: false)</param>
+/// <param name="MaxSuggestions">Maximum number of AI tag suggestions to generate (default: 3)</param>
+public record Base64DocumentUploadRequest(
+    [property: Description("Username or identifier of the document owner")] string Owner,
+    [property: Description("Original filename of the document")] string FileName,
+    [property: Description("Base64-encoded file content")] string Base64Content,
+    [property: Description("Optional list of tags for document organization")] List<string>? Tags = null,
+    [property: Description("Whether to generate AI tag suggestions after upload")] bool SuggestTags = false,    [property: Description("Maximum number of AI tag suggestions to generate")] int MaxSuggestions = 3
+);
+
 // Service interface definition is in DocumentModels.cs
+
+// Make Program class accessible for testing
+public partial class Program { }
