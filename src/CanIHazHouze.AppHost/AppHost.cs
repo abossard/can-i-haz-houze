@@ -1,3 +1,5 @@
+using Azure.Provisioning.Storage;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 // Add Azure Cosmos DB with emulator for local development
