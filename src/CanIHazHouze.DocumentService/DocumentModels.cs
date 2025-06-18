@@ -35,6 +35,7 @@ public interface IDocumentService
     Task<DocumentMeta?> GetDocumentAsync(Guid id, string owner);
     Task<DocumentMeta?> UpdateDocumentTagsAsync(Guid id, string owner, List<string> tags);
     Task<bool> DeleteDocumentAsync(Guid id, string owner);
+    string GetDocumentPath(Guid id, string owner, string fileName);
 }
 
 public class DocumentServiceImpl : IDocumentService
@@ -218,6 +219,12 @@ public class DocumentServiceImpl : IDocumentService
             _logger.LogError(ex, "Failed to delete document {Id} for owner {Owner}", id, owner);
             return false;
         }
+    }
+
+    public string GetDocumentPath(Guid id, string owner, string fileName)
+    {
+        var userDir = GetUserDir(owner);
+        return Path.Combine(userDir, fileName);
     }
 
     private string Sanitize(string username) =>

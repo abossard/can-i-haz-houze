@@ -9,9 +9,27 @@ var cosmos = builder.AddAzureCosmosDB("cosmos")
         emulator.WithLifetime(ContainerLifetime.Persistent);
         emulator.WithDataVolume();
         emulator.WithDataExplorer();
-
     });
 #pragma warning restore ASPIRECOSMOSDB001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
+
+// Add Azure OpenAI for document processing
+// For local development, you can use a connection string to an existing OpenAI service
+// For production, this will provision a new Azure OpenAI resource
+var openai = builder.ExecutionContext.IsPublishMode
+    ? builder.AddAzureOpenAI("openai")
+    : builder.AddConnectionString("openai");
+
+// Configure OpenAI resource for production
+if (builder.ExecutionContext.IsPublishMode)
+{
+    // Add model deployments for document processing
+    var openaiResource = (IResourceBuilder<AzureOpenAIResource>)openai;
+    
+    openaiResource.AddDeployment(
+        name: "gpt-4o-mini",
+        modelName: "gpt-4o-mini", 
+        modelVersion: "2024-07-18"); // GPT-4o mini for metadata extraction
+}
 
 // Create shared database with separate containers for each service
 var houzeDatabase = cosmos.AddCosmosDatabase("houze");
@@ -23,6 +41,7 @@ var mortgagesContainer = houzeDatabase.AddContainer("mortgages", "/owner");
 
 var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>("documentservice")
     .WithReference(cosmos) // Reference the cosmos resource instead of container
+    .WithReference(openai) // Add OpenAI reference for document processing
     .WithHttpHealthCheck("/health");
 
 var ledgerService = builder.AddProject<Projects.CanIHazHouze_LedgerService>("ledgerservice")

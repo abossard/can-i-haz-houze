@@ -35,8 +35,14 @@ builder.Services.Configure<DocumentStorageOptions>(
 // Add Azure Cosmos DB using Aspire
 builder.AddAzureCosmosClient("cosmos");
 
+// Add Azure OpenAI client for document processing
+builder.AddAzureOpenAIClient("openai");
+
 // Add document service
 builder.Services.AddScoped<IDocumentService, DocumentServiceImpl>();
+
+// Add AI document analysis service
+builder.Services.AddScoped<IDocumentAIService, DocumentAIService>();
 
 var app = builder.Build();
 
@@ -470,6 +476,188 @@ app.MapGet("/documents/user/{owner}/verification", async (string owner, IDocumen
 
 app.MapDefaultEndpoints();
 
+// AI-powered document analysis endpoint
+app.MapPost("/documents/{id}/analyze", async (
+    Guid id, 
+    [Required] string owner, 
+    IDocumentService documentService,
+    IDocumentAIService aiService) =>
+{
+    try
+    {
+        app.Logger.LogInformation("Starting AI analysis for document {DocumentId} owned by {Owner}", id, owner);
+        
+        // First, get the document to verify it exists and user has access
+        var document = await documentService.GetDocumentAsync(id, owner);
+        if (document is null)
+        {
+            return Results.NotFound("Document not found or access denied");
+        }
+
+        // Read the document content (for now, we'll need to implement text extraction)
+        // This is a simplified version - in production you'd want proper text extraction
+        var filePath = documentService.GetDocumentPath(id, owner, document.FileName);
+        if (!File.Exists(filePath))
+        {
+            return Results.NotFound("Document file not found");
+        }
+
+        // For demonstration, we'll read text files directly
+        // In production, you'd use OCR for images, PDF readers for PDFs, etc.
+        string textContent;
+        var extension = Path.GetExtension(document.FileName).ToLowerInvariant();
+        
+        if (extension == ".txt" || extension == ".md")
+        {
+            textContent = await File.ReadAllTextAsync(filePath);
+        }
+        else
+        {
+            // For non-text files, we'll use a placeholder
+            // In production, you'd implement proper text extraction
+            textContent = $"Document file: {document.FileName}\nFile type: {extension}\nUploaded: {document.UploadedAt}\nTags: {string.Join(", ", document.Tags)}";
+        }
+
+        // Perform AI analysis
+        var metadata = await aiService.ExtractMetadataAsync(textContent, document.FileName);
+        
+        var result = new
+        {
+            DocumentId = id,
+            FileName = document.FileName,
+            OriginalTags = document.Tags,
+            AIAnalysis = metadata,
+            AnalyzedAt = DateTimeOffset.UtcNow,
+            TextContentLength = textContent.Length,
+            SupportedFileType = extension == ".txt" || extension == ".md"
+        };
+
+        app.Logger.LogInformation("Successfully completed AI analysis for document {DocumentId}", id);
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error analyzing document {DocumentId} for owner {Owner}", id, owner);
+        return Results.Problem("An error occurred while analyzing the document");
+    }
+})
+.WithName("AnalyzeDocument")
+.WithSummary("Analyze a document using AI to extract metadata and insights")
+.WithDescription("""
+    Uses Azure OpenAI to analyze a document and extract structured metadata including:
+    
+    **Key Features:**
+    - Document type classification (Invoice, Contract, Receipt, etc.)
+    - Automatic summary generation
+    - Entity extraction (names, companies, amounts, dates)
+    - Tag suggestions based on content
+    - Confidence scoring for analysis quality
+    
+    **Supported File Types:**
+    - Text files (.txt, .md) - full content analysis
+    - Other files - metadata-based analysis (filename, tags, etc.)
+    
+    **Parameters:**
+    - `id` (required): Document ID to analyze
+    - `owner` (required): Username/identifier of the document owner
+    
+    **Response:**
+    Returns detailed AI analysis including document type, summary, extracted entities, suggested tags, and confidence scores.
+    
+    **Note:** This operation requires an active Azure OpenAI connection and may take a few seconds to complete.
+    """)
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "AI Document Analysis" }];
+    
+    var idParam = operation.Parameters.FirstOrDefault(p => p.Name == "id");
+    if (idParam != null)
+    {
+        idParam.Description = "Unique identifier of the document to analyze";
+        idParam.Required = true;
+    }
+    
+    var ownerParam = operation.Parameters.FirstOrDefault(p => p.Name == "owner");
+    if (ownerParam != null)
+    {
+        ownerParam.Description = "Username or identifier of the document owner";
+        ownerParam.Required = true;
+        ownerParam.Example = new Microsoft.OpenApi.Any.OpenApiString("john_doe");
+    }
+    
+    return operation;
+})
+.Produces(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status500InternalServerError);
+
+// Endpoint to suggest tags for new uploads using AI
+app.MapPost("/documents/suggest-tags", async (
+    [FromBody] SuggestTagsRequest request,
+    IDocumentAIService aiService) =>
+{
+    try
+    {
+        if (string.IsNullOrWhiteSpace(request.TextContent) && string.IsNullOrWhiteSpace(request.FileName))
+        {
+            return Results.BadRequest("Either text content or filename must be provided");
+        }
+
+        var textForAnalysis = !string.IsNullOrWhiteSpace(request.TextContent) 
+            ? request.TextContent 
+            : $"Filename: {request.FileName}";
+
+        var suggestedTags = await aiService.SuggestTagsAsync(
+            textForAnalysis, 
+            request.ExistingTags, 
+            request.MaxTags);
+
+        var result = new
+        {
+            SuggestedTags = suggestedTags,
+            RequestedMaxTags = request.MaxTags,
+            ExistingTags = request.ExistingTags ?? new List<string>(),
+            AnalyzedAt = DateTimeOffset.UtcNow
+        };
+
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error suggesting tags");
+        return Results.Problem("An error occurred while suggesting tags");
+    }
+})
+.WithName("SuggestTags")
+.WithSummary("Get AI-suggested tags for document content")
+.WithDescription("""
+    Uses AI to analyze text content or filename and suggest relevant tags for document organization.
+    
+    **Use Cases:**
+    - Tag suggestion before uploading documents
+    - Improving existing document organization
+    - Standardizing tag naming across documents
+    
+    **Request Body:**
+    ```json
+    {
+        "textContent": "Document text to analyze (optional)",
+        "fileName": "document.pdf (optional if textContent provided)",
+        "existingTags": ["tag1", "tag2"] (optional),
+        "maxTags": 5
+    }
+    ```
+    """)
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "AI Document Analysis" }];
+    return operation;
+})
+.Accepts<SuggestTagsRequest>("application/json")
+.Produces(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status400BadRequest)
+.Produces(StatusCodes.Status500InternalServerError);
+
 app.Run();
 
 // Make Program class accessible for testing
@@ -496,6 +684,20 @@ public record DocumentMeta(
     [property: Description("List of tags for document organization")] List<string> Tags,
     [property: Description("Filename with unique GUID prefix")] string FileName,
     [property: Description("Upload timestamp in UTC")] DateTimeOffset UploadedAt
+);
+
+/// <summary>
+/// Request model for AI tag suggestions
+/// </summary>
+/// <param name="TextContent">Text content to analyze for tag suggestions (optional)</param>
+/// <param name="FileName">Filename to analyze if text content not provided (optional)</param>
+/// <param name="ExistingTags">Current tags to consider when suggesting new ones (optional)</param>
+/// <param name="MaxTags">Maximum number of tags to suggest (default: 5)</param>
+public record SuggestTagsRequest(
+    [property: Description("Text content to analyze for tag suggestions")] string? TextContent = null,
+    [property: Description("Filename to analyze for tag suggestions")] string? FileName = null,
+    [property: Description("Existing tags to consider")] List<string>? ExistingTags = null,
+    [property: Description("Maximum number of tags to suggest")] int MaxTags = 5
 );
 
 // Service interface definition is in DocumentModels.cs
