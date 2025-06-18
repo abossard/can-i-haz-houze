@@ -12,3 +12,4 @@ hooks:
     shell: sh
     run: ./scripts/setup-local-openai.sh
     interactive: true
+    continueOnError: true

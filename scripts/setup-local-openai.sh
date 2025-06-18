@@ -4,20 +4,111 @@
 # This script automatically retrieves OpenAI connection details from Azure after deployment
 # and configures them for local development
 
-set -e
+# Add fallback instructions in case of any issues
+handle_error() {
+    echo ""
+    echo "⚠️  Automatic setup encountered an error, but deployment succeeded!"
+    echo "=================================================="
+    echo ""
+    echo "You can manually set up the OpenAI connection by:"
+    echo ""
+    echo "1. Find your resource group:"
+    echo "   az group list --query \"[?contains(name, 'can-i-haz-houze')].name\" -o tsv"
+    echo ""
+    echo "2. Find your OpenAI resource:"
+    echo "   az cognitiveservices account list --resource-group <your-rg> --query \"[?kind=='OpenAI'].name\" -o tsv"
+    echo ""
+    echo "3. Get connection details:"
+    echo "   az cognitiveservices account show --name <openai-name> --resource-group <your-rg> --query properties.endpoint -o tsv"
+    echo "   az cognitiveservices account keys list --name <openai-name> --resource-group <your-rg> --query key1 -o tsv"
+    echo ""
+    echo "4. Set user secrets:"
+    echo "   cd src/CanIHazHouze.AppHost"
+    echo "   dotnet user-secrets set \"ConnectionStrings:openai\" \"Endpoint=<endpoint>;ApiKey=<key>\""
+    echo ""
+    echo "💡 Your deployment was successful - this is just a local development setup issue!"
+    echo ""
+    exit 1
+}
+
+trap 'handle_error' ERR
 
 echo ""
 echo "🤖 Setting up OpenAI connection for local development..."
 echo "=================================================="
 
+# Check if required tools are available
+if ! command -v azd &> /dev/null; then
+    echo "❌ Error: Azure Developer CLI (azd) is not installed"
+    echo "   Please install it from: https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd"
+    exit 1
+fi
+
+if ! command -v az &> /dev/null; then
+    echo "❌ Error: Azure CLI (az) is not installed"
+    echo "   Please install it from: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli"
+    exit 1
+fi
+
+# Check if user is logged in to Azure
+if ! az account show &> /dev/null; then
+    echo "❌ Error: You are not logged in to Azure"
+    echo "   Please run: az login"
+    exit 1
+fi
+
 # Load environment variables from azd
 echo "📄 Loading azd environment variables..."
 eval "$(azd env get-values)"
 
-# Check if we have the required environment variables
+# Debug: Show available environment variables (remove sensitive data)
+echo "🔍 Available environment variables:"
+azd env get-values | grep -E '^AZURE_|^SERVICE_' | sed 's/=.*/=***/' || echo "   (No Azure environment variables found)"
+echo ""
+
+# Try to find the resource group using multiple methods
+AZURE_RESOURCE_GROUP=""
+
+# Method 1: Check if AZURE_RESOURCE_GROUP is already set
+if [ -n "$AZURE_RESOURCE_GROUP" ]; then
+    echo "✅ Found resource group from environment: $AZURE_RESOURCE_GROUP"
+else
+    echo "🔍 AZURE_RESOURCE_GROUP not found in environment, searching for resource group..."
+    
+    # Method 2: Look for resource groups with the app name
+    if [ -n "$AZURE_ENV_NAME" ]; then
+        echo "   Searching for resource group containing: $AZURE_ENV_NAME"
+        AZURE_RESOURCE_GROUP=$(az group list --query "[?contains(name, '$AZURE_ENV_NAME')].name" --output tsv 2>/dev/null | head -1)
+    fi
+    
+    # Method 3: Look for resource groups with 'can-i-haz-houze'
+    if [ -z "$AZURE_RESOURCE_GROUP" ]; then
+        echo "   Searching for resource group containing: can-i-haz-houze"
+        AZURE_RESOURCE_GROUP=$(az group list --query "[?contains(name, 'can-i-haz-houze')].name" --output tsv 2>/dev/null | head -1)
+    fi
+    
+    # Method 4: Look for any resource group with OpenAI resources
+    if [ -z "$AZURE_RESOURCE_GROUP" ]; then
+        echo "   Searching for any resource group with OpenAI resources..."
+        for rg in $(az group list --query "[].name" --output tsv 2>/dev/null); do
+            openai_count=$(az cognitiveservices account list --resource-group "$rg" --query "[?kind=='OpenAI'] | length(@)" --output tsv 2>/dev/null || echo "0")
+            if [ "$openai_count" -gt 0 ]; then
+                AZURE_RESOURCE_GROUP="$rg"
+                echo "   Found OpenAI resource in: $rg"
+                break
+            fi
+        done
+    fi
+fi
+
+# Final check
 if [ -z "$AZURE_RESOURCE_GROUP" ]; then
-    echo "❌ Error: AZURE_RESOURCE_GROUP not found in environment"
-    echo "   Make sure you've run 'azd up' or 'azd provision' first"
+    echo "❌ Error: Could not find a resource group with OpenAI resources"
+    echo "   Available resource groups:"
+    az group list --query "[].name" --output table 2>/dev/null || echo "   (Unable to list resource groups)"
+    echo ""
+    echo "   💡 Tip: Make sure you've run 'azd up' or 'azd provision' and the deployment completed successfully"
+    echo "   💡 Tip: Check that you're logged into the correct Azure subscription with 'az account show'"
     exit 1
 fi
 
@@ -47,7 +138,11 @@ OPENAI_ENDPOINT=$(az cognitiveservices account show \
     --output tsv 2>/dev/null)
 
 if [ -z "$OPENAI_ENDPOINT" ]; then
-    echo "❌ Error: Could not retrieve OpenAI endpoint"
+    echo "❌ Error: Could not retrieve OpenAI endpoint for resource '$OPENAI_RESOURCE_NAME'"
+    echo "   This might be due to:"
+    echo "   • Insufficient permissions to read the resource"
+    echo "   • The resource is still being provisioned"
+    echo "   • The resource is in an error state"
     exit 1
 fi
 
@@ -60,7 +155,11 @@ OPENAI_KEY=$(az cognitiveservices account keys list \
     --output tsv 2>/dev/null)
 
 if [ -z "$OPENAI_KEY" ]; then
-    echo "❌ Error: Could not retrieve OpenAI API key"
+    echo "❌ Error: Could not retrieve OpenAI API key for resource '$OPENAI_RESOURCE_NAME'"
+    echo "   This might be due to:"
+    echo "   • Insufficient permissions to read keys (need Cognitive Services Contributor role)"
+    echo "   • The resource is still being provisioned"
+    echo "   • The resource is in an error state"
     exit 1
 fi
 
