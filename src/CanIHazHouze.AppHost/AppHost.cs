@@ -31,6 +31,18 @@ if (builder.ExecutionContext.IsPublishMode)
         modelVersion: "2024-07-18"); // GPT-4o mini for metadata extraction
 }
 
+// Add Azure Storage with Azurite emulator for local development
+// Automatically uses real Azure Storage in production
+var storage = builder.AddAzureStorage("storage")
+    .RunAsEmulator(azurite =>
+    {
+        azurite.WithLifetime(ContainerLifetime.Persistent);
+        azurite.WithDataVolume();
+    });
+
+// Add Blob Storage for document file storage
+var blobStorage = storage.AddBlobs("blobs");
+
 // Create shared database with separate containers for each service
 var houzeDatabase = cosmos.AddCosmosDatabase("houze");
 
@@ -43,6 +55,7 @@ var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>(
     .WithExternalHttpEndpoints()
     .WithReference(cosmos) // Reference the cosmos resource instead of container
     .WithReference(openai) // Add OpenAI reference for document processing
+    .WithReference(blobStorage) // Add Blob Storage reference for document file storage
     .WithHttpHealthCheck("/health");
 
 var ledgerService = builder.AddProject<Projects.CanIHazHouze_LedgerService>("ledgerservice")

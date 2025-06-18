@@ -113,6 +113,30 @@ azd auth login
 azd up
 ```
 
+### 🤖 Automatic OpenAI Setup (NEW!)
+
+After running `azd up`, the system **automatically** configures your OpenAI connection for local development! 
+
+The post-deploy hook will:
+- 🔍 Find your deployed Azure OpenAI resource
+- 🔑 Retrieve the endpoint and API key
+- 🔐 Configure your local user secrets automatically
+- ✅ Make your app ready for local development
+
+**No manual configuration needed!** Just run `azd up` and then `dotnet run --project src/CanIHazHouze.AppHost` locally.
+
+### Manual OpenAI Setup (If Needed) 🛠️
+
+If the automatic setup doesn't work or you want to run it manually:
+
+```bash
+# Run just the post-deploy hook
+azd hooks run postdeploy
+
+# Or get connection details manually (old way)
+# See the "Get Connection Details After Deployment" section below
+```
+
 ### Subsequent Deployments 🔄
 ```bash
 # Deploy code changes
@@ -132,7 +156,9 @@ azd env select      # Switch environments
 ```
 
 ### Get Connection Details After Deployment 🔍
-After running `azd up`, you can retrieve your Azure OpenAI connection details using Azure CLI:
+⚠️ **Note**: With the new automatic setup, you usually don't need to do this manually!
+
+The automatic post-deploy hook should configure everything for you. But if you need to get the details manually:
 
 ```bash
 # Get the resource group name (usually rg-<app-name>)
@@ -156,13 +182,20 @@ az cognitiveservices account keys list \
   --query key1 \
   --output tsv
 
-# Combine them for local development
-echo "ConnectionStrings:openai=Endpoint=<endpoint-from-above>;ApiKey=<key-from-above>"
+# Set user secrets manually (if automatic setup failed)
+cd src/CanIHazHouze.AppHost
+dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=<endpoint>;ApiKey=<key>"
 ```
 
 💡 **Pro Tip**: For production apps deployed with `azd`, the connection is automatically configured using managed identity - no manual connection string needed!
 
 ## 🎯 Key Features
+
+### Automated DevOps Experience 🤖
+- **One-Command Deploy**: `azd up` deploys everything to Azure
+- **Auto-Configuration**: OpenAI connection automatically configured for local development
+- **Cross-Platform Scripts**: Works on macOS and Linux (requires bash)
+- **Zero Manual Setup**: No need to copy/paste connection strings
 
 ### Document Service 📄
 - **Upload documents** with drag & drop
