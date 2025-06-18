@@ -31,12 +31,7 @@ git clone https://github.com/yourusername/can-i-haz-houze.git
 cd can-i-haz-houze/src
 ```
 
-### 2. Install .NET Aspire CLI 🔧
-```bash
-dotnet tool install --global aspire.cli --prerelease
-```
-
-### 3. Set Up Your Secrets (Shh! 🤫)
+### 2. Set Up Your Secrets (Shh! 🤫)
 
 #### For Local Development with Azure OpenAI:
 ```bash
@@ -49,7 +44,7 @@ dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=https://your-openai
 export ConnectionStrings__openai="Endpoint=https://your-openai-resource.openai.azure.com/;ApiKey=your-key"
 ```
 
-### 4. Launch the Beast 🐉
+### 3. Launch the Beast 🐉
 ```bash
 dotnet run --project CanIHazHouze.AppHost
 ```
@@ -136,6 +131,37 @@ azd env list        # List environments
 azd env select      # Switch environments
 ```
 
+### Get Connection Details After Deployment 🔍
+After running `azd up`, you can retrieve your Azure OpenAI connection details using Azure CLI:
+
+```bash
+# Get the resource group name (usually rg-<app-name>)
+az group list --query "[?contains(name, 'can-i-haz-houze')].name" -o tsv
+
+# Set variables (replace with your actual values)
+RESOURCE_GROUP="rg-can-i-haz-houze-dev"  # from above command
+OPENAI_SERVICE_NAME="openai-can-i-haz-houze"  # your OpenAI resource name
+
+# Get the endpoint
+az cognitiveservices account show \
+  --name $OPENAI_SERVICE_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --query properties.endpoint \
+  --output tsv
+
+# Get the API key
+az cognitiveservices account keys list \
+  --name $OPENAI_SERVICE_NAME \
+  --resource-group $RESOURCE_GROUP \
+  --query key1 \
+  --output tsv
+
+# Combine them for local development
+echo "ConnectionStrings:openai=Endpoint=<endpoint-from-above>;ApiKey=<key-from-above>"
+```
+
+💡 **Pro Tip**: For production apps deployed with `azd`, the connection is automatically configured using managed identity - no manual connection string needed!
+
 ## 🎯 Key Features
 
 ### Document Service 📄
@@ -156,6 +182,11 @@ azd env select      # Switch environments
 - AI-assisted decision making
 
 ## 🔧 Development Tips
+
+### Why No Aspire CLI? 🤔
+You might see references to the `aspire` CLI in other tutorials. It's a preview tool that's just a convenience wrapper around `dotnet run` - it automatically finds your AppHost project. Since our project structure is clear and we're already using standard .NET commands, we don't need it! 
+
+> *"Keep it simple, stupid!"* - Some wise developer probably 🧠
 
 ### Running Individual Services 🎪
 ```bash

@@ -40,15 +40,18 @@ var ledgersContainer = houzeDatabase.AddContainer("ledgers", "/owner");
 var mortgagesContainer = houzeDatabase.AddContainer("mortgages", "/owner");
 
 var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>("documentservice")
+    .WithExternalHttpEndpoints()
     .WithReference(cosmos) // Reference the cosmos resource instead of container
     .WithReference(openai) // Add OpenAI reference for document processing
     .WithHttpHealthCheck("/health");
 
 var ledgerService = builder.AddProject<Projects.CanIHazHouze_LedgerService>("ledgerservice")
+    .WithExternalHttpEndpoints()
     .WithReference(cosmos) // Reference the cosmos resource instead of container
     .WithHttpHealthCheck("/health");
 
 var mortgageService = builder.AddProject<Projects.CanIHazHouze_MortgageApprover>("mortgageapprover")
+    .WithExternalHttpEndpoints()
     .WithReference(cosmos) // Reference the cosmos resource instead of container
     .WithReference(documentService)     // ← Keep for cross-service verification
     .WithReference(ledgerService)       // ← Keep for cross-service verification
