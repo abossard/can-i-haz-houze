@@ -70,7 +70,7 @@ builder.AddServiceDefaults();
 builder.Services.AddProblemDetails();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.AddOpenApiWithAzureContainerAppsServers();
 
 // Add CORS
 builder.Services.AddCors(options =>

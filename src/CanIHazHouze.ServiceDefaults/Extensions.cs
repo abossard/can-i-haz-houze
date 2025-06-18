@@ -7,6 +7,8 @@ using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.OpenApi;
 
 namespace Microsoft.Extensions.Hosting;
 
@@ -123,5 +125,52 @@ public static class Extensions
         }
 
         return app;
+    }
+
+    /// <summary>
+    /// Adds OpenAPI configuration with Azure Container Apps server URL detection
+    /// </summary>
+    public static TBuilder AddOpenApiWithAzureContainerAppsServers<TBuilder>(this TBuilder builder)
+        where TBuilder : IHostApplicationBuilder
+    {
+        builder.Services.AddOpenApi(options =>
+        {
+            options.AddDocumentTransformer((document, context, cancellationToken) =>
+            {
+                // Clear any existing servers
+                document.Servers.Clear();
+
+                // Try to construct server URL from Azure Container Apps environment variables
+                var configuration = context.ApplicationServices.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+                var containerAppName = configuration["CONTAINER_APP_NAME"];
+                var containerAppEnvDnsSuffix = configuration["CONTAINER_APP_ENV_DNS_SUFFIX"];
+
+                if (!string.IsNullOrEmpty(containerAppName) && !string.IsNullOrEmpty(containerAppEnvDnsSuffix))
+                {
+                    var serverUrl = $"https://{containerAppName}.{containerAppEnvDnsSuffix}";
+
+                    document.Servers.Add(new OpenApiServer
+                    {
+                        Url = serverUrl,
+                        Description = "Azure Container Apps server"
+                    });                    // Log the constructed URL for debugging
+                    var loggerFactory = context.ApplicationServices.GetService<ILoggerFactory>();
+                    var logger = loggerFactory?.CreateLogger("OpenApiServerConfiguration");
+                    logger?.LogInformation("OpenAPI Server URL constructed from environment variables: {ServerUrl}", serverUrl);
+                }
+                else
+                {
+                    // Log missing environment variables for debugging
+                    var loggerFactory = context.ApplicationServices.GetService<ILoggerFactory>();
+                    var logger = loggerFactory?.CreateLogger("OpenApiServerConfiguration");
+                    logger?.LogDebug("Azure Container Apps environment variables not found. CONTAINER_APP_NAME: {AppName}, CONTAINER_APP_ENV_DNS_SUFFIX: {DnsSuffix}",
+                        containerAppName ?? "null", containerAppEnvDnsSuffix ?? "null");
+                }
+
+                return Task.CompletedTask;
+            });
+        });
+
+        return builder;
     }
 }

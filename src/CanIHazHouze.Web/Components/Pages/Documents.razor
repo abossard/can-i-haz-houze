@@ -279,9 +279,13 @@ else
 
             var result = await DocumentApi.UploadDocumentAsync(currentOwner.Trim(), selectedFile, tags);
 
-            if (result != null)
+            if (result != null && result.Document != null)
             {
-                uploadSuccess = $"Successfully uploaded '{GetDisplayFileName(result.FileName)}'";
+                uploadSuccess = $"Successfully uploaded '{GetDisplayFileName(result.Document.FileName)}'";
+                if (result.SuggestionsGenerated && result.AITagSuggestions?.Any() == true)
+                {
+                    uploadSuccess += $" with AI tag suggestions: {string.Join(", ", result.AITagSuggestions)}";
+                }
                 ClearUpload();
                 
                 // Refresh the document list
@@ -416,8 +420,14 @@ else
         }
     }
 
-    private static string GetDisplayFileName(string fileName)
+    private static string GetDisplayFileName(string? fileName)
     {
+        // Handle null or empty filename
+        if (string.IsNullOrEmpty(fileName))
+        {
+            return "Unknown file";
+        }
+        
         // Remove the GUID prefix to show a cleaner filename
         if (fileName.Length > 36 && fileName[36] == '_')
         {

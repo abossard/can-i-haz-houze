@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel;
 using CanIHazHouze.DocumentService;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,14 +27,17 @@ builder.Services.AddCors(options =>
 });
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.AddOpenApiWithAzureContainerAppsServers();
 
-// Configure document storage options
+// Configure document storage options (now for blob storage)
 builder.Services.Configure<CanIHazHouze.DocumentService.DocumentStorageOptions>(
     builder.Configuration.GetSection("DocumentStorage"));
 
 // Add Azure Cosmos DB using Aspire
 builder.AddAzureCosmosClient("cosmos");
+
+// Add Azure Blob Storage using Aspire
+builder.AddAzureBlobClient("blobs");
 
 // Add Azure OpenAI client for document processing
 builder.AddAzureOpenAIClient("openai");
@@ -78,41 +82,49 @@ app.MapPost("/documents", async (
         {
             return Results.BadRequest("File is required");
         }
-        
-        app.Logger.LogInformation("Starting document upload for owner: {Owner}, file: {FileName}", owner, file.FileName);
+          app.Logger.LogInformation("Starting document upload for owner: {Owner}, file: {FileName}", owner, file.FileName);
         
         var tagList = string.IsNullOrWhiteSpace(tags) 
             ? new List<string>() 
             : tags.Split(',').Select(t => t.Trim()).ToList();
         
+        // If AI tag suggestions are requested, read file content first (before uploading)
+        string? textForAnalysis = null;
+        if (suggestTags)
+        {
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (extension == ".txt" || extension == ".md")
+            {
+                try
+                {
+                    using var reader = new StreamReader(file.OpenReadStream());
+                    textForAnalysis = await reader.ReadToEndAsync();
+                    app.Logger.LogInformation("Read {Length} characters from text file for AI analysis", textForAnalysis.Length);
+                }
+                catch (Exception ex)
+                {
+                    app.Logger.LogWarning(ex, "Failed to read file content for AI analysis, will use filename only");
+                    textForAnalysis = $"Filename: {file.FileName}\nExisting tags: {string.Join(", ", tagList)}";
+                }
+            }
+            else
+            {
+                // For non-text files, use filename and existing tags
+                textForAnalysis = $"Filename: {file.FileName}\nExisting tags: {string.Join(", ", tagList)}";
+            }
+        }
+        
         var documentMeta = await documentService.UploadDocumentAsync(owner, file, tagList);
         
         app.Logger.LogInformation("Document uploaded successfully: {DocumentId}", documentMeta.Id);
-        
-        // If AI tag suggestions are requested, generate them
+          // If AI tag suggestions are requested, generate them using pre-read content
         List<string>? suggestedTags = null;
-        if (suggestTags)
+        if (suggestTags && !string.IsNullOrEmpty(textForAnalysis))
         {
             try
             {
                 app.Logger.LogInformation("Generating AI tag suggestions for document: {DocumentId}", documentMeta.Id);
                 
-                // For text files, read content for better suggestions
-                string textForAnalysis;
-                var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-                
-                if (extension == ".txt" || extension == ".md")
-                {
-                    // Read the uploaded file content
-                    var filePath = documentService.GetDocumentPath(documentMeta.Id, owner, documentMeta.FileName);
-                    textForAnalysis = await File.ReadAllTextAsync(filePath);
-                }
-                else
-                {
-                    // Use filename and existing tags for analysis
-                    textForAnalysis = $"Filename: {file.FileName}\nExisting tags: {string.Join(", ", tagList)}";
-                }
-
                 suggestedTags = await aiService.SuggestTagsAsync(textForAnalysis, tagList, maxSuggestions);
                 app.Logger.LogInformation("Generated {Count} AI tag suggestions", suggestedTags?.Count ?? 0);
             }
@@ -469,6 +481,109 @@ app.MapDelete("/documents/{id}", async (Guid id, [Required] string owner, IDocum
 .Produces(StatusCodes.Status404NotFound)
 .Produces(StatusCodes.Status500InternalServerError);
 
+// Document download endpoint
+app.MapGet("/documents/{id}/download", async (Guid id, [Required] string owner, IDocumentService documentService) =>
+{
+    try
+    {
+        // Get document metadata first to verify ownership and get filename
+        var document = await documentService.GetDocumentAsync(id, owner);
+        if (document == null)
+        {
+            return Results.NotFound("Document not found or access denied");
+        }
+        
+        // Get document content stream
+        var contentStream = await documentService.GetDocumentContentAsync(id, owner);
+        if (contentStream == null)
+        {
+            return Results.NotFound("Document content not found");
+        }
+        
+        // Determine content type from filename
+        var extension = Path.GetExtension(document.FileName).ToLowerInvariant();
+        var contentType = extension switch
+        {
+            ".pdf" => "application/pdf",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".txt" => "text/plain",
+            ".json" => "application/json",
+            ".xml" => "application/xml",
+            ".zip" => "application/zip",
+            ".doc" => "application/msword",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".xls" => "application/vnd.ms-excel",
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            _ => "application/octet-stream"
+        };
+        
+        // Extract original filename without GUID prefix
+        var originalFileName = document.FileName;
+        if (originalFileName.Contains('_') && Guid.TryParse(originalFileName.Split('_')[0], out _))
+        {
+            originalFileName = string.Join("_", originalFileName.Split('_').Skip(1));
+        }
+        
+        return Results.Stream(contentStream, contentType, originalFileName);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Error downloading document: {ex.Message}", statusCode: 500);
+    }
+})
+.WithName("DownloadDocument")
+.WithSummary("Download a document file")
+.WithDescription("""
+    Downloads the actual file content for a specific document.
+    
+    **Key Features:**
+    - Returns the original file with appropriate content-type headers
+    - Access control: only downloads documents owned by the specified user
+    - Preserves original filename for download
+    - Supports all file types uploaded to the system
+    
+    **Parameters:**
+    - `id` (path, required): Unique GUID identifier of the document
+    - `owner` (query, required): Username/identifier of the document owner
+    
+    **Response:**
+    Returns the file content as a stream with appropriate headers for browser download.
+    
+    **Use Cases:**
+    - Download documents for viewing or editing
+    - Backup or archive documents locally
+    - Share document files with external systems
+    
+    **Example:**
+    GET /documents/123e4567-e89b-12d3-a456-426614174000/download?owner=john_doe
+    """)
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Document Management" }];
+    
+    var idParam = operation.Parameters.FirstOrDefault(p => p.Name == "id");
+    if (idParam != null)
+    {
+        idParam.Description = "Unique GUID identifier of the document to download";
+        idParam.Example = new Microsoft.OpenApi.Any.OpenApiString("123e4567-e89b-12d3-a456-426614174000");
+    }
+    
+    var ownerParam = operation.Parameters.FirstOrDefault(p => p.Name == "owner");
+    if (ownerParam != null)
+    {
+        ownerParam.Description = "Username or identifier of the document owner";
+        ownerParam.Required = true;
+        ownerParam.Example = new Microsoft.OpenApi.Any.OpenApiString("john_doe");
+    }
+    
+    return operation;
+})
+.Produces(StatusCodes.Status200OK, contentType: "application/octet-stream")
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status500InternalServerError);
+
 // Document verification endpoint for mortgage approval
 app.MapGet("/documents/user/{owner}/verification", async (string owner, IDocumentService documentService) =>
 {
@@ -571,14 +686,11 @@ app.MapPost("/documents/{id}/analyze", async (
         if (document is null)
         {
             return Results.NotFound("Document not found or access denied");
-        }
-
-        // Read the document content (for now, we'll need to implement text extraction)
-        // This is a simplified version - in production you'd want proper text extraction
-        var filePath = documentService.GetDocumentPath(id, owner, document.FileName);
-        if (!File.Exists(filePath))
+        }        // Read the document content from blob storage
+        var contentStream = await documentService.GetDocumentContentAsync(id, owner);
+        if (contentStream == null)
         {
-            return Results.NotFound("Document file not found");
+            return Results.NotFound("Document content not found");
         }
 
         // For demonstration, we'll read text files directly
@@ -588,7 +700,8 @@ app.MapPost("/documents/{id}/analyze", async (
         
         if (extension == ".txt" || extension == ".md")
         {
-            textContent = await File.ReadAllTextAsync(filePath);
+            using var reader = new StreamReader(contentStream);
+            textContent = await reader.ReadToEndAsync();
         }
         else
         {
@@ -687,13 +800,11 @@ app.MapPut("/documents/{id}/enhance-tags", async (
         if (document is null)
         {
             return Results.NotFound("Document not found or access denied");
-        }
-
-        // Read the document content for AI analysis
-        var filePath = documentService.GetDocumentPath(id, owner, document.FileName);
-        if (!File.Exists(filePath))
+        }        // Read the document content for AI analysis from blob storage
+        var contentStream = await documentService.GetDocumentContentAsync(id, owner);
+        if (contentStream == null)
         {
-            return Results.NotFound("Document file not found");
+            return Results.NotFound("Document content not found");
         }
 
         // Extract text content for analysis
@@ -702,10 +813,13 @@ app.MapPut("/documents/{id}/enhance-tags", async (
         
         if (extension == ".txt" || extension == ".md")
         {
-            textContent = await File.ReadAllTextAsync(filePath);
+            using var reader = new StreamReader(contentStream);
+            textContent = await reader.ReadToEndAsync();
         }
         else
         {
+            // For non-text files, use metadata for analysis
+            contentStream.Dispose(); // Clean up the stream since we're not using it
             // For non-text files, use metadata for analysis
             textContent = $"Document file: {document.FileName}\nFile type: {extension}\nUploaded: {document.UploadedAt}\nExisting tags: {string.Join(", ", document.Tags)}";
         }

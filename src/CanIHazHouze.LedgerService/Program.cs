@@ -26,7 +26,7 @@ builder.Services.AddCors(options =>
 });
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.AddOpenApiWithAzureContainerAppsServers();
 
 // Configure ledger storage options
 builder.Services.Configure<LedgerStorageOptions>(

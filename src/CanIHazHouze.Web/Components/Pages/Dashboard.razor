@@ -263,8 +263,14 @@ else
         }
     }
 
-    private static string GetDisplayFileName(string fileName)
+    private static string GetDisplayFileName(string? fileName)
     {
+        // Handle null or empty filename
+        if (string.IsNullOrEmpty(fileName))
+        {
+            return "Unknown file";
+        }
+        
         // Remove the GUID prefix to show a cleaner filename
         if (fileName.Length > 36 && fileName[36] == '_')
         {

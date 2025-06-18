@@ -2,6 +2,21 @@ using Microsoft.AspNetCore.Components.Forms;
 
 namespace CanIHazHouze.Web;
 
+public record DocumentMeta(
+    Guid Id,
+    string Owner,
+    List<string> Tags,
+    string FileName,
+    DateTimeOffset UploadedAt
+);
+
+public record UploadDocumentResponse(
+    DocumentMeta Document,
+    List<string>? AITagSuggestions,
+    bool SuggestionsGenerated,
+    string Message
+);
+
 public class DocumentApiClient(HttpClient httpClient)
 {
     public async Task<DocumentMeta[]> GetDocumentsAsync(string owner, CancellationToken cancellationToken = default)
@@ -31,7 +46,7 @@ public class DocumentApiClient(HttpClient httpClient)
         }
     }
 
-    public async Task<DocumentMeta?> UploadDocumentAsync(string owner, IBrowserFile file, List<string> tags, CancellationToken cancellationToken = default)
+    public async Task<UploadDocumentResponse?> UploadDocumentAsync(string owner, IBrowserFile file, List<string> tags, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -55,7 +70,7 @@ public class DocumentApiClient(HttpClient httpClient)
 
             if (response.IsSuccessStatusCode)
             {
-                return await response.Content.ReadFromJsonAsync<DocumentMeta>(cancellationToken: cancellationToken);
+                return await response.Content.ReadFromJsonAsync<UploadDocumentResponse>(cancellationToken: cancellationToken);
             }
             else
             {
@@ -109,5 +124,3 @@ public class DocumentApiClient(HttpClient httpClient)
         }
     }
 }
-
-public record DocumentMeta(Guid Id, string Owner, List<string> Tags, string FileName, DateTimeOffset UploadedAt);
