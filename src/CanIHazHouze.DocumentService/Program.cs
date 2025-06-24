@@ -10,13 +10,20 @@ using System.Runtime.InteropServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Enhanced startup logging
+var logger = LoggerFactory.Create(config => config.AddConsole()).CreateLogger("Startup");
+logger.LogInformation("🔧 Building CanIHazHouze.DocumentService...");
+
 // Add service defaults & Aspire client integrations.
+logger.LogInformation("➕ Adding Aspire service defaults...");
 builder.AddServiceDefaults();
 
 // Add services to the container.
+logger.LogInformation("➕ Adding problem details support...");
 builder.Services.AddProblemDetails();
 
 // Add CORS
+logger.LogInformation("➕ Configuring CORS policy...");
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -28,42 +35,88 @@ builder.Services.AddCors(options =>
 });
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+logger.LogInformation("➕ Adding OpenAPI with Azure Container Apps servers...");
 builder.AddOpenApiWithAzureContainerAppsServers();
 
 // Configure document storage options (now for blob storage)
+logger.LogInformation("⚙️  Configuring document storage options...");
 builder.Services.Configure<CanIHazHouze.DocumentService.DocumentStorageOptions>(
     builder.Configuration.GetSection("DocumentStorage"));
 
 // Add Azure Cosmos DB using Aspire
+logger.LogInformation("🌐 Adding Azure Cosmos DB client...");
 builder.AddAzureCosmosClient("cosmos");
 
 // Add Azure Blob Storage using Aspire
+logger.LogInformation("📁 Adding Azure Blob Storage client...");
 builder.AddAzureBlobClient("blobs");
 
 // Add Azure OpenAI client for document processing
+logger.LogInformation("🤖 Adding Azure OpenAI client...");
 builder.AddAzureOpenAIClient("openai");
 
 // Add document service
+logger.LogInformation("📄 Registering document service...");
 builder.Services.AddScoped<IDocumentService, DocumentServiceImpl>();
 
 // Add AI document analysis service
+logger.LogInformation("🧠 Registering AI document analysis service...");
 builder.Services.AddScoped<IDocumentAIService, DocumentAIService>();
 
+logger.LogInformation("✅ Service configuration completed");
+logger.LogInformation("🏗️  Building application...");
+
 var app = builder.Build();
+
+// Enhanced startup logging
+app.Logger.LogInformation("🚀 CanIHazHouze.DocumentService starting up...");
+app.Logger.LogInformation("📋 Application Name: {ApplicationName}", builder.Environment.ApplicationName);
+app.Logger.LogInformation("🌍 Environment: {Environment}", builder.Environment.EnvironmentName);
+app.Logger.LogInformation("📁 Content Root: {ContentRoot}", builder.Environment.ContentRootPath);
+app.Logger.LogInformation("🖥️  Platform: {Platform}", Environment.OSVersion.Platform);
+
+// Configure application lifetime events
+var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+lifetime.ApplicationStarted.Register(() =>
+{
+    app.Logger.LogInformation("✅ CanIHazHouze.DocumentService has started successfully");
+    app.Logger.LogInformation("🌐 Application is now ready to accept requests");
+});
+
+lifetime.ApplicationStopping.Register(() =>
+{
+    app.Logger.LogWarning("⚠️  CanIHazHouze.DocumentService is stopping...");
+    app.Logger.LogInformation("🔄 Graceful shutdown initiated");
+});
+
+lifetime.ApplicationStopped.Register(() =>
+{
+    app.Logger.LogInformation("🛑 CanIHazHouze.DocumentService has stopped completely");
+    app.Logger.LogInformation("👋 Goodbye!");
+});
 
 // Configure Unix signal handling (ignore signals but log them)
 ConfigureSignalHandling(app.Logger);
 
 // Configure the HTTP request pipeline.
+app.Logger.LogInformation("🔧 Configuring HTTP request pipeline...");
+
+app.Logger.LogInformation("➕ Adding exception handler...");
 app.UseExceptionHandler();
 
 // Use CORS
+app.Logger.LogInformation("➕ Adding CORS middleware...");
 app.UseCors();
 
+app.Logger.LogInformation("➕ Mapping OpenAPI endpoints...");
 app.MapOpenApi();
 app.MapScalarApiReference();
 
+app.Logger.LogInformation("➕ Adding static files middleware...");
 app.UseStaticFiles(); // optional for serving files
+
+app.Logger.LogInformation("🔗 Configuring API endpoints...");
+app.Logger.LogInformation("📄 Setting up document management endpoints...");
 
 // Base64 document upload endpoint
 app.MapPost("/documents/base64", async (
@@ -1130,6 +1183,10 @@ app.MapPut("/documents/{id}/enhance-tags", async (
 
 app.MapDefaultEndpoints();
 
+app.Logger.LogInformation("🎯 All endpoints configured successfully");
+app.Logger.LogInformation("🚀 Starting CanIHazHouze.DocumentService...");
+app.Logger.LogInformation("📍 The application will be available once Aspire dependencies are ready");
+
 app.Run();
 
 /// <summary>
@@ -1138,13 +1195,21 @@ app.Run();
 /// <param name="logger">Logger instance for signal logging</param>
 static void ConfigureSignalHandling(ILogger logger)
 {
+    logger.LogInformation("🔧 Starting Unix signal handling configuration...");
+    logger.LogInformation("🖥️  Platform detection: {Platform}", Environment.OSVersion.Platform);
+    logger.LogInformation("⚙️  Operating System: {OS}", Environment.OSVersion);
+    
     // Only configure signal handling on Unix platforms
     if (!OperatingSystem.IsWindows())
     {
+        logger.LogInformation("🐧 Unix platform detected - Configuring signal handlers...");
+        
         try
         {
             // Register handlers for common termination signals
             // Note: SIGKILL and SIGSTOP cannot be caught by design
+            logger.LogInformation("📋 Preparing signal registration for Unix signals...");
+            
             var signals = new[]
             {
                 PosixSignal.SIGTERM,  // Termination request (kill command default)
@@ -1153,31 +1218,58 @@ static void ConfigureSignalHandling(ILogger logger)
                 PosixSignal.SIGQUIT   // Quit (Ctrl+\)
             };
 
+            logger.LogInformation("🎯 Registering handlers for {SignalCount} Unix signals: {Signals}", 
+                signals.Length, string.Join(", ", signals.Select(s => s.ToString())));
+
+            var registeredCount = 0;
             foreach (var signal in signals)
             {
-                PosixSignalRegistration.Create(signal, context =>
+                try
                 {
-                    var timestamp = DateTimeOffset.UtcNow;
-                    logger.LogWarning("🚨 Unix signal {Signal} received at {Timestamp} - Signal ignored, application continues running", 
-                        signal, timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff UTC"));
+                    logger.LogDebug("🔗 Registering handler for signal: {Signal}", signal);
                     
-                    // Cancel the default behavior (process termination) to keep the app running
-                    context.Cancel = true;
-                });
+                    PosixSignalRegistration.Create(signal, context =>
+                    {
+                        var timestamp = DateTimeOffset.UtcNow;
+                        logger.LogWarning("🚨 Unix signal {Signal} received at {Timestamp} - Signal ignored, application continues running", 
+                            signal, timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff UTC"));
+                        
+                        // Cancel the default behavior (process termination) to keep the app running
+                        context.Cancel = true;
+                        
+                        logger.LogInformation("✋ Signal {Signal} handling completed - Process termination cancelled", signal);
+                    });
+                    
+                    registeredCount++;
+                    logger.LogDebug("✅ Successfully registered handler for signal: {Signal}", signal);
+                }
+                catch (Exception signalEx)
+                {
+                    logger.LogWarning(signalEx, "⚠️  Failed to register handler for signal {Signal} - continuing with other signals", signal);
+                }
             }
 
-            logger.LogInformation("✅ Unix signal handling configured - Application will ignore SIGTERM, SIGINT, SIGHUP, and SIGQUIT signals");
-            logger.LogInformation("ℹ️  Note: SIGKILL (kill -9) cannot be caught and will still terminate the process immediately");
+            logger.LogInformation("✅ Unix signal handling configured successfully");
+            logger.LogInformation("📊 Signal registration summary: {RegisteredCount}/{TotalCount} signals registered", 
+                registeredCount, signals.Length);
+            logger.LogInformation("🛡️  Application will ignore SIGTERM, SIGINT, SIGHUP, and SIGQUIT signals");
+            logger.LogInformation("ℹ️  Note: SIGKILL (kill -9) and SIGSTOP cannot be caught and will still terminate the process immediately");
+            logger.LogInformation("🎮 Signal handling is now active - Use kill -9 <PID> to force terminate if needed");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "❌ Failed to configure Unix signal handling");
+            logger.LogError(ex, "❌ Failed to configure Unix signal handling - Application will use default signal behavior");
+            logger.LogError("💡 This may affect graceful shutdown behavior in containerized environments");
         }
     }
     else
     {
-        logger.LogInformation("ℹ️  Unix signal handling skipped - Running on Windows platform");
+        logger.LogInformation("🪟 Windows platform detected - Unix signal handling not applicable");
+        logger.LogInformation("ℹ️  Windows uses different termination mechanisms (Ctrl+C, Close button, etc.)");
+        logger.LogInformation("✅ Signal handling configuration completed (Windows - no action required)");
     }
+    
+    logger.LogInformation("🏁 Unix signal handling configuration finished");
 }
 
 // Make Program class accessible for testing
