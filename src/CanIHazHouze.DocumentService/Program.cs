@@ -6,6 +6,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel;
 using CanIHazHouze.DocumentService;
 using Microsoft.OpenApi.Models;
+using System.Runtime.InteropServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +50,9 @@ builder.Services.AddScoped<IDocumentService, DocumentServiceImpl>();
 builder.Services.AddScoped<IDocumentAIService, DocumentAIService>();
 
 var app = builder.Build();
+
+// Configure Unix signal handling (ignore signals but log them)
+ConfigureSignalHandling(app.Logger);
 
 // Configure the HTTP request pipeline.
 app.UseExceptionHandler();
@@ -1128,6 +1132,54 @@ app.MapDefaultEndpoints();
 
 app.Run();
 
+/// <summary>
+/// Configures Unix signal handling to capture and log signals without terminating the application
+/// </summary>
+/// <param name="logger">Logger instance for signal logging</param>
+static void ConfigureSignalHandling(ILogger logger)
+{
+    // Only configure signal handling on Unix platforms
+    if (!OperatingSystem.IsWindows())
+    {
+        try
+        {
+            // Register handlers for common termination signals
+            // Note: SIGKILL and SIGSTOP cannot be caught by design
+            var signals = new[]
+            {
+                PosixSignal.SIGTERM,  // Termination request (kill command default)
+                PosixSignal.SIGINT,   // Interrupt (Ctrl+C)
+                PosixSignal.SIGHUP,   // Hang up (terminal closed)
+                PosixSignal.SIGQUIT   // Quit (Ctrl+\)
+            };
+
+            foreach (var signal in signals)
+            {
+                PosixSignalRegistration.Create(signal, context =>
+                {
+                    var timestamp = DateTimeOffset.UtcNow;
+                    logger.LogWarning("🚨 Unix signal {Signal} received at {Timestamp} - Signal ignored, application continues running", 
+                        signal, timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff UTC"));
+                    
+                    // Cancel the default behavior (process termination) to keep the app running
+                    context.Cancel = true;
+                });
+            }
+
+            logger.LogInformation("✅ Unix signal handling configured - Application will ignore SIGTERM, SIGINT, SIGHUP, and SIGQUIT signals");
+            logger.LogInformation("ℹ️  Note: SIGKILL (kill -9) cannot be caught and will still terminate the process immediately");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "❌ Failed to configure Unix signal handling");
+        }
+    }
+    else
+    {
+        logger.LogInformation("ℹ️  Unix signal handling skipped - Running on Windows platform");
+    }
+}
+
 // Make Program class accessible for testing
 public partial class Program { }
 
@@ -1173,6 +1225,3 @@ public record Base64DocumentUploadRequest(
 );
 
 // Service interface definition is in DocumentModels.cs
-
-// Make Program class accessible for testing
-public partial class Program { }
