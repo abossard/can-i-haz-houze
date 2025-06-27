@@ -16,7 +16,7 @@ Welcome to the ultimate .NET Aspire-powered mortgage approval system! This baby 
 ## 🛠️ Prerequisites (The Boring Stuff)
 # 🎬🏠🚀 **WATCH THIS FIRST!** 🤩📺✨
 
-[![Watch the Ultimate Can I Haz Houze? Walkthrough!](https://img.youtube.com/vi/FjfPg8VdgfA/0.jpg)](https://youtu.be/FjfPg8VdgfA)
+[![Watch the Ultimate Can I Haz Houze? Walkthrough!](image.png)](https://youtu.be/FjfPg8VdgfA)
 
 > **This video explains EVERYTHING you need to know!**  
 > 👉 Click above to get the full tour, setup, and pro tips in action!  
