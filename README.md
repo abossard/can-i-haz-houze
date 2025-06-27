@@ -14,6 +14,13 @@ Welcome to the ultimate .NET Aspire-powered mortgage approval system! This baby 
 - **🤖 Azure OpenAI Integration**: Because humans are terrible at reading documents
 
 ## 🛠️ Prerequisites (The Boring Stuff)
+# 🎬🏠🚀 **WATCH THIS FIRST!** 🤩📺✨
+
+[![Watch the Ultimate Can I Haz Houze? Walkthrough!](https://img.youtube.com/vi/FjfPg8VdgfA/0.jpg)](https://youtu.be/FjfPg8VdgfA)
+
+> **This video explains EVERYTHING you need to know!**  
+> 👉 Click above to get the full tour, setup, and pro tips in action!  
+> _Don't miss it before you start!_ 🎉
 
 Before you can haz houze, you need:
 
