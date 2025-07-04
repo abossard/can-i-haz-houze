@@ -21,6 +21,7 @@
     <ProjectReference Include="..\CanIHazHouze.AppHost\CanIHazHouze.AppHost.csproj" />
     <ProjectReference Include="..\CanIHazHouze.DocumentService\CanIHazHouze.DocumentService.csproj" />
     <ProjectReference Include="..\CanIHazHouze.LedgerService\CanIHazHouze.LedgerService.csproj" />
+    <ProjectReference Include="..\CanIHazHouze.ServiceDefaults\CanIHazHouze.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>
