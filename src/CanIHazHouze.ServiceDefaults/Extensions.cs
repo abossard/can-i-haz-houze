@@ -9,6 +9,10 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Microsoft.OpenApi.Models;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.Extensions.Options;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
 
 namespace Microsoft.Extensions.Hosting;
 
@@ -37,11 +41,32 @@ public static class Extensions
             http.AddServiceDiscovery();
         });
 
+        // Add MCP support by default
+        builder.AddMCPSupport();
+
         // Uncomment the following to restrict the allowed schemes for service discovery.
         // builder.Services.Configure<ServiceDiscoveryOptions>(options =>
         // {
         //     options.AllowedSchemes = ["https"];
         // });
+
+        return builder;
+    }
+
+    /// <summary>
+    /// Adds MCP (Model Context Protocol) server support to the application
+    /// </summary>
+    public static TBuilder AddMCPSupport<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        // Configure MCP options from configuration
+        builder.Services.Configure<MCPOptions>(
+            builder.Configuration.GetSection("MCP"));
+
+        // Register MCP server as singleton
+        builder.Services.AddSingleton<IMCPServer, AspireMCPServer>();
+
+        // Add hosted service to start/stop MCP server
+        builder.Services.AddHostedService<MCPServerHostedService>();
 
         return builder;
     }
@@ -124,7 +149,248 @@ public static class Extensions
             });
         }
 
+        // Map MCP endpoints
+        app.MapMCPEndpoints();
+
         return app;
+    }
+
+    /// <summary>
+    /// Maps MCP (Model Context Protocol) endpoints
+    /// </summary>
+    public static WebApplication MapMCPEndpoints(this WebApplication app)
+    {
+        var mcpOptions = app.Services.GetService<IOptions<MCPOptions>>();
+        if (mcpOptions?.Value?.Enabled != true)
+        {
+            return app;
+        }
+
+        var mcpServer = app.Services.GetRequiredService<IMCPServer>();
+        var logger = app.Services.GetRequiredService<ILogger<AspireMCPServer>>();
+
+        // Map WebSocket endpoint for MCP
+        app.Map(mcpOptions.Value.Endpoint, async context =>
+        {
+            if (context.WebSockets.IsWebSocketRequest)
+            {
+                using var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                await HandleMCPWebSocketConnection(webSocket, mcpServer, logger);
+            }
+            else
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsync("WebSocket connection required for MCP endpoint");
+            }
+        });
+
+        // Add HTTP endpoint for MCP capabilities discovery
+        app.MapGet($"{mcpOptions.Value.Endpoint}/capabilities", (IMCPServer server) =>
+        {
+            return Results.Ok(new
+            {
+                capabilities = new
+                {
+                    tools = server.GetAvailableTools().Select(t => new
+                    {
+                        name = t.Name,
+                        description = t.Description,
+                        inputSchema = JsonSerializer.Deserialize<object>(t.InputSchema.RootElement.GetRawText())
+                    }),
+                    resources = server.GetAvailableResources().Select(r => new
+                    {
+                        uri = r.Uri,
+                        name = r.Name,
+                        description = r.Description,
+                        mimeType = r.MimeType
+                    })
+                },
+                protocolVersion = "2024-11-05",
+                serverInfo = new
+                {
+                    name = "CanIHazHouze MCP Server",
+                    version = "1.0.0"
+                }
+            });
+        })
+        .WithName("MCPCapabilities")
+        .WithSummary("Get MCP server capabilities")
+        .WithDescription("Returns available tools and resources for Model Context Protocol clients")
+        .WithTags("MCP");
+
+        logger.LogInformation("MCP endpoints mapped at {Endpoint}", mcpOptions.Value.Endpoint);
+        return app;
+    }
+
+    private static async Task HandleMCPWebSocketConnection(WebSocket webSocket, IMCPServer mcpServer, ILogger logger)
+    {
+        var buffer = new byte[1024 * 4];
+        
+        try
+        {
+            while (webSocket.State == WebSocketState.Open)
+            {
+                var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                
+                if (result.MessageType == WebSocketMessageType.Text)
+                {
+                    var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    logger.LogDebug("Received MCP message: {Message}", message);
+
+                    try
+                    {
+                        var response = await ProcessMCPMessage(message, mcpServer);
+                        var responseBytes = Encoding.UTF8.GetBytes(response);
+                        
+                        await webSocket.SendAsync(
+                            new ArraySegment<byte>(responseBytes), 
+                            WebSocketMessageType.Text, 
+                            true, 
+                            CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Error processing MCP message");
+                        
+                        var errorResponse = JsonSerializer.Serialize(new
+                        {
+                            jsonrpc = "2.0",
+                            error = new
+                            {
+                                code = -1,
+                                message = ex.Message
+                            },
+                            id = (object?)null
+                        });
+                        
+                        var errorBytes = Encoding.UTF8.GetBytes(errorResponse);
+                        await webSocket.SendAsync(
+                            new ArraySegment<byte>(errorBytes), 
+                            WebSocketMessageType.Text, 
+                            true, 
+                            CancellationToken.None);
+                    }
+                }
+                else if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "WebSocket connection error");
+        }
+        finally
+        {
+            if (webSocket.State == WebSocketState.Open)
+            {
+                await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Connection closed", CancellationToken.None);
+            }
+        }
+    }
+
+    private static async Task<string> ProcessMCPMessage(string message, IMCPServer mcpServer)
+    {
+        using var document = JsonDocument.Parse(message);
+        var root = document.RootElement;
+        
+        var method = root.GetProperty("method").GetString();
+        var id = root.TryGetProperty("id", out var idProp) ? idProp : (JsonElement?)null;
+
+        object result = method switch
+        {
+            "initialize" => new
+            {
+                protocolVersion = "2024-11-05",
+                capabilities = new
+                {
+                    tools = new { },
+                    resources = new { }
+                },
+                serverInfo = new
+                {
+                    name = "CanIHazHouze MCP Server",
+                    version = "1.0.0"
+                }
+            },
+            "tools/list" => new
+            {
+                tools = mcpServer.GetAvailableTools().Select(t => new
+                {
+                    name = t.Name,
+                    description = t.Description,
+                    inputSchema = JsonSerializer.Deserialize<object>(t.InputSchema.RootElement.GetRawText())
+                })
+            },
+            "tools/call" => await HandleToolCall(root, mcpServer),
+            "resources/list" => new
+            {
+                resources = mcpServer.GetAvailableResources().Select(r => new
+                {
+                    uri = r.Uri,
+                    name = r.Name,
+                    description = r.Description,
+                    mimeType = r.MimeType
+                })
+            },
+            "resources/read" => await HandleResourceRead(root, mcpServer),
+            _ => throw new InvalidOperationException($"Unknown method: {method}")
+        };
+
+        var response = new
+        {
+            jsonrpc = "2.0",
+            result = result,
+            id = id?.ValueKind == JsonValueKind.Null ? (object?)null : 
+                id?.ValueKind == JsonValueKind.String ? id?.GetString() : 
+                id?.ValueKind == JsonValueKind.Number ? id?.GetInt32() : 
+                (object?)null
+        };
+
+        return JsonSerializer.Serialize(response);
+    }
+
+    private static async Task<object> HandleToolCall(JsonElement root, IMCPServer mcpServer)
+    {
+        var paramsElement = root.GetProperty("params");
+        var toolName = paramsElement.GetProperty("name").GetString() ?? "";
+        var arguments = paramsElement.GetProperty("arguments");
+
+        var result = await mcpServer.HandleToolCallAsync(toolName, arguments);
+        
+        return new
+        {
+            content = new[]
+            {
+                new
+                {
+                    type = "text",
+                    text = JsonSerializer.Serialize(result)
+                }
+            }
+        };
+    }
+
+    private static async Task<object> HandleResourceRead(JsonElement root, IMCPServer mcpServer)
+    {
+        var paramsElement = root.GetProperty("params");
+        var uri = paramsElement.GetProperty("uri").GetString() ?? "";
+
+        var result = await mcpServer.HandleResourceRequestAsync(uri);
+        
+        return new
+        {
+            contents = new[]
+            {
+                new
+                {
+                    uri = uri,
+                    mimeType = "application/json",
+                    text = JsonSerializer.Serialize(result)
+                }
+            }
+        };
     }
 
     /// <summary>

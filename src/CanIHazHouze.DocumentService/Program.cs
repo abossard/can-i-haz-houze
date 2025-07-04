@@ -1183,6 +1183,129 @@ app.MapPut("/documents/{id}/enhance-tags", async (
 
 app.MapDefaultEndpoints();
 
+// Register MCP tools for DocumentService
+var mcpServer = app.Services.GetRequiredService<IMCPServer>();
+var documentService = app.Services.GetRequiredService<IDocumentService>();
+var aiService = app.Services.GetRequiredService<IDocumentAIService>();
+
+// Register upload document tool
+mcpServer.RegisterTool<UploadDocumentMCPRequest>("upload_document",
+    "Upload a new document with optional tags and AI suggestions",
+    async req => 
+    {
+        // Convert base64 to stream for upload
+        var fileBytes = Convert.FromBase64String(req.Base64Content);
+        var stream = new MemoryStream(fileBytes);
+        var formFile = new FormFile(stream, 0, fileBytes.Length, "file", req.FileName);
+        
+        var result = await documentService.UploadDocumentAsync(req.Owner, formFile, req.Tags ?? new List<string>());
+        
+        // Add AI suggestions if requested
+        List<string>? suggestions = null;
+        if (req.SuggestTags)
+        {
+            var textContent = req.FileName; // Simplified for demo
+            suggestions = await aiService.SuggestTagsAsync(textContent, req.Tags ?? new List<string>(), req.MaxSuggestions);
+        }
+        
+        return new { Document = result, AITagSuggestions = suggestions };
+    });
+
+// Register list documents tool
+mcpServer.RegisterTool<ListDocumentsRequest>("list_documents",
+    "Get all documents for a user",
+    async req => await documentService.GetDocumentsAsync(req.Owner));
+
+// Register get document tool
+mcpServer.RegisterTool<GetDocumentRequest>("get_document",
+    "Get document metadata by ID",
+    async req => await documentService.GetDocumentAsync(req.Id, req.Owner));
+
+// Register update document tags tool
+mcpServer.RegisterTool<UpdateDocumentTagsRequest>("update_document_tags",
+    "Update document tags",
+    async req => await documentService.UpdateDocumentTagsAsync(req.Id, req.Owner, req.Tags));
+
+// Register delete document tool
+mcpServer.RegisterTool<DeleteDocumentRequest>("delete_document",
+    "Delete a document",
+    async req => await documentService.DeleteDocumentAsync(req.Id, req.Owner));
+
+// Register verify documents tool
+mcpServer.RegisterTool<VerifyDocumentsRequest>("verify_mortgage_documents",
+    "Verify that a user has uploaded all required mortgage documents",
+    async req => 
+    {
+        var documents = await documentService.GetDocumentsAsync(req.Owner);
+        
+        var hasIncomeDocuments = documents.Any(d => d.Tags.Any(t => 
+            t.Contains("income", StringComparison.OrdinalIgnoreCase) || 
+            t.Contains("salary", StringComparison.OrdinalIgnoreCase) ||
+            t.Contains("pay", StringComparison.OrdinalIgnoreCase)));
+            
+        var hasCreditReport = documents.Any(d => d.Tags.Any(t => 
+            t.Contains("credit", StringComparison.OrdinalIgnoreCase)));
+            
+        var hasEmploymentVerification = documents.Any(d => d.Tags.Any(t => 
+            t.Contains("employment", StringComparison.OrdinalIgnoreCase)));
+            
+        var hasPropertyAppraisal = documents.Any(d => d.Tags.Any(t => 
+            t.Contains("appraisal", StringComparison.OrdinalIgnoreCase)));
+
+        return new
+        {
+            UserName = req.Owner,
+            HasIncomeDocuments = hasIncomeDocuments,
+            HasCreditReport = hasCreditReport,
+            HasEmploymentVerification = hasEmploymentVerification,
+            HasPropertyAppraisal = hasPropertyAppraisal,
+            AllDocumentsVerified = hasIncomeDocuments && hasCreditReport && hasEmploymentVerification && hasPropertyAppraisal,
+            TotalDocuments = documents.Count()
+        };
+    });
+
+// Register analyze document tool
+mcpServer.RegisterTool<AnalyzeDocumentRequest>("analyze_document_ai",
+    "Analyze a document using AI to extract metadata and insights",
+    async req => 
+    {
+        var document = await documentService.GetDocumentAsync(req.Id, req.Owner);
+        if (document == null) throw new InvalidOperationException("Document not found");
+        
+        var contentStream = await documentService.GetDocumentContentAsync(req.Id, req.Owner);
+        if (contentStream == null) throw new InvalidOperationException("Document content not found");
+        
+        string textContent;
+        var extension = Path.GetExtension(document.FileName).ToLowerInvariant();
+        
+        if (extension == ".txt" || extension == ".md")
+        {
+            using var reader = new StreamReader(contentStream);
+            textContent = await reader.ReadToEndAsync();
+        }
+        else
+        {
+            textContent = $"Document file: {document.FileName}\nFile type: {extension}";
+        }
+
+        var metadata = await aiService.ExtractMetadataAsync(textContent, document.FileName);
+        
+        return new
+        {
+            DocumentId = req.Id,
+            FileName = document.FileName,
+            AIAnalysis = metadata,
+            AnalyzedAt = DateTimeOffset.UtcNow
+        };
+    });
+
+// Register MCP resources for DocumentService
+mcpServer.RegisterResource("documents://all", "All Documents", 
+    "Summary of all documents in the system",
+    async () => new { message = "Document catalog resource - specify owner parameter for user documents" });
+
+app.Logger.LogInformation("🔧 Registered MCP tools and resources for DocumentService");
+
 app.Logger.LogInformation("🎯 All endpoints configured successfully");
 app.Logger.LogInformation("🚀 Starting CanIHazHouze.DocumentService...");
 app.Logger.LogInformation("📍 The application will be available once Aspire dependencies are ready");
@@ -1315,5 +1438,65 @@ public record Base64DocumentUploadRequest(
     [property: Description("Optional list of tags for document organization")] List<string>? Tags = null,
     [property: Description("Whether to generate AI tag suggestions after upload")] bool SuggestTags = false,    [property: Description("Maximum number of AI tag suggestions to generate")] int MaxSuggestions = 3
 );
+
+// MCP Tool Request Models for DocumentService
+/// <summary>
+/// Request model for uploading document via MCP
+/// </summary>
+/// <param name="Owner">Username or identifier of the document owner</param>
+/// <param name="FileName">Original filename of the document</param>
+/// <param name="Base64Content">Base64-encoded file content</param>
+/// <param name="Tags">Optional list of tags for document organization</param>
+/// <param name="SuggestTags">Whether to generate AI tag suggestions after upload</param>
+/// <param name="MaxSuggestions">Maximum number of AI tag suggestions to generate</param>
+public record UploadDocumentMCPRequest(
+    string Owner,
+    string FileName,
+    string Base64Content,
+    List<string>? Tags = null,
+    bool SuggestTags = false,
+    int MaxSuggestions = 3
+);
+
+/// <summary>
+/// Request model for listing documents via MCP
+/// </summary>
+/// <param name="Owner">Username or identifier of the document owner</param>
+public record ListDocumentsRequest(string Owner);
+
+/// <summary>
+/// Request model for getting document metadata via MCP
+/// </summary>
+/// <param name="Id">Unique GUID identifier of the document</param>
+/// <param name="Owner">Username or identifier of the document owner</param>
+public record GetDocumentRequest(Guid Id, string Owner);
+
+/// <summary>
+/// Request model for updating document tags via MCP
+/// </summary>
+/// <param name="Id">Unique GUID identifier of the document</param>
+/// <param name="Owner">Username or identifier of the document owner</param>
+/// <param name="Tags">Array of tag strings to assign to the document</param>
+public record UpdateDocumentTagsRequest(Guid Id, string Owner, List<string> Tags);
+
+/// <summary>
+/// Request model for deleting document via MCP
+/// </summary>
+/// <param name="Id">Unique GUID identifier of the document to delete</param>
+/// <param name="Owner">Username or identifier of the document owner</param>
+public record DeleteDocumentRequest(Guid Id, string Owner);
+
+/// <summary>
+/// Request model for verifying mortgage documents via MCP
+/// </summary>
+/// <param name="Owner">Username or identifier to verify documents for</param>
+public record VerifyDocumentsRequest(string Owner);
+
+/// <summary>
+/// Request model for analyzing document via MCP
+/// </summary>
+/// <param name="Id">Unique identifier of the document to analyze</param>
+/// <param name="Owner">Username or identifier of the document owner</param>
+public record AnalyzeDocumentRequest(Guid Id, string Owner);
 
 // Service interface definition is in DocumentModels.cs

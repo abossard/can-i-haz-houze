@@ -374,6 +374,37 @@ app.MapPost("/accounts/{owner}/reset", async (string owner, ILedgerService ledge
 
 app.MapDefaultEndpoints();
 
+// Register MCP tools for LedgerService
+var mcpServer = app.Services.GetRequiredService<IMCPServer>();
+var ledgerService = app.Services.GetRequiredService<ILedgerService>();
+
+// Register get account info tool
+mcpServer.RegisterTool<GetAccountRequest>("get_account_info", 
+    "Retrieve account information including balance and timestamps",
+    async req => await ledgerService.GetAccountAsync(req.Owner));
+
+// Register update balance tool  
+mcpServer.RegisterTool<UpdateBalanceRequest>("update_account_balance",
+    "Update account balance by adding or subtracting the specified amount", 
+    async req => await ledgerService.UpdateBalanceAsync(req.Owner, req.Amount, req.Description));
+
+// Register get transactions tool
+mcpServer.RegisterTool<GetTransactionsRequest>("get_transaction_history",
+    "Retrieve transaction history for a user account with pagination support",
+    async req => await ledgerService.GetTransactionsAsync(req.Owner, req.Skip, req.Take));
+
+// Register reset account tool
+mcpServer.RegisterTool<ResetAccountRequest>("reset_account",
+    "Reset account to initial state with new random balance", 
+    async req => await ledgerService.ResetAccountAsync(req.Owner));
+
+// Register MCP resources for LedgerService
+mcpServer.RegisterResource("ledger://accounts/summary", "Account Summary", 
+    "Summary of all account information",
+    async () => new { message = "Account summary resource - specify owner parameter for specific account" });
+
+app.Logger.LogInformation("Registered MCP tools and resources for LedgerService");
+
 app.Run();
 
 // Make Program class accessible for testing
@@ -695,3 +726,32 @@ public class LedgerServiceImpl : ILedgerService
         return Math.Round(randomValue, 2);
     }
 }
+
+// MCP Tool Request Models
+/// <summary>
+/// Request model for getting account information via MCP
+/// </summary>
+/// <param name="Owner">Username or identifier of the account owner</param>
+public record GetAccountRequest(string Owner);
+
+/// <summary>
+/// Request model for updating account balance via MCP
+/// </summary>
+/// <param name="Owner">Username or identifier of the account owner</param>
+/// <param name="Amount">Amount to add (positive) or subtract (negative) from the balance</param>
+/// <param name="Description">Description of the transaction for audit purposes</param>
+public record UpdateBalanceRequest(string Owner, decimal Amount, string Description);
+
+/// <summary>
+/// Request model for getting transaction history via MCP
+/// </summary>
+/// <param name="Owner">Username or identifier of the account owner</param>
+/// <param name="Skip">Number of transactions to skip for pagination (default: 0)</param>
+/// <param name="Take">Maximum number of transactions to return (default: 50)</param>
+public record GetTransactionsRequest(string Owner, int Skip = 0, int Take = 50);
+
+/// <summary>
+/// Request model for resetting account via MCP
+/// </summary>
+/// <param name="Owner">Username or identifier of the account owner</param>
+public record ResetAccountRequest(string Owner);
