@@ -391,6 +391,70 @@ app.MapGet("/mortgage-requests/{requestId:guid}/verification-status", async (
 .WithSummary("Get detailed verification status")
 .WithDescription("Returns detailed information about document and financial verification status.");
 
+// Register MCP tools for MortgageApprover
+var mcpServer = app.Services.GetRequiredService<IMCPServer>();
+var mortgageService = app.Services.GetRequiredService<IMortgageApprovalService>();
+
+// Register create mortgage request tool
+mcpServer.RegisterTool<CreateMortgageRequestMCPRequest>("create_mortgage_request",
+    "Create a new mortgage application request",
+    async req => 
+    {
+        var mortgageRequest = await mortgageService.CreateMortgageRequestAsync(req.UserName);
+        return MortgageRequestDto.FromDomain(mortgageRequest);
+    });
+
+// Register get mortgage request tool
+mcpServer.RegisterTool<GetMortgageRequestRequest>("get_mortgage_request",
+    "Retrieve mortgage application details by request ID",
+    async req => 
+    {
+        var mortgageRequest = await mortgageService.GetMortgageRequestAsync(req.RequestId);
+        return mortgageRequest != null ? MortgageRequestDto.FromDomain(mortgageRequest) : null;
+    });
+
+// Register get mortgage request by user tool
+mcpServer.RegisterTool<GetMortgageRequestByUserRequest>("get_mortgage_request_by_user",
+    "Retrieve mortgage application details by username",
+    async req => 
+    {
+        var mortgageRequest = await mortgageService.GetMortgageRequestByUserAsync(req.UserName);
+        return mortgageRequest != null ? MortgageRequestDto.FromDomain(mortgageRequest) : null;
+    });
+
+// Register update mortgage data tool
+mcpServer.RegisterTool<UpdateMortgageDataMCPRequest>("update_mortgage_data",
+    "Update mortgage application data sections",
+    async req => 
+    {
+        var updateData = new UpdateMortgageDataStrongDto
+        {
+            Income = req.Income,
+            Credit = req.Credit,
+            Employment = req.Employment,
+            Property = req.Property
+        };
+        
+        var mortgageRequest = await mortgageService.UpdateMortgageDataAsync(req.RequestId, updateData);
+        return mortgageRequest != null ? MortgageRequestDto.FromDomain(mortgageRequest) : null;
+    });
+
+// Register cross-service verification tool
+mcpServer.RegisterTool<VerifyMortgageRequestRequest>("verify_mortgage_request",
+    "Trigger cross-service verification for mortgage request",
+    async req => 
+    {
+        var verificationService = app.Services.GetRequiredService<ICrossServiceVerificationService>();
+        return await verificationService.VerifyMortgageRequestAsync(req.RequestId);
+    });
+
+// Register MCP resources for MortgageApprover
+mcpServer.RegisterResource("mortgage://requests/summary", "Mortgage Requests Summary", 
+    "Summary of all mortgage requests in the system",
+    async () => new { message = "Mortgage requests summary resource - specify user parameter for user-specific requests" });
+
+app.Logger.LogInformation("Registered MCP tools and resources for MortgageApprover");
+
 app.Run();
 
 // DTOs for API endpoints
@@ -1302,3 +1366,44 @@ public class MortgageApprovalServiceImpl : IMortgageApprovalService
         return principal * (monthlyRate * monthlyRateCompounded) / (monthlyRateCompounded - 1);
     }
 }
+
+// MCP Tool Request Models for MortgageApprover
+/// <summary>
+/// Request model for creating mortgage request via MCP
+/// </summary>
+/// <param name="UserName">Username for mortgage application</param>
+public record CreateMortgageRequestMCPRequest(string UserName);
+
+/// <summary>
+/// Request model for getting mortgage request via MCP
+/// </summary>
+/// <param name="RequestId">Unique GUID identifier of the mortgage request</param>
+public record GetMortgageRequestRequest(Guid RequestId);
+
+/// <summary>
+/// Request model for getting mortgage request by user via MCP
+/// </summary>
+/// <param name="UserName">Username to search for</param>
+public record GetMortgageRequestByUserRequest(string UserName);
+
+/// <summary>
+/// Request model for updating mortgage data via MCP
+/// </summary>
+/// <param name="RequestId">Unique GUID identifier of the mortgage request</param>
+/// <param name="Income">Income data to update</param>
+/// <param name="Credit">Credit data to update</param>
+/// <param name="Employment">Employment data to update</param>
+/// <param name="Property">Property data to update</param>
+public record UpdateMortgageDataMCPRequest(
+    Guid RequestId,
+    MortgageIncomeData? Income = null,
+    MortgageCreditData? Credit = null,
+    MortgageEmploymentData? Employment = null,
+    MortgagePropertyData? Property = null
+);
+
+/// <summary>
+/// Request model for verifying mortgage request via MCP
+/// </summary>
+/// <param name="RequestId">Unique GUID identifier of the mortgage request</param>
+public record VerifyMortgageRequestRequest(Guid RequestId);
