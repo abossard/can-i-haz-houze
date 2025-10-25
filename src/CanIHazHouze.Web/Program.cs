@@ -38,6 +38,13 @@ builder.Services.AddHttpClient<MortgageApiClient>(client =>
         client.BaseAddress = new("https+http://mortgageapprover");
     });
 
+builder.Services.AddHttpClient<CrmApiClient>(client =>
+    {
+        // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+        // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+        client.BaseAddress = new("https+http://crmservice");
+    });
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
