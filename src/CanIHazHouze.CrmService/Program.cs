@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel;
 using System.Net;
 using Microsoft.Azure.Cosmos;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -510,9 +511,11 @@ public class ComplaintApproval
 public class Complaint
 {
     [Description("Cosmos DB document id")]
+    [JsonIgnore] // Don't serialize this in API responses
     public string id { get; set; } = string.Empty;
     
     [Description("Customer name (partition key)")]
+    [JsonIgnore] // Don't serialize this in API responses
     public string customerName { get; set; } = string.Empty;
     
     [Description("Unique identifier for the complaint")]
@@ -543,6 +546,7 @@ public class Complaint
     public List<ComplaintApproval> Approvals { get; set; } = new();
     
     [Description("Document type discriminator")]
+    [JsonIgnore] // Don't serialize this in API responses
     public string Type { get; set; } = "complaint";
 }
 

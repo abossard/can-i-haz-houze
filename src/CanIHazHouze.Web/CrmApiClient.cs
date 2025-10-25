@@ -186,8 +186,6 @@ public class ComplaintApproval
 
 public class Complaint
 {
-    public string id { get; set; } = string.Empty;
-    public string customerName { get; set; } = string.Empty;
     public Guid Id { get; set; }
     public string CustomerName { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
@@ -197,5 +195,4 @@ public class Complaint
     public DateTime UpdatedAt { get; set; }
     public List<ComplaintComment> Comments { get; set; } = new();
     public List<ComplaintApproval> Approvals { get; set; } = new();
-    public string Type { get; set; } = "complaint";
 }
