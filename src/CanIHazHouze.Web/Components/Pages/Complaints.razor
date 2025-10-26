@@ -1,0 +1,442 @@
+@page "/complaints"
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+
+@inject CrmApiClient CrmApi
+
+<PageTitle>🎫 Complaints - CanIHazHouze</PageTitle>
+
+<h1>🎫 Customer Complaints</h1>
+
+<p>This component demonstrates managing customer complaints with status tracking, comments, and approvals using the CRM Service.</p>
+
+<div class="mb-3">
+    <label for="customerInput" class="form-label">Customer Name:</label>
+    <div class="input-group">
+        <span class="input-group-text"><i class="bi bi-person"></i></span>
+        <input type="text" class="form-control" id="customerInput" @bind="currentCustomer" @onkeypress="OnKeyPress" placeholder="Enter customer name..." />
+        <button class="btn btn-primary" type="button" @onclick="LoadComplaints">Load Complaints</button>
+    </div>
+</div>
+
+@* Create Complaint Panel *@
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Create New Complaint</h5>
+    </div>
+    <div class="card-body">
+        @if (!string.IsNullOrWhiteSpace(createError))
+        {
+            <div class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> @createError
+            </div>
+        }
+        
+        @if (!string.IsNullOrWhiteSpace(createSuccess))
+        {
+            <div class="alert alert-success" role="alert">
+                <i class="bi bi-check-circle"></i> @createSuccess
+            </div>
+        }
+
+        <div class="mb-3">
+            <label for="titleInput" class="form-label">Title:</label>
+            <input type="text" class="form-control" id="titleInput" @bind="newComplaintTitle" placeholder="Brief title of the complaint" maxlength="200" />
+        </div>
+
+        <div class="mb-3">
+            <label for="descriptionInput" class="form-label">Description:</label>
+            <textarea class="form-control" id="descriptionInput" @bind="newComplaintDescription" rows="4" placeholder="Detailed description of the complaint" maxlength="2000"></textarea>
+        </div>
+
+        <button class="btn btn-success" type="button" @onclick="CreateComplaint" 
+                disabled="@(isCreating || string.IsNullOrWhiteSpace(currentCustomer) || string.IsNullOrWhiteSpace(newComplaintTitle) || string.IsNullOrWhiteSpace(newComplaintDescription))">
+            @if (isCreating)
+            {
+                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+            }
+            <i class="bi bi-plus-circle"></i> Create Complaint
+        </button>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (complaints == null)
+{
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-info-circle"></i> Enter a customer name above to view their complaints.
+    </div>
+}
+else if (complaints.Length == 0)
+{
+    <div class="alert alert-warning" role="alert">
+        <i class="bi bi-folder-x"></i> No complaints found for customer "<strong>@loadedCustomer</strong>".
+    </div>
+}
+else
+{
+    <div class="mb-3">
+        <h4>Complaints for <span class="text-primary">@loadedCustomer</span> (@complaints.Length complaint@(complaints.Length == 1 ? "" : "s"))</h4>
+    </div>
+
+    <div class="row">
+        @foreach (var complaint in complaints)
+        {
+            <div class="col-md-12 mb-3">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">@complaint.Title</h5>
+                            <span class="badge @GetStatusBadgeClass(complaint.Status)">@complaint.Status</span>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleDetails(complaint.Id)">
+                                <i class="bi bi-eye"></i> @(selectedComplaintId == complaint.Id ? "Hide" : "Show") Details
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteComplaint(complaint.Id)">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-2">@complaint.Description</p>
+                        <small class="text-muted">
+                            Created: @complaint.CreatedAt.ToString("MMM dd, yyyy h:mm tt") | 
+                            Updated: @complaint.UpdatedAt.ToString("MMM dd, yyyy h:mm tt")
+                        </small>
+
+                        @if (selectedComplaintId == complaint.Id)
+                        {
+                            <hr />
+                            
+                            @* Status Update *@
+                            <div class="mb-3">
+                                <h6>Update Status:</h6>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => UpdateStatus(complaint.Id, ComplaintStatus.New)">New</button>
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => UpdateStatus(complaint.Id, ComplaintStatus.InProgress)">In Progress</button>
+                                    <button class="btn btn-sm btn-outline-success" @onclick="() => UpdateStatus(complaint.Id, ComplaintStatus.Solved)">Solved</button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => UpdateStatus(complaint.Id, ComplaintStatus.Rejected)">Rejected</button>
+                                </div>
+                            </div>
+
+                            @* Add Comment *@
+                            <div class="mb-3">
+                                <h6>Add Comment:</h6>
+                                <div class="input-group mb-2">
+                                    <input type="text" class="form-control" @bind="newCommentAuthor" placeholder="Your name" />
+                                    <input type="text" class="form-control" @bind="newCommentText" placeholder="Comment text" />
+                                    <button class="btn btn-primary" @onclick="() => AddComment(complaint.Id)">
+                                        <i class="bi bi-chat"></i> Add Comment
+                                    </button>
+                                </div>
+                            </div>
+
+                            @* Comments *@
+                            @if (complaint.Comments.Any())
+                            {
+                                <div class="mb-3">
+                                    <h6>Comments (@complaint.Comments.Count):</h6>
+                                    @foreach (var comment in complaint.Comments.OrderByDescending(c => c.CreatedAt))
+                                    {
+                                        <div class="card mb-2">
+                                            <div class="card-body p-2">
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        <strong>@comment.AuthorName</strong> 
+                                                        <small class="text-muted">(@comment.CreatedAt.ToString("MMM dd, h:mm tt"))</small>
+                                                        <p class="mb-0 mt-1">@comment.Text</p>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-outline-danger ms-2" @onclick="() => DeleteComment(complaint.Id, comment.Id)">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            @* Add Approval *@
+                            <div class="mb-3">
+                                <h6>Add Approval:</h6>
+                                <div class="input-group mb-2">
+                                    <input type="text" class="form-control" @bind="newApprovalApprover" placeholder="Approver name" />
+                                    <select class="form-select" @bind="newApprovalDecision">
+                                        <option value="@ApprovalDecision.Pending">Pending</option>
+                                        <option value="@ApprovalDecision.Approved">Approved</option>
+                                        <option value="@ApprovalDecision.Rejected">Rejected</option>
+                                    </select>
+                                    <input type="text" class="form-control" @bind="newApprovalComments" placeholder="Optional comments" />
+                                    <button class="btn btn-success" @onclick="() => AddApproval(complaint.Id)">
+                                        <i class="bi bi-check-circle"></i> Add Approval
+                                    </button>
+                                </div>
+                            </div>
+
+                            @* Approvals *@
+                            @if (complaint.Approvals.Any())
+                            {
+                                <div class="mb-3">
+                                    <h6>Approvals (@complaint.Approvals.Count):</h6>
+                                    @foreach (var approval in complaint.Approvals.OrderByDescending(a => a.CreatedAt))
+                                    {
+                                        <div class="card mb-2">
+                                            <div class="card-body p-2">
+                                                <strong>@approval.ApproverName</strong> 
+                                                <span class="badge @GetApprovalBadgeClass(approval.Decision)">@approval.Decision</span>
+                                                <small class="text-muted">(@approval.CreatedAt.ToString("MMM dd, h:mm tt"))</small>
+                                                @if (!string.IsNullOrEmpty(approval.Comments))
+                                                {
+                                                    <p class="mb-0 mt-1">@approval.Comments</p>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-3" role="alert">
+        <i class="bi bi-exclamation-triangle"></i> @errorMessage
+    </div>
+}
+
+@code {
+    private string currentCustomer = string.Empty;
+    private string loadedCustomer = string.Empty;
+    private Complaint[]? complaints = null;
+    private bool isLoading = false;
+    private bool isCreating = false;
+    private string errorMessage = string.Empty;
+    private string createError = string.Empty;
+    private string createSuccess = string.Empty;
+
+    // Create complaint fields
+    private string newComplaintTitle = string.Empty;
+    private string newComplaintDescription = string.Empty;
+
+    // Selected complaint for details
+    private Guid? selectedComplaintId = null;
+
+    // Comment fields
+    private string newCommentAuthor = string.Empty;
+    private string newCommentText = string.Empty;
+
+    // Approval fields
+    private string newApprovalApprover = string.Empty;
+    private ApprovalDecision newApprovalDecision = ApprovalDecision.Pending;
+    private string newApprovalComments = string.Empty;
+
+    private async Task LoadComplaints()
+    {
+        if (string.IsNullOrWhiteSpace(currentCustomer))
+        {
+            errorMessage = "Please enter a customer name";
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = string.Empty;
+        selectedComplaintId = null;
+
+        try
+        {
+            complaints = await CrmApi.GetComplaintsAsync(currentCustomer);
+            loadedCustomer = currentCustomer;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading complaints: {ex.Message}";
+            complaints = null;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateComplaint()
+    {
+        if (string.IsNullOrWhiteSpace(currentCustomer) || 
+            string.IsNullOrWhiteSpace(newComplaintTitle) || 
+            string.IsNullOrWhiteSpace(newComplaintDescription))
+        {
+            createError = "Please fill in all fields";
+            return;
+        }
+
+        isCreating = true;
+        createError = string.Empty;
+        createSuccess = string.Empty;
+
+        try
+        {
+            var complaint = await CrmApi.CreateComplaintAsync(currentCustomer, newComplaintTitle, newComplaintDescription);
+            
+            if (complaint != null)
+            {
+                createSuccess = "Complaint created successfully!";
+                newComplaintTitle = string.Empty;
+                newComplaintDescription = string.Empty;
+                
+                // Reload complaints
+                await LoadComplaints();
+            }
+            else
+            {
+                createError = "Failed to create complaint";
+            }
+        }
+        catch (Exception ex)
+        {
+            createError = $"Error creating complaint: {ex.Message}";
+        }
+        finally
+        {
+            isCreating = false;
+        }
+    }
+
+    private async Task UpdateStatus(Guid complaintId, ComplaintStatus status)
+    {
+        try
+        {
+            var updated = await CrmApi.UpdateComplaintStatusAsync(complaintId, currentCustomer, status);
+            if (updated != null)
+            {
+                await LoadComplaints();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error updating status: {ex.Message}";
+        }
+    }
+
+    private async Task AddComment(Guid complaintId)
+    {
+        if (string.IsNullOrWhiteSpace(newCommentAuthor) || string.IsNullOrWhiteSpace(newCommentText))
+        {
+            errorMessage = "Please fill in author name and comment text";
+            return;
+        }
+
+        try
+        {
+            var updated = await CrmApi.AddCommentAsync(complaintId, currentCustomer, newCommentAuthor, newCommentText);
+            if (updated != null)
+            {
+                newCommentAuthor = string.Empty;
+                newCommentText = string.Empty;
+                await LoadComplaints();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding comment: {ex.Message}";
+        }
+    }
+
+    private async Task AddApproval(Guid complaintId)
+    {
+        if (string.IsNullOrWhiteSpace(newApprovalApprover))
+        {
+            errorMessage = "Please enter approver name";
+            return;
+        }
+
+        try
+        {
+            var updated = await CrmApi.AddApprovalAsync(complaintId, currentCustomer, newApprovalApprover, newApprovalDecision, newApprovalComments);
+            if (updated != null)
+            {
+                newApprovalApprover = string.Empty;
+                newApprovalDecision = ApprovalDecision.Pending;
+                newApprovalComments = string.Empty;
+                await LoadComplaints();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding approval: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteComplaint(Guid complaintId)
+    {
+        try
+        {
+            var deleted = await CrmApi.DeleteComplaintAsync(complaintId, currentCustomer);
+            if (deleted)
+            {
+                await LoadComplaints();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting complaint: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteComment(Guid complaintId, Guid commentId)
+    {
+        try
+        {
+            var updated = await CrmApi.DeleteCommentAsync(complaintId, commentId, currentCustomer);
+            if (updated != null)
+            {
+                await LoadComplaints();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting comment: {ex.Message}";
+        }
+    }
+
+    private void ToggleDetails(Guid complaintId)
+    {
+        selectedComplaintId = selectedComplaintId == complaintId ? null : complaintId;
+    }
+
+    private string GetStatusBadgeClass(ComplaintStatus status) => status switch
+    {
+        ComplaintStatus.New => "bg-primary",
+        ComplaintStatus.InProgress => "bg-warning text-dark",
+        ComplaintStatus.Solved => "bg-success",
+        ComplaintStatus.Rejected => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetApprovalBadgeClass(ApprovalDecision decision) => decision switch
+    {
+        ApprovalDecision.Pending => "bg-warning text-dark",
+        ApprovalDecision.Approved => "bg-success",
+        ApprovalDecision.Rejected => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private async Task OnKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoadComplaints();
+        }
+    }
+}

@@ -56,6 +56,7 @@ var houzeDatabase = cosmos.AddCosmosDatabase("houze");
 var documentsContainer = houzeDatabase.AddContainer("documents", "/owner");
 var ledgersContainer = houzeDatabase.AddContainer("ledgers", "/owner"); 
 var mortgagesContainer = houzeDatabase.AddContainer("mortgages", "/owner");
+var crmContainer = houzeDatabase.AddContainer("crm", "/customerName");
 
 var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>("documentservice")
     .WithExternalHttpEndpoints()
@@ -77,7 +78,12 @@ var mortgageService = builder.AddProject<Projects.CanIHazHouze_MortgageApprover>
     .WithReference(ledgerService)       // ← Keep for cross-service verification
     .WithHttpHealthCheck("/health")
     .WaitFor(documentService)           
-    .WaitFor(ledgerService);            
+    .WaitFor(ledgerService);
+
+var crmService = builder.AddProject<Projects.CanIHazHouze_CrmService>("crmservice")
+    .WithExternalHttpEndpoints()
+    .WithReference(cosmos) // Reference the cosmos resource
+    .WithHttpHealthCheck("/health");
 
 builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")
     .WithExternalHttpEndpoints()
@@ -85,8 +91,10 @@ builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")
     .WithReference(documentService)
     .WithReference(ledgerService)
     .WithReference(mortgageService)
+    .WithReference(crmService)
     .WaitFor(documentService)
     .WaitFor(ledgerService)
-    .WaitFor(mortgageService);
+    .WaitFor(mortgageService)
+    .WaitFor(crmService);
 
 builder.Build().Run();
