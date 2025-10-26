@@ -144,6 +144,27 @@ public class CrmApiClient(HttpClient httpClient)
             return false;
         }
     }
+
+    public async Task<Complaint?> DeleteCommentAsync(Guid id, Guid commentId, string customerName, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var response = await httpClient.DeleteAsync(
+                $"/complaints/{id}/comments/{commentId}?customerName={Uri.EscapeDataString(customerName)}", 
+                cancellationToken);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<Complaint>(cancellationToken: cancellationToken);
+            }
+            
+            return null;
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
 }
 
 // Data models matching the CRM service
@@ -156,8 +177,8 @@ public enum ComplaintStatus
 {
     New,
     InProgress,
-    Resolved,
-    Closed
+    Solved,
+    Rejected
 }
 
 public enum ApprovalDecision

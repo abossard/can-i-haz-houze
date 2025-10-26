@@ -404,6 +404,43 @@ app.MapDelete("/complaints/{id:guid}", async (
 .Produces(StatusCodes.Status404NotFound)
 .Produces(StatusCodes.Status500InternalServerError);
 
+app.MapDelete("/complaints/{id:guid}/comments/{commentId:guid}", async (
+    Guid id,
+    Guid commentId,
+    [Required] string customerName,
+    ICrmService crmService) =>
+{
+    try
+    {
+        var complaint = await crmService.DeleteCommentAsync(id, commentId, customerName);
+        return complaint is null ? Results.NotFound() : Results.Ok(complaint);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error deleting comment {CommentId} from complaint {Id} for customer {CustomerName}", 
+            commentId, id, customerName);
+        return Results.Problem("An error occurred while deleting the comment");
+    }
+})
+.WithName("DeleteComplaintComment")
+.WithSummary("Delete a comment from a complaint")
+.WithDescription("""
+    Removes a specific comment from a complaint.
+    
+    **Parameters:**
+    - `id` (path, required): Unique GUID identifier of the complaint
+    - `commentId` (path, required): Unique GUID identifier of the comment to delete
+    - `customerName` (query, required): Name or identifier of the customer
+    """)
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Complaint Management" }];
+    return operation;
+})
+.Produces<Complaint>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status500InternalServerError);
+
 app.MapDefaultEndpoints();
 
 app.Run();
@@ -452,8 +489,8 @@ public enum ComplaintStatus
 {
     New,
     InProgress,
-    Resolved,
-    Closed
+    Solved,
+    Rejected
 }
 
 /// <summary>
@@ -563,6 +600,7 @@ public interface ICrmService
     Task<Complaint?> AddCommentAsync(Guid id, string customerName, string authorName, string text);
     Task<Complaint?> AddApprovalAsync(Guid id, string customerName, string approverName, ApprovalDecision decision, string? comments);
     Task<bool> DeleteComplaintAsync(Guid id, string customerName);
+    Task<Complaint?> DeleteCommentAsync(Guid id, Guid commentId, string customerName);
 }
 
 /// <summary>
@@ -764,5 +802,24 @@ public class CrmServiceImpl : ICrmService
             _logger.LogError(ex, "Error deleting complaint {ComplaintId} for customer {CustomerName}", id, customerName);
             throw;
         }
+    }
+
+    public async Task<Complaint?> DeleteCommentAsync(Guid id, Guid commentId, string customerName)
+    {
+        var complaint = await GetComplaintAsync(id, customerName);
+        if (complaint == null) return null;
+
+        var comment = complaint.Comments.FirstOrDefault(c => c.Id == commentId);
+        if (comment == null) return null;
+
+        complaint.Comments.Remove(comment);
+        complaint.UpdatedAt = DateTime.UtcNow;
+
+        await _container.ReplaceItemAsync(complaint, complaint.id, new PartitionKey(customerName));
+        
+        _logger.LogInformation("Deleted comment {CommentId} from complaint {ComplaintId} for customer {CustomerName}", 
+            commentId, id, customerName);
+        
+        return complaint;
     }
 }

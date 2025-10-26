@@ -122,8 +122,8 @@ else
                                 <div class="btn-group">
                                     <button class="btn btn-sm btn-outline-secondary" @onclick="() => UpdateStatus(complaint.Id, ComplaintStatus.New)">New</button>
                                     <button class="btn btn-sm btn-outline-primary" @onclick="() => UpdateStatus(complaint.Id, ComplaintStatus.InProgress)">In Progress</button>
-                                    <button class="btn btn-sm btn-outline-success" @onclick="() => UpdateStatus(complaint.Id, ComplaintStatus.Resolved)">Resolved</button>
-                                    <button class="btn btn-sm btn-outline-dark" @onclick="() => UpdateStatus(complaint.Id, ComplaintStatus.Closed)">Closed</button>
+                                    <button class="btn btn-sm btn-outline-success" @onclick="() => UpdateStatus(complaint.Id, ComplaintStatus.Solved)">Solved</button>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => UpdateStatus(complaint.Id, ComplaintStatus.Rejected)">Rejected</button>
                                 </div>
                             </div>
 
@@ -148,9 +148,16 @@ else
                                     {
                                         <div class="card mb-2">
                                             <div class="card-body p-2">
-                                                <strong>@comment.AuthorName</strong> 
-                                                <small class="text-muted">(@comment.CreatedAt.ToString("MMM dd, h:mm tt"))</small>
-                                                <p class="mb-0 mt-1">@comment.Text</p>
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div class="flex-grow-1">
+                                                        <strong>@comment.AuthorName</strong> 
+                                                        <small class="text-muted">(@comment.CreatedAt.ToString("MMM dd, h:mm tt"))</small>
+                                                        <p class="mb-0 mt-1">@comment.Text</p>
+                                                    </div>
+                                                    <button class="btn btn-sm btn-outline-danger ms-2" @onclick="() => DeleteComment(complaint.Id, comment.Id)">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     }
@@ -387,6 +394,22 @@ else
         }
     }
 
+    private async Task DeleteComment(Guid complaintId, Guid commentId)
+    {
+        try
+        {
+            var updated = await CrmApi.DeleteCommentAsync(complaintId, commentId, currentCustomer);
+            if (updated != null)
+            {
+                await LoadComplaints();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting comment: {ex.Message}";
+        }
+    }
+
     private void ToggleDetails(Guid complaintId)
     {
         selectedComplaintId = selectedComplaintId == complaintId ? null : complaintId;
@@ -396,8 +419,8 @@ else
     {
         ComplaintStatus.New => "bg-primary",
         ComplaintStatus.InProgress => "bg-warning text-dark",
-        ComplaintStatus.Resolved => "bg-success",
-        ComplaintStatus.Closed => "bg-secondary",
+        ComplaintStatus.Solved => "bg-success",
+        ComplaintStatus.Rejected => "bg-danger",
         _ => "bg-secondary"
     };
 
