@@ -1,5 +1,9 @@
 @page "/api-docs"
 @inject IJSRuntime JSRuntime
+@inject DocumentApiClient DocumentApiClient
+@inject LedgerApiClient LedgerApiClient
+@inject MortgageApiClient MortgageApiClient
+@inject CrmApiClient CrmApiClient
 
 <PageTitle>API Documentation - CanIHazHouze</PageTitle>
 
@@ -140,11 +144,11 @@
 </div>
 
 @code {
-    // OpenAPI URLs - using Aspire service discovery URLs
-    private string MortgageOpenApiUrl => "https+http://mortgageapprover/openapi/v1.json";
-    private string DocumentOpenApiUrl => "https+http://documentservice/openapi/v1.json";
-    private string LedgerOpenApiUrl => "https+http://ledgerservice/openapi/v1.json";
-    private string CrmOpenApiUrl => "https+http://crmservice/openapi/v1.json";
+    // OpenAPI URLs - dynamically resolved from API client base addresses
+    private string MortgageOpenApiUrl => $"{MortgageApiClient.BaseUrl}/openapi/v1.json";
+    private string DocumentOpenApiUrl => $"{DocumentApiClient.BaseUrl}/openapi/v1.json";
+    private string LedgerOpenApiUrl => $"{LedgerApiClient.BaseUrl}/openapi/v1.json";
+    private string CrmOpenApiUrl => $"{CrmApiClient.BaseUrl}/openapi/v1.json";
 
     // System Prompts - extracted from PROMPTS.md
     private string MortgageSystemPrompt => @"# MORTGAGE AGENT - CanIHazHouze System

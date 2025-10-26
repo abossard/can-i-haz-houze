@@ -19,6 +19,8 @@ public record UploadDocumentResponse(
 
 public class DocumentApiClient(HttpClient httpClient)
 {
+    public string BaseUrl => httpClient.BaseAddress?.ToString().TrimEnd('/') ?? string.Empty;
+
     public async Task<DocumentMeta[]> GetDocumentsAsync(string owner, CancellationToken cancellationToken = default)
     {
         try
