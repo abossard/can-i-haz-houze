@@ -7,6 +7,8 @@ public class MortgageApiClient
     private readonly HttpClient _httpClient;
     private readonly ILogger<MortgageApiClient> _logger;
 
+    public string BaseUrl => _httpClient.BaseAddress?.ToString().TrimEnd('/') ?? string.Empty;
+
     public MortgageApiClient(HttpClient httpClient, ILogger<MortgageApiClient> logger)
     {
         _httpClient = httpClient;

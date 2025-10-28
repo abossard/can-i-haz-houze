@@ -2,6 +2,8 @@ namespace CanIHazHouze.Web;
 
 public class LedgerApiClient(HttpClient httpClient)
 {
+    public string BaseUrl => httpClient.BaseAddress?.ToString().TrimEnd('/') ?? string.Empty;
+
     public async Task<AccountInfo?> GetAccountAsync(string owner, CancellationToken cancellationToken = default)
     {
         try

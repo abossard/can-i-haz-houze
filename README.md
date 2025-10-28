@@ -221,6 +221,56 @@ dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=<endpoint>;ApiKey=<
 - Document verification checks
 - AI-assisted decision making
 
+### API Documentation for Azure AI Foundry 🔌
+**NEW!** Build AI agents with our comprehensive API documentation page!
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              🔌 API Documentation Page                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  🏦 Mortgage Service    📋 OpenAPI Spec + System Prompt    │
+│  📄 Document Service    📋 OpenAPI Spec + System Prompt    │
+│  💰 Ledger Service      📋 OpenAPI Spec + System Prompt    │
+│  🎫 CRM Service         📋 OpenAPI Spec + System Prompt    │
+│                                                             │
+│  ✨ One-Click Copy to Clipboard                            │
+│  ✨ Ready for Azure AI Foundry                             │
+│  ✨ Complete System Prompts Included                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- **Dynamic URL Resolution**: OpenAPI URLs automatically resolve to actual FQDNs in production
+- **Four Complete Agents**: Mortgage, Document, Ledger, and CRM agents with detailed system prompts
+- **Copy-to-Clipboard**: Easy copying of URLs and prompts for Azure AI Foundry
+- **Tutorial Ready**: Perfect for learning Azure AI Foundry agent creation
+
+**How to Use:**
+1. Navigate to `/api-docs` or click "🔌 API Documentation" in the sidebar
+2. Copy the OpenAPI specification URL for your desired service
+3. Copy the corresponding system prompt
+4. Create a new agent in Azure AI Foundry with these configs
+5. Your AI agent is ready to interact with CanIHazHouze services!
+
+**Example - Creating a Mortgage Agent:**
+```
+1. Copy: https://mortgageapprover.../openapi/v1.json
+2. Copy: Complete Mortgage Agent system prompt (included on page)
+3. In Azure AI Foundry:
+   - Create new agent
+   - Paste OpenAPI spec URL
+   - Paste system prompt
+   - Configure and deploy!
+```
+
+Each agent includes:
+- **Role & Responsibilities**: Clear definition of agent purpose
+- **Core Directives**: Behavioral guidelines (e.g., "NEVER FABRICATE DATA")
+- **API Features**: Complete documentation of available tools
+- **Workflows**: Example interactions and best practices
+- **Communication Style**: Professional tone guidelines
+
 ## 🔧 Development Tips
 
 ### Why No Aspire CLI? 🤔

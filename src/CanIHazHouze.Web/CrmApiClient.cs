@@ -2,6 +2,8 @@ namespace CanIHazHouze.Web;
 
 public class CrmApiClient(HttpClient httpClient)
 {
+    public string BaseUrl => httpClient.BaseAddress?.ToString().TrimEnd('/') ?? string.Empty;
+
     public async Task<Complaint?> CreateComplaintAsync(string customerName, string title, string description, CancellationToken cancellationToken = default)
     {
         try
