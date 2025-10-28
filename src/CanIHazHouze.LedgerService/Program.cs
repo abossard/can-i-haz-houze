@@ -566,6 +566,7 @@ public class LedgerStorageOptions
     public string BaseDirectory { get; set; } = Path.Combine(Directory.GetCurrentDirectory(), "LedgerData");
     public decimal MinInitialBalance { get; set; } = 100.00m;
     public decimal MaxInitialBalance { get; set; } = 10000.00m;
+    public int MaxQueryLimit { get; set; } = 100; // Maximum items to return in list queries
 }
 
 // Data models with OpenAPI annotations
@@ -787,8 +788,9 @@ public class LedgerServiceImpl : ILedgerService
 
         try
         {
+            // Select only needed fields to reduce RU consumption
             var query = new QueryDefinition(
-                "SELECT * FROM c WHERE c.owner = @owner AND c.Type = @type ORDER BY c.CreatedAt DESC OFFSET @skip LIMIT @take")
+                "SELECT c.TransactionId, c.Owner, c.Amount, c.BalanceAfter, c.Description, c.CreatedAt FROM c WHERE c.owner = @owner AND c.Type = @type ORDER BY c.CreatedAt DESC OFFSET @skip LIMIT @take")
                 .WithParameter("@owner", owner)
                 .WithParameter("@type", "transaction")
                 .WithParameter("@skip", skip)
@@ -880,13 +882,13 @@ public class LedgerServiceImpl : ILedgerService
 
     public async Task<IEnumerable<AccountInfo>> GetRecentlyUpdatedAccountsAsync(int take = 10)
     {
-        take = Math.Min(take, 100); // Limit to prevent excessive data transfer
+        take = Math.Min(take, _options.MaxQueryLimit); // Limit to prevent excessive data transfer
 
         try
         {
-            // Query for all accounts ordered by LastUpdatedAt descending
+            // Query for accounts ordered by LastUpdatedAt descending, selecting only needed fields
             var query = new QueryDefinition(
-                "SELECT * FROM c WHERE c.Type = @type ORDER BY c.LastUpdatedAt DESC OFFSET 0 LIMIT @take")
+                "SELECT c.Owner, c.Balance, c.CreatedAt, c.LastUpdatedAt FROM c WHERE c.Type = @type ORDER BY c.LastUpdatedAt DESC OFFSET 0 LIMIT @take")
                 .WithParameter("@type", "account")
                 .WithParameter("@take", take);
 
@@ -914,13 +916,13 @@ public class LedgerServiceImpl : ILedgerService
 
     public async Task<IEnumerable<TransactionInfo>> GetRecentTransactionsAsync(int take = 20)
     {
-        take = Math.Min(take, 100); // Limit to prevent excessive data transfer
+        take = Math.Min(take, _options.MaxQueryLimit); // Limit to prevent excessive data transfer
 
         try
         {
-            // Query for all transactions ordered by CreatedAt descending
+            // Query for transactions ordered by CreatedAt descending, selecting only needed fields
             var query = new QueryDefinition(
-                "SELECT * FROM c WHERE c.Type = @type ORDER BY c.CreatedAt DESC OFFSET 0 LIMIT @take")
+                "SELECT c.TransactionId, c.Owner, c.Amount, c.BalanceAfter, c.Description, c.CreatedAt FROM c WHERE c.Type = @type ORDER BY c.CreatedAt DESC OFFSET 0 LIMIT @take")
                 .WithParameter("@type", "transaction")
                 .WithParameter("@take", take);
 
