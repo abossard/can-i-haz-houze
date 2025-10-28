@@ -80,6 +80,36 @@ public class LedgerApiClient(HttpClient httpClient)
             return null;
         }
     }
+
+    public async Task<AccountInfo[]> GetRecentlyUpdatedAccountsAsync(int take = 10, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var accounts = await httpClient.GetFromJsonAsync<AccountInfo[]>(
+                $"/accounts/recent?take={take}", 
+                cancellationToken);
+            return accounts ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+    }
+
+    public async Task<TransactionInfo[]> GetRecentTransactionsAsync(int take = 20, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var transactions = await httpClient.GetFromJsonAsync<TransactionInfo[]>(
+                $"/transactions/recent?take={take}", 
+                cancellationToken);
+            return transactions ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+    }
 }
 
 public record AccountInfo(string Owner, decimal Balance, DateTimeOffset CreatedAt, DateTimeOffset LastUpdatedAt);
