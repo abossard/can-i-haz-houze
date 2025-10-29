@@ -19,6 +19,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.2" />
   </ItemGroup>  <ItemGroup>
     <ProjectReference Include="..\CanIHazHouze.AppHost\CanIHazHouze.AppHost.csproj" />
+    <ProjectReference Include="..\CanIHazHouze.CrmService\CanIHazHouze.CrmService.csproj" />
     <ProjectReference Include="..\CanIHazHouze.DocumentService\CanIHazHouze.DocumentService.csproj" />
     <ProjectReference Include="..\CanIHazHouze.LedgerService\CanIHazHouze.LedgerService.csproj" />
   </ItemGroup>
