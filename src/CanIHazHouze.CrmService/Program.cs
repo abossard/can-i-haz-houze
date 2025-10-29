@@ -114,6 +114,67 @@ app.MapPost("/complaints", async (
 .Produces<string>(StatusCodes.Status400BadRequest)
 .Produces(StatusCodes.Status500InternalServerError);
 
+app.MapGet("/complaints/recent", async (
+    ICrmService crmService,
+    [FromQuery] int limit = 10) =>
+{
+    try
+    {
+        var complaints = await crmService.GetRecentComplaintsAsync(limit);
+        return Results.Ok(complaints);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error retrieving recent complaints");
+        return Results.Problem("An error occurred while retrieving recent complaints");
+    }
+})
+.WithName("ListRecentComplaints")
+.WithSummary("Get the most recent complaints across all customers")
+.WithDescription("""
+    Retrieves the most recent complaints from all customers, ordered by creation date.
+    
+    **Key Features:**
+    - Returns complaints from all customers
+    - Ordered by creation date (most recent first)
+    - Configurable limit (default: 10, max: 50)
+    - Useful for monitoring and dashboard displays
+    
+    **Parameters:**
+    - `limit` (optional): Maximum number of complaints to return (default: 10, max: 50)
+    
+    **Example Response:**
+    ```json
+    [
+        {
+            "id": "123e4567-e89b-12d3-a456-426614174000",
+            "customerName": "john_doe",
+            "title": "Service issue with mortgage approval",
+            "description": "...",
+            "status": "InProgress",
+            "createdAt": "2024-06-15T14:20:00Z",
+            "updatedAt": "2024-06-15T14:25:00Z",
+            "comments": [...],
+            "approvals": [...]
+        }
+    ]
+    ```
+    """)
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Complaint Management" }];
+    var param = operation.Parameters.FirstOrDefault(p => p.Name == "limit");
+    if (param != null)
+    {
+        param.Description = "Maximum number of complaints to return (default: 10, max: 50)";
+        param.Required = false;
+        param.Example = new Microsoft.OpenApi.Any.OpenApiInteger(10);
+    }
+    return operation;
+})
+.Produces<IEnumerable<Complaint>>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status500InternalServerError);
+
 app.MapGet("/complaints", async (
     [Required] string customerName,
     ICrmService crmService) =>
@@ -596,6 +657,7 @@ public interface ICrmService
     Task<Complaint> CreateComplaintAsync(string customerName, string title, string description);
     Task<Complaint?> GetComplaintAsync(Guid id, string customerName);
     Task<IEnumerable<Complaint>> GetComplaintsAsync(string customerName);
+    Task<IEnumerable<Complaint>> GetRecentComplaintsAsync(int limit);
     Task<Complaint?> UpdateComplaintStatusAsync(Guid id, string customerName, ComplaintStatus status);
     Task<Complaint?> AddCommentAsync(Guid id, string customerName, string authorName, string text);
     Task<Complaint?> AddApprovalAsync(Guid id, string customerName, string approverName, ApprovalDecision decision, string? comments);
@@ -703,6 +765,37 @@ public class CrmServiceImpl : ICrmService
         catch (CosmosException ex)
         {
             _logger.LogError(ex, "Error retrieving complaints for customer {CustomerName}", customerName);
+            throw;
+        }
+    }
+
+    public async Task<IEnumerable<Complaint>> GetRecentComplaintsAsync(int limit)
+    {
+        // Ensure limit is within reasonable bounds
+        limit = Math.Max(1, Math.Min(limit, 50));
+
+        try
+        {
+            var query = new QueryDefinition(
+                "SELECT * FROM c WHERE c.Type = @type ORDER BY c.CreatedAt DESC OFFSET 0 LIMIT @limit")
+                .WithParameter("@type", "complaint")
+                .WithParameter("@limit", limit);
+
+            var iterator = _container.GetItemQueryIterator<Complaint>(query);
+            var complaints = new List<Complaint>();
+
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                complaints.AddRange(response);
+            }
+
+            _logger.LogInformation("Retrieved {Count} recent complaints", complaints.Count);
+            return complaints;
+        }
+        catch (CosmosException ex)
+        {
+            _logger.LogError(ex, "Error retrieving recent complaints");
             throw;
         }
     }

@@ -438,6 +438,13 @@ You have access to the complete CRM Service API through your available tools.
 - `Comments`: List of comments on the complaint
 - `Approvals`: List of approval decisions
 
+### Recent Complaints
+- **NEW**: Access recent complaints across all customers
+- Use the `/complaints/recent` endpoint to get the latest complaints
+- Configurable limit (default: 10, max: 50)
+- Useful for monitoring trends and identifying systemic issues
+- Results ordered by creation date (most recent first)
+
 ### Complaint Status Flow
 - **New** → Initial state when complaint is created
 - **InProgress** → Complaint is being actively worked on
@@ -472,6 +479,14 @@ You have access to the complete CRM Service API through your available tools.
 3. Update status appropriately as work progresses
 4. Request approvals when needed for resolution
 5. Close complaints when fully resolved
+6. **NEW**: Monitor recent complaints across all customers to identify trends and systemic issues
+
+### For Monitoring and Analytics:
+1. Use the recent complaints endpoint to track overall customer satisfaction
+2. Identify recurring issues across multiple customers
+3. Spot trends in complaint types and resolution times
+4. Prioritize systemic issues that affect multiple customers
+5. Use insights to proactively address common problems
 
 ### When Communicating with Customers:
 1. Be empathetic and understanding
