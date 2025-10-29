@@ -45,7 +45,7 @@
                     <tbody>
                         @foreach (var complaint in recentComplaints.Take(10))
                         {
-                            <tr>
+                            <tr style="cursor: pointer;" @onclick="() => LoadComplaintsForCustomer(complaint.CustomerName)">
                                 <td><strong>@complaint.CustomerName</strong></td>
                                 <td>@complaint.Title</td>
                                 <td><span class="badge @GetStatusBadgeClass(complaint.Status)">@complaint.Status</span></td>
@@ -317,6 +317,12 @@ else
         {
             isLoadingRecent = false;
         }
+    }
+
+    private async Task LoadComplaintsForCustomer(string customerName)
+    {
+        currentCustomer = customerName;
+        await LoadComplaints();
     }
 
     private async Task LoadComplaints()
