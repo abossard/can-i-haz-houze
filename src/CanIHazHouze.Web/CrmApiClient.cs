@@ -49,6 +49,21 @@ public class CrmApiClient(HttpClient httpClient)
         }
     }
 
+    public async Task<Complaint[]> GetRecentComplaintsAsync(int limit = 10, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var complaints = await httpClient.GetFromJsonAsync<Complaint[]>(
+                $"/complaints/recent?limit={limit}", 
+                cancellationToken);
+            return complaints ?? [];
+        }
+        catch (HttpRequestException)
+        {
+            return [];
+        }
+    }
+
     public async Task<Complaint?> GetComplaintAsync(Guid id, string customerName, CancellationToken cancellationToken = default)
     {
         try

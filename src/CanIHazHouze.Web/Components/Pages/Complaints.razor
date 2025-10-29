@@ -10,6 +10,57 @@
 
 <p>This component demonstrates managing customer complaints with status tracking, comments, and approvals using the CRM Service.</p>
 
+@* Recent Complaints Section *@
+<div class="card mb-4 border-info">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="bi bi-clock-history"></i> Recent Complaints (All Customers)</h5>
+    </div>
+    <div class="card-body">
+        @if (isLoadingRecent)
+        {
+            <div class="d-flex justify-content-center">
+                <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        }
+        else if (recentComplaints == null || recentComplaints.Length == 0)
+        {
+            <div class="text-muted text-center py-3">
+                <i class="bi bi-inbox"></i> No recent complaints found.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Customer</th>
+                            <th>Title</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var complaint in recentComplaints.Take(10))
+                        {
+                            <tr>
+                                <td><strong>@complaint.CustomerName</strong></td>
+                                <td>@complaint.Title</td>
+                                <td><span class="badge @GetStatusBadgeClass(complaint.Status)">@complaint.Status</span></td>
+                                <td>
+                                    <small class="text-muted">@complaint.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</small>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
 <div class="mb-3">
     <label for="customerInput" class="form-label">Customer Name:</label>
     <div class="input-group">
@@ -221,7 +272,9 @@ else
     private string currentCustomer = string.Empty;
     private string loadedCustomer = string.Empty;
     private Complaint[]? complaints = null;
+    private Complaint[]? recentComplaints = null;
     private bool isLoading = false;
+    private bool isLoadingRecent = false;
     private bool isCreating = false;
     private string errorMessage = string.Empty;
     private string createError = string.Empty;
@@ -242,6 +295,29 @@ else
     private string newApprovalApprover = string.Empty;
     private ApprovalDecision newApprovalDecision = ApprovalDecision.Pending;
     private string newApprovalComments = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRecentComplaints();
+    }
+
+    private async Task LoadRecentComplaints()
+    {
+        isLoadingRecent = true;
+        try
+        {
+            recentComplaints = await CrmApi.GetRecentComplaintsAsync(10);
+        }
+        catch
+        {
+            // Silently fail - recent complaints is a nice-to-have feature
+            recentComplaints = [];
+        }
+        finally
+        {
+            isLoadingRecent = false;
+        }
+    }
 
     private async Task LoadComplaints()
     {
@@ -295,8 +371,9 @@ else
                 newComplaintTitle = string.Empty;
                 newComplaintDescription = string.Empty;
                 
-                // Reload complaints
+                // Reload complaints and recent complaints
                 await LoadComplaints();
+                await LoadRecentComplaints();
             }
             else
             {
