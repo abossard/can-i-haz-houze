@@ -10,6 +10,6 @@ services:
 hooks:
   postdeploy:
     shell: sh
-    run: ./scripts/setup-local-openai.sh
+    run: ./scripts/postdeploy.sh
     interactive: true
     continueOnError: true
