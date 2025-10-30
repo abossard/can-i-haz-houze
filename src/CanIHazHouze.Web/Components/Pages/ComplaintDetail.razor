@@ -1,0 +1,403 @@
+@page "/complaints/{id:guid}"
+@attribute [StreamRendering(true)]
+@rendermode InteractiveServer
+
+@inject CrmApiClient CrmApi
+@inject NavigationManager Navigation
+
+<PageTitle>🎫 Complaint Detail - CanIHazHouze</PageTitle>
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/complaints">Complaints</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Detail</li>
+    </ol>
+</nav>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center mt-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger" role="alert">
+        <i class="bi bi-exclamation-triangle"></i> @errorMessage
+    </div>
+    <button class="btn btn-primary" @onclick="GoBack">
+        <i class="bi bi-arrow-left"></i> Back to Complaints
+    </button>
+}
+else if (complaint != null)
+{
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h1 class="h3 mb-0">🎫 @complaint.Title</h1>
+            <span class="badge @GetStatusBadgeClass(complaint.Status) fs-6">@complaint.Status</span>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <h6 class="text-muted">Customer</h6>
+                <p class="mb-0"><i class="bi bi-person"></i> @complaint.CustomerName</p>
+            </div>
+
+            <div class="mb-3">
+                <h6 class="text-muted">Description</h6>
+                <p class="mb-0">@complaint.Description</p>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <h6 class="text-muted">Created</h6>
+                    <p class="mb-0"><i class="bi bi-calendar"></i> @complaint.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted">Last Updated</h6>
+                    <p class="mb-0"><i class="bi bi-clock-history"></i> @complaint.UpdatedAt.ToString("MMM dd, yyyy h:mm tt")</p>
+                </div>
+            </div>
+
+            @* Status Update *@
+            <div class="mb-4">
+                <h5>Update Status</h5>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => UpdateStatus(ComplaintStatus.New)">New</button>
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => UpdateStatus(ComplaintStatus.InProgress)">In Progress</button>
+                    <button class="btn btn-sm btn-outline-success" @onclick="() => UpdateStatus(ComplaintStatus.Solved)">Solved</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => UpdateStatus(ComplaintStatus.Rejected)">Rejected</button>
+                </div>
+            </div>
+
+            <hr />
+
+            @* Comments Section *@
+            <div class="mb-4">
+                <h5>Comments (@complaint.Comments.Count)</h5>
+                
+                @* Add Comment *@
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6>Add Comment</h6>
+                        <div class="mb-2">
+                            <input type="text" class="form-control" @bind="newCommentAuthor" placeholder="Your name" />
+                        </div>
+                        <div class="mb-2">
+                            <textarea class="form-control" @bind="newCommentText" placeholder="Comment text" rows="3"></textarea>
+                        </div>
+                        <button class="btn btn-primary" @onclick="AddComment" 
+                                disabled="@(string.IsNullOrWhiteSpace(newCommentAuthor) || string.IsNullOrWhiteSpace(newCommentText))">
+                            <i class="bi bi-chat"></i> Add Comment
+                        </button>
+                    </div>
+                </div>
+
+                @* Display Comments *@
+                @if (complaint.Comments.Any())
+                {
+                    <div class="list-group">
+                        @foreach (var comment in complaint.Comments.OrderByDescending(c => c.CreatedAt))
+                        {
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">@comment.AuthorName</h6>
+                                        <small class="text-muted">@comment.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</small>
+                                        <p class="mb-0 mt-2">@comment.Text</p>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteComment(comment.Id)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted"><i>No comments yet.</i></p>
+                }
+            </div>
+
+            <hr />
+
+            @* Approvals Section *@
+            <div class="mb-4">
+                <h5>Approvals (@complaint.Approvals.Count)</h5>
+                
+                @* Add Approval *@
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6>Add Approval</h6>
+                        <div class="row mb-2">
+                            <div class="col-md-4">
+                                <input type="text" class="form-control" @bind="newApprovalApprover" placeholder="Approver name" />
+                            </div>
+                            <div class="col-md-4">
+                                <select class="form-select" @bind="newApprovalDecision">
+                                    <option value="@ApprovalDecision.Pending">Pending</option>
+                                    <option value="@ApprovalDecision.Approved">Approved</option>
+                                    <option value="@ApprovalDecision.Rejected">Rejected</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-success w-100" @onclick="AddApproval"
+                                        disabled="@(string.IsNullOrWhiteSpace(newApprovalApprover))">
+                                    <i class="bi bi-check-circle"></i> Add Approval
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <textarea class="form-control" @bind="newApprovalComments" placeholder="Optional comments" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                @* Display Approvals *@
+                @if (complaint.Approvals.Any())
+                {
+                    <div class="list-group">
+                        @foreach (var approval in complaint.Approvals.OrderByDescending(a => a.CreatedAt))
+                        {
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <h6 class="mb-0">@approval.ApproverName</h6>
+                                        <small class="text-muted">@approval.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</small>
+                                    </div>
+                                    <span class="badge @GetApprovalBadgeClass(approval.Decision)">@approval.Decision</span>
+                                </div>
+                                @if (!string.IsNullOrEmpty(approval.Comments))
+                                {
+                                    <p class="mb-0">@approval.Comments</p>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted"><i>No approvals yet.</i></p>
+                }
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <button class="btn btn-primary" @onclick="GoBack">
+                    <i class="bi bi-arrow-left"></i> Back to Complaints
+                </button>
+                <button class="btn btn-danger" @onclick="DeleteComplaint">
+                    <i class="bi bi-trash"></i> Delete Complaint
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success mt-3" role="alert">
+        <i class="bi bi-check-circle"></i> @successMessage
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? CustomerName { get; set; }
+
+    private Complaint? complaint = null;
+    private bool isLoading = true;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    // Comment fields
+    private string newCommentAuthor = string.Empty;
+    private string newCommentText = string.Empty;
+
+    // Approval fields
+    private string newApprovalApprover = string.Empty;
+    private ApprovalDecision newApprovalDecision = ApprovalDecision.Pending;
+    private string newApprovalComments = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadComplaint();
+    }
+
+    private async Task LoadComplaint()
+    {
+        if (string.IsNullOrWhiteSpace(CustomerName))
+        {
+            errorMessage = "Customer name is required";
+            isLoading = false;
+            return;
+        }
+
+        isLoading = true;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        try
+        {
+            complaint = await CrmApi.GetComplaintAsync(Id, CustomerName);
+            
+            if (complaint == null)
+            {
+                errorMessage = "Complaint not found";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading complaint: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task UpdateStatus(ComplaintStatus status)
+    {
+        if (complaint == null || string.IsNullOrWhiteSpace(CustomerName)) return;
+
+        try
+        {
+            var updated = await CrmApi.UpdateComplaintStatusAsync(Id, CustomerName, status);
+            if (updated != null)
+            {
+                complaint = updated;
+                successMessage = $"Status updated to {status}";
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error updating status: {ex.Message}";
+        }
+    }
+
+    private async Task AddComment()
+    {
+        if (complaint == null || string.IsNullOrWhiteSpace(CustomerName)) return;
+        
+        if (string.IsNullOrWhiteSpace(newCommentAuthor) || string.IsNullOrWhiteSpace(newCommentText))
+        {
+            errorMessage = "Please fill in author name and comment text";
+            return;
+        }
+
+        try
+        {
+            var updated = await CrmApi.AddCommentAsync(Id, CustomerName, newCommentAuthor, newCommentText);
+            if (updated != null)
+            {
+                complaint = updated;
+                newCommentAuthor = string.Empty;
+                newCommentText = string.Empty;
+                successMessage = "Comment added successfully";
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding comment: {ex.Message}";
+        }
+    }
+
+    private async Task AddApproval()
+    {
+        if (complaint == null || string.IsNullOrWhiteSpace(CustomerName)) return;
+        
+        if (string.IsNullOrWhiteSpace(newApprovalApprover))
+        {
+            errorMessage = "Please enter approver name";
+            return;
+        }
+
+        try
+        {
+            var updated = await CrmApi.AddApprovalAsync(Id, CustomerName, newApprovalApprover, newApprovalDecision, newApprovalComments);
+            if (updated != null)
+            {
+                complaint = updated;
+                newApprovalApprover = string.Empty;
+                newApprovalDecision = ApprovalDecision.Pending;
+                newApprovalComments = string.Empty;
+                successMessage = "Approval added successfully";
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding approval: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteComment(Guid commentId)
+    {
+        if (complaint == null || string.IsNullOrWhiteSpace(CustomerName)) return;
+
+        try
+        {
+            var updated = await CrmApi.DeleteCommentAsync(Id, commentId, CustomerName);
+            if (updated != null)
+            {
+                complaint = updated;
+                successMessage = "Comment deleted successfully";
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting comment: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteComplaint()
+    {
+        if (complaint == null || string.IsNullOrWhiteSpace(CustomerName)) return;
+
+        try
+        {
+            var deleted = await CrmApi.DeleteComplaintAsync(Id, CustomerName);
+            if (deleted)
+            {
+                Navigation.NavigateTo("/complaints");
+            }
+            else
+            {
+                errorMessage = "Failed to delete complaint";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error deleting complaint: {ex.Message}";
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/complaints");
+    }
+
+    private string GetStatusBadgeClass(ComplaintStatus status) => status switch
+    {
+        ComplaintStatus.New => "bg-primary",
+        ComplaintStatus.InProgress => "bg-warning text-dark",
+        ComplaintStatus.Solved => "bg-success",
+        ComplaintStatus.Rejected => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private string GetApprovalBadgeClass(ApprovalDecision decision) => decision switch
+    {
+        ApprovalDecision.Pending => "bg-warning text-dark",
+        ApprovalDecision.Approved => "bg-success",
+        ApprovalDecision.Rejected => "bg-danger",
+        _ => "bg-secondary"
+    };
+}
