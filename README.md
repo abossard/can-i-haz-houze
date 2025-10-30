@@ -120,11 +120,12 @@ azd auth login
 azd up
 ```
 
-### 🤖 Automatic OpenAI Setup (NEW!)
+### 🤖 Automatic Post-Deployment Setup (NEW!)
 
-After running `azd up`, the system **automatically** configures your OpenAI connection for local development! 
+After running `azd up`, the system **automatically** performs post-deployment configuration! 
 
 The post-deploy hook will:
+- 🌐 Enable public network access on Storage Account and Cosmos DB (for development/testing)
 - 🔍 Find your deployed Azure OpenAI resource
 - 🔑 Retrieve the endpoint and API key
 - 🔐 Configure your local user secrets automatically
