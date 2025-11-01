@@ -93,13 +93,13 @@ public class ErrorHandlingDelegatingHandler : DelegatingHandler
 
         // Extract service name from hostname (e.g., "documentservice" -> "Document Service")
         var host = requestUri.Host.ToLowerInvariant();
-        if (host.Contains("document"))
+        if (host.Equals("documentservice", StringComparison.OrdinalIgnoreCase) || host.StartsWith("documentservice.", StringComparison.OrdinalIgnoreCase))
             return "Document Service";
-        if (host.Contains("ledger"))
+        if (host.Equals("ledgerservice", StringComparison.OrdinalIgnoreCase) || host.StartsWith("ledgerservice.", StringComparison.OrdinalIgnoreCase))
             return "Ledger Service";
-        if (host.Contains("mortgage"))
+        if (host.Equals("mortgageapprover", StringComparison.OrdinalIgnoreCase) || host.StartsWith("mortgageapprover.", StringComparison.OrdinalIgnoreCase))
             return "Mortgage Service";
-        if (host.Contains("crm"))
+        if (host.Equals("crmservice", StringComparison.OrdinalIgnoreCase) || host.StartsWith("crmservice.", StringComparison.OrdinalIgnoreCase))
             return "CRM Service";
 
         return "Service";

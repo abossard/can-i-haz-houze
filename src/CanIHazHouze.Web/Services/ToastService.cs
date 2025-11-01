@@ -36,12 +36,6 @@ public class ToastService
         
         _toasts.Add(toast);
         OnShow?.Invoke(toast);
-        
-        // Auto-remove after duration
-        Task.Delay(TimeSpan.FromSeconds(durationSeconds)).ContinueWith(_ =>
-        {
-            _toasts.Remove(toast);
-        });
     }
 
     public void ShowSuccess(string message, int durationSeconds = 5)
