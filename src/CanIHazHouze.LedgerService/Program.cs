@@ -589,7 +589,10 @@ app.Logger.LogInformation("Registered MCP tools and resources for LedgerService"
 app.Run();
 
 // Make Program class accessible for testing
-public partial class Program { }
+namespace CanIHazHouze.LedgerService
+{
+    public partial class Program { }
+}
 
 // Configuration options
 public class LedgerStorageOptions

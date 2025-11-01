@@ -1396,7 +1396,10 @@ static void ConfigureSignalHandling(ILogger logger)
 }
 
 // Make Program class accessible for testing
-public partial class Program { }
+namespace CanIHazHouze.DocumentService
+{
+    public partial class Program { }
+}
 
 // Data models with OpenAPI annotations
 /// Request model for AI tag suggestions

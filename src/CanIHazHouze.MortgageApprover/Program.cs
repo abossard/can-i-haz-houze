@@ -435,17 +435,20 @@ mcpServer.RegisterTool<UpdateMortgageDataMCPRequest>("update_mortgage_data",
             Property = req.Property
         };
         
-        var mortgageRequest = await mortgageService.UpdateMortgageDataAsync(req.RequestId, updateData);
+        var mortgageRequest = await mortgageService.UpdateMortgageDataStrongAsync(req.RequestId, updateData);
         return mortgageRequest != null ? MortgageRequestDto.FromDomain(mortgageRequest) : null;
     });
 
 // Register cross-service verification tool
 mcpServer.RegisterTool<VerifyMortgageRequestRequest>("verify_mortgage_request",
-    "Trigger cross-service verification for mortgage request",
+    "Trigger cross-service verification for mortgage request including document and ledger checks",
     async req => 
     {
         var verificationService = app.Services.GetRequiredService<ICrossServiceVerificationService>();
-        return await verificationService.VerifyMortgageRequestAsync(req.RequestId);
+        var mortgageRequest = await mortgageService.GetMortgageRequestAsync(req.RequestId);
+        if (mortgageRequest == null) return null;
+        
+        return await verificationService.VerifyMortgageRequirementsAsync(mortgageRequest.UserName, mortgageRequest.RequestData);
     });
 
 // Register MCP resources for MortgageApprover
@@ -1407,3 +1410,9 @@ public record UpdateMortgageDataMCPRequest(
 /// </summary>
 /// <param name="RequestId">Unique GUID identifier of the mortgage request</param>
 public record VerifyMortgageRequestRequest(Guid RequestId);
+
+// Make Program class accessible for testing
+namespace CanIHazHouze.MortgageApprover
+{
+    public partial class Program { }
+}
