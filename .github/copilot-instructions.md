@@ -80,6 +80,15 @@ dotnet build
 
 **Note on Docker**: .NET Aspire automatically manages Docker containers for development dependencies (Cosmos DB emulator, Azurite storage emulator) when you run the AppHost. You don't need to manually start these services.
 
+#### GitHub Codespaces
+This repository includes a devcontainer configuration (`.devcontainer/devcontainer.json`) that provides:
+- Docker-in-Docker support for Aspire orchestration
+- .NET 9.0 SDK pre-installed
+- Azure CLI and Azure Developer CLI (azd)
+- All necessary VS Code extensions
+
+When using GitHub Codespaces, Docker is automatically available and Aspire can orchestrate containers.
+
 ### Code Conventions
 
 1. **Nullable Reference Types**: Enabled across all projects (`<Nullable>enable</Nullable>`)

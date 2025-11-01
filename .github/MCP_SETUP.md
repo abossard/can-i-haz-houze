@@ -2,6 +2,16 @@
 
 This repository is configured to use Model Context Protocol (MCP) servers that extend GitHub Copilot coding agent's capabilities.
 
+## Docker Availability
+
+**Good News**: Docker is available in the GitHub Copilot coding agent execution environment and in GitHub Codespaces!
+
+- **In Codespaces**: The `.devcontainer/devcontainer.json` configuration enables Docker-in-Docker, allowing full Docker support
+- **For Copilot Agent**: Docker commands are available via the MCP configuration, enabling container management and debugging
+- **.NET Aspire**: Automatically detects and uses Docker to orchestrate Cosmos DB and Azurite emulators
+
+Note: While Codespaces uses the devcontainer configuration, the Copilot coding agent execution environment currently runs in a separate environment similar to GitHub Actions runners. However, Docker is available in both.
+
 ## Available MCP Servers
 
 ### 1. Docker CLI
