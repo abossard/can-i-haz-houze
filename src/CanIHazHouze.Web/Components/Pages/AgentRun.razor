@@ -167,6 +167,7 @@
     private bool loading = true;
     private bool running = false;
     private string? error;
+    // TODO: In production, retrieve owner from authenticated user context
     private string owner = "demo-user";
 
     protected override async Task OnInitializedAsync()

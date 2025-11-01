@@ -44,9 +44,12 @@ if (!string.IsNullOrEmpty(openAiConnectionString))
     
     if (!string.IsNullOrEmpty(endpoint) && !string.IsNullOrEmpty(key))
     {
+        // Get deployment name from configuration, default to gpt-4o-mini
+        var deploymentName = builder.Configuration["OpenAI:DeploymentName"] ?? "gpt-4o-mini";
+        
         var kernelBuilder = builder.Services.AddKernel();
         kernelBuilder.AddAzureOpenAIChatCompletion(
-            deploymentName: "gpt-4o-mini",
+            deploymentName: deploymentName,
             endpoint: endpoint,
             apiKey: key);
     }

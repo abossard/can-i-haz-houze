@@ -190,6 +190,7 @@
     [Parameter]
     public string? AgentId { get; set; }
 
+    // TODO: In production, retrieve owner from authenticated user context
     private AgentModel agent = new() { Owner = "demo-user" };
     private bool loading = false;
     private bool saving = false;
