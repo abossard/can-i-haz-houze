@@ -164,7 +164,7 @@ Once configured, GitHub Copilot coding agent can:
 ### MCP Servers Not Listed
 - Update VS Code to the latest version
 - Update GitHub Copilot extension
-- Check VS Code settings: `chat.agent.enabled` should be `true`
+- Reload VS Code window after adding MCP configuration
 
 ## Security Considerations
 
