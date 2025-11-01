@@ -57,6 +57,8 @@ var documentsContainer = houzeDatabase.AddContainer("documents", "/owner");
 var ledgersContainer = houzeDatabase.AddContainer("ledgers", "/owner"); 
 var mortgagesContainer = houzeDatabase.AddContainer("mortgages", "/owner");
 var crmContainer = houzeDatabase.AddContainer("crm", "/customerName");
+var agentsContainer = houzeDatabase.AddContainer("agents", "/owner");
+var agentRunsContainer = houzeDatabase.AddContainer("agent-runs", "/owner");
 
 var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>("documentservice")
     .WithExternalHttpEndpoints()
@@ -85,6 +87,12 @@ var crmService = builder.AddProject<Projects.CanIHazHouze_CrmService>("crmservic
     .WithReference(cosmos) // Reference the cosmos resource
     .WithHttpHealthCheck("/health");
 
+var agentService = builder.AddProject<Projects.CanIHazHouze_AgentService>("agentservice")
+    .WithExternalHttpEndpoints()
+    .WithReference(cosmos) // Reference the cosmos resource
+    .WithReference(openai) // Add OpenAI reference for agent execution
+    .WithHttpHealthCheck("/health");
+
 builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
@@ -92,9 +100,11 @@ builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")
     .WithReference(ledgerService)
     .WithReference(mortgageService)
     .WithReference(crmService)
+    .WithReference(agentService)
     .WaitFor(documentService)
     .WaitFor(ledgerService)
     .WaitFor(mortgageService)
-    .WaitFor(crmService);
+    .WaitFor(crmService)
+    .WaitFor(agentService);
 
 builder.Build().Run();

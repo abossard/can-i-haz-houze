@@ -1,0 +1,309 @@
+@page "/agents/new"
+@page "/agents/edit/{AgentId}"
+@using AgentModel = CanIHazHouze.Web.Agent
+@using AgentConfigModel = CanIHazHouze.Web.AgentConfig
+@using AgentInputVariableModel = CanIHazHouze.Web.AgentInputVariable
+@inject AgentApiClient AgentApi
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(IsEditMode ? "Edit Agent" : "Create Agent") - CanIHazHouze</PageTitle>
+
+<div class="container mt-4">
+    <div class="mb-4">
+        <button class="btn btn-outline-secondary" @onclick="GoBack">
+            ← Back to Agents
+        </button>
+    </div>
+
+    <h1>@(IsEditMode ? "✏️ Edit Agent" : "➕ Create Agent")</h1>
+
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="alert alert-danger" role="alert">
+            <strong>Error:</strong> @error
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Basic Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Agent Name *</label>
+                            <input type="text" class="form-control" id="name" @bind="agent.Name" placeholder="My Assistant Agent" />
+                        </div>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" rows="2" @bind="agent.Description" placeholder="A helpful agent that..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="prompt" class="form-label">System Prompt *</label>
+                            <textarea class="form-control" id="prompt" rows="8" @bind="agent.Prompt" 
+                                      placeholder="You are a helpful assistant that...&#10;&#10;Use {{variableName}} to reference input variables."></textarea>
+                            <div class="form-text">Use {{variableName}} syntax to reference input variables in your prompt.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Configuration</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="model" class="form-label">Model</label>
+                                <select class="form-select" id="model" @bind="agent.Config.Model">
+                                    <option value="gpt-4o-mini">GPT-4o Mini</option>
+                                    <option value="gpt-4o">GPT-4o</option>
+                                    <option value="gpt-4">GPT-4</option>
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="maxTokens" class="form-label">Max Tokens</label>
+                                <input type="number" class="form-control" id="maxTokens" @bind="agent.Config.MaxTokens" min="100" max="4000" />
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="temperature" class="form-label">Temperature: @agent.Config.Temperature.ToString("F2")</label>
+                                <input type="range" class="form-range" id="temperature" @bind="agent.Config.Temperature" min="0" max="2" step="0.1" />
+                                <div class="form-text">Controls randomness: 0 is focused, 2 is creative</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="topP" class="form-label">Top P: @agent.Config.TopP.ToString("F2")</label>
+                                <input type="range" class="form-range" id="topP" @bind="agent.Config.TopP" min="0" max="1" step="0.05" />
+                                <div class="form-text">Nucleus sampling threshold</div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="frequencyPenalty" class="form-label">Frequency Penalty: @agent.Config.FrequencyPenalty.ToString("F2")</label>
+                                <input type="range" class="form-range" id="frequencyPenalty" @bind="agent.Config.FrequencyPenalty" min="0" max="2" step="0.1" />
+                                <div class="form-text">Reduces repetition</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="presencePenalty" class="form-label">Presence Penalty: @agent.Config.PresencePenalty.ToString("F2")</label>
+                                <input type="range" class="form-range" id="presencePenalty" @bind="agent.Config.PresencePenalty" min="0" max="2" step="0.1" />
+                                <div class="form-text">Encourages new topics</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Input Variables</h5>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="AddInputVariable">➕ Add Variable</button>
+                    </div>
+                    <div class="card-body">
+                        @if (agent.InputVariables.Count == 0)
+                        {
+                            <p class="text-muted">No input variables defined. Add variables to make your agent dynamic.</p>
+                        }
+                        else
+                        {
+                            @for (int i = 0; i < agent.InputVariables.Count; i++)
+                            {
+                                var index = i;
+                                var variable = agent.InputVariables[index];
+                                <div class="card mb-2">
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-4 mb-2">
+                                                <input type="text" class="form-control form-control-sm" @bind="variable.Name" placeholder="Variable name" />
+                                            </div>
+                                            <div class="col-md-6 mb-2">
+                                                <input type="text" class="form-control form-control-sm" @bind="variable.Description" placeholder="Description" />
+                                            </div>
+                                            <div class="col-md-2 mb-2">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" @bind="variable.Required" id="required-@index" />
+                                                    <label class="form-check-label" for="required-@index">Required</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-danger mt-2" @onclick="() => RemoveInputVariable(index)">Remove</button>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Tools</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">Select the tools this agent can use:</p>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" @bind="toolLedgerApi" id="tool-ledger" />
+                            <label class="form-check-label" for="tool-ledger">
+                                💰 Ledger API - Access financial ledger data
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" @bind="toolCrmApi" id="tool-crm" />
+                            <label class="form-check-label" for="tool-crm">
+                                🎫 CRM API - Access customer relationship data
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" @bind="toolDocumentsApi" id="tool-documents" />
+                            <label class="form-check-label" for="tool-documents">
+                                📄 Documents API - Access document storage
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mb-4">
+                    <button class="btn btn-primary" @onclick="SaveAgent" disabled="@saving">
+                        @if (saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        }
+                        💾 Save Agent
+                    </button>
+                    <button class="btn btn-outline-secondary" @onclick="GoBack">Cancel</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string? AgentId { get; set; }
+
+    private AgentModel agent = new() { Owner = "demo-user" };
+    private bool loading = false;
+    private bool saving = false;
+    private string? error;
+    private bool IsEditMode => !string.IsNullOrEmpty(AgentId);
+
+    private bool toolLedgerApi = false;
+    private bool toolCrmApi = false;
+    private bool toolDocumentsApi = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEditMode && !string.IsNullOrEmpty(AgentId))
+        {
+            await LoadAgent();
+        }
+    }
+
+    private async Task LoadAgent()
+    {
+        try
+        {
+            loading = true;
+            error = null;
+            var loadedAgent = await AgentApi.GetAgentAsync("demo-user", AgentId!);
+            if (loadedAgent != null)
+            {
+                agent = loadedAgent;
+                UpdateToolCheckboxes();
+            }
+            else
+            {
+                error = "Agent not found";
+            }
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void UpdateToolCheckboxes()
+    {
+        toolLedgerApi = agent.Tools.Contains("ledger-api");
+        toolCrmApi = agent.Tools.Contains("crm-api");
+        toolDocumentsApi = agent.Tools.Contains("documents-api");
+    }
+
+    private void UpdateToolsList()
+    {
+        agent.Tools.Clear();
+        if (toolLedgerApi) agent.Tools.Add("ledger-api");
+        if (toolCrmApi) agent.Tools.Add("crm-api");
+        if (toolDocumentsApi) agent.Tools.Add("documents-api");
+    }
+
+    private async Task SaveAgent()
+    {
+        try
+        {
+            saving = true;
+            error = null;
+
+            if (string.IsNullOrWhiteSpace(agent.Name))
+            {
+                error = "Agent name is required";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(agent.Prompt))
+            {
+                error = "System prompt is required";
+                return;
+            }
+
+            UpdateToolsList();
+
+            if (IsEditMode)
+            {
+                await AgentApi.UpdateAgentAsync(agent.Owner, AgentId!, agent);
+            }
+            else
+            {
+                await AgentApi.CreateAgentAsync(agent);
+            }
+
+            NavigationManager.NavigateTo("/agents");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private void AddInputVariable()
+    {
+        agent.InputVariables.Add(new AgentInputVariableModel());
+    }
+
+    private void RemoveInputVariable(int index)
+    {
+        agent.InputVariables.RemoveAt(index);
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/agents");
+    }
+}
