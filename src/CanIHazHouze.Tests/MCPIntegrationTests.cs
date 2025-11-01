@@ -13,6 +13,7 @@ namespace CanIHazHouze.Tests;
 public class MCPIntegrationTests
 {
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task LedgerService_MCPCapabilities_ShouldReturnTools()
     {
         // This test validates that the LedgerService properly exposes MCP capabilities
@@ -42,6 +43,7 @@ public class MCPIntegrationTests
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task DocumentService_MCPCapabilities_ShouldReturnTools()
     {
         // This test validates that the DocumentService properly exposes MCP capabilities
@@ -74,6 +76,7 @@ public class MCPIntegrationTests
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task MortgageApprover_MCPCapabilities_ShouldReturnTools()
     {
         // This test validates that the MortgageApprover properly exposes MCP capabilities
@@ -104,6 +107,7 @@ public class MCPIntegrationTests
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task MCPCapabilities_ShouldIncludeProtocolVersion()
     {
         var factory = new WebApplicationFactory<CanIHazHouze.LedgerService.Program>();
@@ -126,6 +130,7 @@ public class MCPIntegrationTests
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task MCPCapabilities_ShouldIncludeResources()
     {
         var factory = new WebApplicationFactory<CanIHazHouze.LedgerService.Program>();
@@ -150,6 +155,7 @@ public class MCPIntegrationTests
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public void MCPConfiguration_ShouldBeEnabledByDefault()
     {
         var factory = new WebApplicationFactory<CanIHazHouze.LedgerService.Program>();
@@ -166,6 +172,7 @@ public class MCPIntegrationTests
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task RESTAPIs_ShouldStillWork_WithMCPEnabled()
     {
         // Ensure MCP doesn't break existing REST functionality
@@ -184,6 +191,7 @@ public class MCPIntegrationTests
     /// This ensures the MCP implementation is functional end-to-end
     /// </summary>
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task MCP_SmokeTest_AllServices_ShouldExposeCapabilities()
     {
         // This is a smoke test that verifies MCP is properly configured and working

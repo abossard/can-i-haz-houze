@@ -8,6 +8,7 @@ public class WebTests
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task GetWebResourceRootReturnsOkStatusCode()
     {
         // Arrange
@@ -40,6 +41,7 @@ public class WebTests
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task GetRecentlyUpdatedAccounts_ReturnsOkWithAccounts()
     {
         // Arrange
@@ -91,6 +93,7 @@ public class WebTests
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task GetRecentTransactions_ReturnsOkWithTransactions()
     {
         // Arrange
@@ -141,6 +144,7 @@ public class WebTests
     }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task RecentActivityEndpoints_IntegrationTest()
     {
         // Arrange
