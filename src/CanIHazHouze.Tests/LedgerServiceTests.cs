@@ -13,6 +13,7 @@ public class LedgerServiceTests
     // private LedgerServiceImpl CreateService(CosmosClient cosmosClient, LedgerStorageOptions? options = null) { ... }
 
     [Fact]
+    [Trait("Category", "Integration")]
     public async Task GetAccount_CreatesNewAccountWithRandomBalance_WhenAccountDoesNotExist()
     {
         // Arrange
