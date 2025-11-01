@@ -190,8 +190,7 @@
     [Parameter]
     public string? AgentId { get; set; }
 
-    // TODO: In production, retrieve owner from authenticated user context
-    private AgentModel agent = new() { Owner = "demo-user" };
+    private AgentModel agent = new();
     private bool loading = false;
     private bool saving = false;
     private string? error;
@@ -215,7 +214,7 @@
         {
             loading = true;
             error = null;
-            var loadedAgent = await AgentApi.GetAgentAsync("demo-user", AgentId!);
+            var loadedAgent = await AgentApi.GetAgentAsync(AgentId!);
             if (loadedAgent != null)
             {
                 agent = loadedAgent;
@@ -274,7 +273,7 @@
 
             if (IsEditMode)
             {
-                await AgentApi.UpdateAgentAsync(agent.Owner, AgentId!, agent);
+                await AgentApi.UpdateAgentAsync(AgentId!, agent);
             }
             else
             {

@@ -22,12 +22,11 @@ public class AgentExecutionService : IAgentExecutionService
         _logger = logger;
     }
 
-    public async Task<AgentRun> ExecuteAgentAsync(string agentId, string owner, Dictionary<string, string> inputValues)
+    public async Task<AgentRun> ExecuteAgentAsync(string agentId, Dictionary<string, string> inputValues)
     {
         var run = new AgentRun
         {
             AgentId = agentId,
-            Owner = owner,
             InputValues = inputValues,
             Status = "running"
         };
@@ -41,7 +40,7 @@ public class AgentExecutionService : IAgentExecutionService
                 Message = "Agent execution started"
             });
 
-            var agent = await _storageService.GetAgentAsync(agentId, owner);
+            var agent = await _storageService.GetAgentAsync(agentId);
             if (agent == null)
             {
                 throw new InvalidOperationException($"Agent {agentId} not found");

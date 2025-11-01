@@ -84,22 +84,22 @@ app.MapGet("/health", () => Results.Ok("Healthy"))
     .Produces<string>(StatusCodes.Status200OK);
 
 // Agent CRUD endpoints
-app.MapGet("/agents/{owner}", async (string owner, IAgentStorageService storage) =>
+app.MapGet("/agents", async (IAgentStorageService storage) =>
 {
     try
     {
-        var agents = await storage.GetAgentsByOwnerAsync(owner);
+        var agents = await storage.GetAllAgentsAsync();
         return Results.Ok(agents);
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error retrieving agents for owner {Owner}", LogSanitizer.Sanitize(owner));
+        app.Logger.LogError(ex, "Error retrieving agents");
         return Results.Problem("An error occurred while retrieving agents");
     }
 })
 .WithName("GetAgents")
-.WithSummary("Get all agents for a user")
-.WithDescription("Retrieves all AI agents owned by the specified user.")
+.WithSummary("Get all agents")
+.WithDescription("Retrieves all AI agents.")
 .WithOpenApi(operation =>
 {
     operation.Tags = [new() { Name = "Agents" }];
@@ -107,11 +107,11 @@ app.MapGet("/agents/{owner}", async (string owner, IAgentStorageService storage)
 })
 .Produces<List<Agent>>(StatusCodes.Status200OK);
 
-app.MapGet("/agents/{owner}/{id}", async (string owner, string id, IAgentStorageService storage) =>
+app.MapGet("/agents/{id}", async (string id, IAgentStorageService storage) =>
 {
     try
     {
-        var agent = await storage.GetAgentAsync(id, owner);
+        var agent = await storage.GetAgentAsync(id);
         if (agent == null)
         {
             return Results.NotFound($"Agent {id} not found");
@@ -120,13 +120,13 @@ app.MapGet("/agents/{owner}/{id}", async (string owner, string id, IAgentStorage
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error retrieving agent {Id} for owner {Owner}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(owner));
+        app.Logger.LogError(ex, "Error retrieving agent {Id}", LogSanitizer.Sanitize(id));
         return Results.Problem("An error occurred while retrieving the agent");
     }
 })
 .WithName("GetAgent")
 .WithSummary("Get a specific agent")
-.WithDescription("Retrieves a specific AI agent by ID for the specified user.")
+.WithDescription("Retrieves a specific AI agent by ID.")
 .WithOpenApi(operation =>
 {
     operation.Tags = [new() { Name = "Agents" }];
@@ -140,11 +140,11 @@ app.MapPost("/agents", async ([FromBody] Agent agent, IAgentStorageService stora
     try
     {
         var created = await storage.CreateAgentAsync(agent);
-        return Results.Created($"/agents/{agent.Owner}/{created.Id}", created);
+        return Results.Created($"/agents/{created.Id}", created);
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error creating agent for owner {Owner}", LogSanitizer.Sanitize(agent.Owner));
+        app.Logger.LogError(ex, "Error creating agent");
         return Results.Problem("An error occurred while creating the agent");
     }
 })
@@ -158,18 +158,17 @@ app.MapPost("/agents", async ([FromBody] Agent agent, IAgentStorageService stora
 })
 .Produces<Agent>(StatusCodes.Status201Created);
 
-app.MapPut("/agents/{owner}/{id}", async (string owner, string id, [FromBody] Agent agent, IAgentStorageService storage) =>
+app.MapPut("/agents/{id}", async (string id, [FromBody] Agent agent, IAgentStorageService storage) =>
 {
     try
     {
         agent.Id = id;
-        agent.Owner = owner;
         var updated = await storage.UpdateAgentAsync(agent);
         return Results.Ok(updated);
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error updating agent {Id} for owner {Owner}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(owner));
+        app.Logger.LogError(ex, "Error updating agent {Id}", LogSanitizer.Sanitize(id));
         return Results.Problem("An error occurred while updating the agent");
     }
 })
@@ -183,16 +182,16 @@ app.MapPut("/agents/{owner}/{id}", async (string owner, string id, [FromBody] Ag
 })
 .Produces<Agent>(StatusCodes.Status200OK);
 
-app.MapDelete("/agents/{owner}/{id}", async (string owner, string id, IAgentStorageService storage) =>
+app.MapDelete("/agents/{id}", async (string id, IAgentStorageService storage) =>
 {
     try
     {
-        await storage.DeleteAgentAsync(id, owner);
+        await storage.DeleteAgentAsync(id);
         return Results.NoContent();
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error deleting agent {Id} for owner {Owner}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(owner));
+        app.Logger.LogError(ex, "Error deleting agent {Id}", LogSanitizer.Sanitize(id));
         return Results.Problem("An error occurred while deleting the agent");
     }
 })
@@ -207,20 +206,19 @@ app.MapDelete("/agents/{owner}/{id}", async (string owner, string id, IAgentStor
 .Produces(StatusCodes.Status204NoContent);
 
 // Agent execution endpoints
-app.MapPost("/agents/{owner}/{id}/run", async (
-    string owner,
+app.MapPost("/agents/{id}/run", async (
     string id,
     [FromBody] Dictionary<string, string> inputValues,
     IAgentExecutionService executionService) =>
 {
     try
     {
-        var run = await executionService.ExecuteAgentAsync(id, owner, inputValues);
+        var run = await executionService.ExecuteAgentAsync(id, inputValues);
         return Results.Ok(run);
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error executing agent {Id} for owner {Owner}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(owner));
+        app.Logger.LogError(ex, "Error executing agent {Id}", LogSanitizer.Sanitize(id));
         return Results.Problem($"An error occurred while executing the agent: {ex.Message}");
     }
 })
@@ -234,11 +232,11 @@ app.MapPost("/agents/{owner}/{id}/run", async (
 })
 .Produces<AgentRun>(StatusCodes.Status200OK);
 
-app.MapGet("/runs/{owner}/{id}", async (string owner, string id, IAgentStorageService storage) =>
+app.MapGet("/runs/{agentId}/{id}", async (string agentId, string id, IAgentStorageService storage) =>
 {
     try
     {
-        var run = await storage.GetRunAsync(id, owner);
+        var run = await storage.GetRunAsync(id, agentId);
         if (run == null)
         {
             return Results.NotFound($"Run {id} not found");
@@ -247,7 +245,7 @@ app.MapGet("/runs/{owner}/{id}", async (string owner, string id, IAgentStorageSe
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error retrieving run {Id} for owner {Owner}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(owner));
+        app.Logger.LogError(ex, "Error retrieving run {Id} for agent {AgentId}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(agentId));
         return Results.Problem("An error occurred while retrieving the run");
     }
 })
@@ -262,16 +260,16 @@ app.MapGet("/runs/{owner}/{id}", async (string owner, string id, IAgentStorageSe
 .Produces<AgentRun>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status404NotFound);
 
-app.MapGet("/agents/{owner}/{agentId}/runs", async (string owner, string agentId, IAgentStorageService storage) =>
+app.MapGet("/agents/{agentId}/runs", async (string agentId, IAgentStorageService storage) =>
 {
     try
     {
-        var runs = await storage.GetRunsByAgentAsync(agentId, owner);
+        var runs = await storage.GetRunsByAgentAsync(agentId);
         return Results.Ok(runs);
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error retrieving runs for agent {AgentId} and owner {Owner}", LogSanitizer.Sanitize(agentId), LogSanitizer.Sanitize(owner));
+        app.Logger.LogError(ex, "Error retrieving runs for agent {AgentId}", LogSanitizer.Sanitize(agentId));
         return Results.Problem("An error occurred while retrieving runs");
     }
 })

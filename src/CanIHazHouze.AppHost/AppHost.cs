@@ -57,8 +57,8 @@ var documentsContainer = houzeDatabase.AddContainer("documents", "/owner");
 var ledgersContainer = houzeDatabase.AddContainer("ledgers", "/owner"); 
 var mortgagesContainer = houzeDatabase.AddContainer("mortgages", "/owner");
 var crmContainer = houzeDatabase.AddContainer("crm", "/customerName");
-var agentsContainer = houzeDatabase.AddContainer("agents", "/owner");
-var agentRunsContainer = houzeDatabase.AddContainer("agent-runs", "/owner");
+var agentsContainer = houzeDatabase.AddContainer("agents", "/id");
+var agentRunsContainer = houzeDatabase.AddContainer("agent-runs", "/agentId");
 
 var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>("documentservice")
     .WithExternalHttpEndpoints()

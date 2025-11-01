@@ -167,8 +167,6 @@
     private bool loading = true;
     private string? error;
     private string? expandedRunId;
-    // TODO: In production, retrieve owner from authenticated user context
-    private string owner = "demo-user";
 
     protected override async Task OnInitializedAsync()
     {
@@ -182,14 +180,14 @@
             loading = true;
             error = null;
             
-            agent = await AgentApi.GetAgentAsync(owner, AgentId!);
+            agent = await AgentApi.GetAgentAsync(AgentId!);
             if (agent == null)
             {
                 error = "Agent not found";
                 return;
             }
 
-            runs = await AgentApi.GetAgentRunsAsync(owner, AgentId!);
+            runs = await AgentApi.GetAgentRunsAsync(AgentId!);
         }
         catch (Exception ex)
         {

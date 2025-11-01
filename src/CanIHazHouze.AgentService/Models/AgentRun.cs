@@ -10,9 +10,6 @@ public class AgentRun
     [Required]
     public string AgentId { get; set; } = string.Empty;
     
-    [Required]
-    public string Owner { get; set; } = string.Empty;
-    
     public Dictionary<string, string> InputValues { get; set; } = new();
     
     public string Status { get; set; } = "pending";
