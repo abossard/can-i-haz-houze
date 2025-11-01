@@ -12,6 +12,8 @@ namespace CanIHazHouze.Tests;
 public class MCPServerTests
 {
     [Fact]
+    [Trait("Category", "Unit")]
+    [Trait("Category", "MCP")]
     public void MCPServer_ShouldRegisterAndExecuteTools()
     {
         // Arrange
@@ -40,6 +42,8 @@ public class MCPServerTests
     }
 
     [Fact]
+    [Trait("Category", "Unit")]
+    [Trait("Category", "MCP")]
     public async Task MCPServer_ShouldExecuteToolCall()
     {
         // Arrange
@@ -71,6 +75,8 @@ public class MCPServerTests
     }
 
     [Fact]
+    [Trait("Category", "Unit")]
+    [Trait("Category", "MCP")]
     public void MCPServer_ShouldRegisterResources()
     {
         // Arrange
@@ -99,6 +105,8 @@ public class MCPServerTests
     }
 
     [Fact]
+    [Trait("Category", "Unit")]
+    [Trait("Category", "MCP")]
     public async Task MCPServer_ShouldHandleResourceRequest()
     {
         // Arrange
@@ -128,6 +136,8 @@ public class MCPServerTests
     }
 
     [Fact]
+    [Trait("Category", "Unit")]
+    [Trait("Category", "MCP")]
     public void MCPOptions_ShouldHaveDefaultValues()
     {
         // Arrange & Act
