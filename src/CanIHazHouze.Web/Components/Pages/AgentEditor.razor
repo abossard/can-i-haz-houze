@@ -220,6 +220,43 @@
                                 📄 Documents API - Access document storage
                             </label>
                         </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" @bind="toolAgentWorkbench" id="tool-agent-workbench" />
+                            <label class="form-check-label" for="tool-agent-workbench">
+                                🤖 Agent Workbench - Create and manage other AI agents
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" @bind="toolWebSearch" id="tool-web-search" />
+                            <label class="form-check-label" for="tool-web-search">
+                                🔍 Web Search - Search the web for real-time information
+                            </label>
+                        </div>
+                        
+                        @if (toolWebSearch)
+                        {
+                            <div class="mt-3 p-3 border rounded bg-light">
+                                <h6>Web Search Configuration</h6>
+                                <div class="mb-2">
+                                    <label class="form-label form-label-sm">Search API Key</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="agent.Config.WebSearchApiKey" 
+                                           placeholder="Enter Google Custom Search API Key or Bing API Key" />
+                                    <div class="form-text">Required for web search functionality</div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label form-label-sm">Search Engine ID (Google only)</label>
+                                    <input type="text" class="form-control form-control-sm" @bind="agent.Config.WebSearchEngineId" 
+                                           placeholder="Enter Google Custom Search Engine ID" />
+                                    <div class="form-text">Only needed for Google Custom Search</div>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" @bind="agent.Config.EnableWebSearch" id="enable-web-search" />
+                                    <label class="form-check-label" for="enable-web-search">
+                                        Enable web search for this agent
+                                    </label>
+                                </div>
+                            </div>
+                        }
                     </div>
                 </div>
 
@@ -252,6 +289,8 @@
     private bool toolLedgerApi = false;
     private bool toolCrmApi = false;
     private bool toolDocumentsApi = false;
+    private bool toolAgentWorkbench = false;
+    private bool toolWebSearch = false;
     
     private List<ModelDeployment> availableModels = new();
 
@@ -307,17 +346,21 @@
 
     private void UpdateToolCheckboxes()
     {
-        toolLedgerApi = agent.Tools.Contains("ledger-api");
-        toolCrmApi = agent.Tools.Contains("crm-api");
-        toolDocumentsApi = agent.Tools.Contains("documents-api");
+        toolLedgerApi = agent.Tools.Contains("LedgerAPI");
+        toolCrmApi = agent.Tools.Contains("CRMAPI");
+        toolDocumentsApi = agent.Tools.Contains("DocumentsAPI");
+        toolAgentWorkbench = agent.Tools.Contains("AgentWorkbench");
+        toolWebSearch = agent.Tools.Contains("WebSearch");
     }
 
     private void UpdateToolsList()
     {
         agent.Tools.Clear();
-        if (toolLedgerApi) agent.Tools.Add("ledger-api");
-        if (toolCrmApi) agent.Tools.Add("crm-api");
-        if (toolDocumentsApi) agent.Tools.Add("documents-api");
+        if (toolLedgerApi) agent.Tools.Add("LedgerAPI");
+        if (toolCrmApi) agent.Tools.Add("CRMAPI");
+        if (toolDocumentsApi) agent.Tools.Add("DocumentsAPI");
+        if (toolAgentWorkbench) agent.Tools.Add("AgentWorkbench");
+        if (toolWebSearch) agent.Tools.Add("WebSearch");
     }
 
     private async Task SaveAgent()

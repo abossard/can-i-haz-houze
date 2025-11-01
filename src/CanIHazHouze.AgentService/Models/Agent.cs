@@ -24,6 +24,7 @@ public class Agent
     
     public AgentConfig Config { get; set; } = new();
     
+    // Available tools: LedgerAPI, CRMAPI, DocumentsAPI, AgentWorkbench, WebSearch
     public List<string> Tools { get; set; } = new();
     
     public List<AgentInputVariable> InputVariables { get; set; } = new();
@@ -54,6 +55,15 @@ public class AgentConfig
     public bool EnableMultiTurn { get; set; } = true;
     
     public string? GoalCompletionPrompt { get; set; }
+    
+    // Enable web search capabilities (requires WebSearch tool)
+    public bool EnableWebSearch { get; set; } = false;
+    
+    // API key for web search (e.g., Google Custom Search API key or Bing Search API key)
+    public string WebSearchApiKey { get; set; } = string.Empty;
+    
+    // Search engine ID for Google Custom Search (if using Google)
+    public string WebSearchEngineId { get; set; } = string.Empty;
 }
 
 public static class AvailableModels

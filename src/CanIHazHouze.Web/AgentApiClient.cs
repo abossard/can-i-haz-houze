@@ -176,6 +176,15 @@ public class AgentConfig
 
     [JsonPropertyName("goalCompletionPrompt")]
     public string? GoalCompletionPrompt { get; set; }
+    
+    [JsonPropertyName("enableWebSearch")]
+    public bool EnableWebSearch { get; set; } = false;
+    
+    [JsonPropertyName("webSearchApiKey")]
+    public string WebSearchApiKey { get; set; } = string.Empty;
+    
+    [JsonPropertyName("webSearchEngineId")]
+    public string WebSearchEngineId { get; set; } = string.Empty;
 }
 
 public class AgentInputVariable
