@@ -31,29 +31,43 @@ if (builder.ExecutionContext.IsPublishMode)
     // Add model deployments for document processing and agent execution
     var openaiResource = (IResourceBuilder<AzureOpenAIResource>)openai;
     
-    // GPT-4o mini - Fast and efficient for most tasks
+    // GPT-5 Series - Advanced reasoning models
+    // GPT-5 - Flagship reasoning model for logic-heavy tasks
     openaiResource.AddDeployment(
-        name: "gpt-4o-mini",
-        modelName: "gpt-4o-mini", 
-        modelVersion: "2024-07-18");
+        name: "gpt-5",
+        modelName: "gpt-5", 
+        modelVersion: "2024-11-01");
     
-    // GPT-4o - More capable for complex reasoning
+    // GPT-5 Mini - Lightweight reasoning model
     openaiResource.AddDeployment(
-        name: "gpt-4o",
-        modelName: "gpt-4o", 
-        modelVersion: "2024-08-06");
+        name: "gpt-5-mini",
+        modelName: "gpt-5-mini", 
+        modelVersion: "2024-11-01");
     
-    // GPT-3.5 Turbo - Cost-effective for simple tasks
+    // GPT-5 Nano - Speed and low latency reasoning
     openaiResource.AddDeployment(
-        name: "gpt-35-turbo",
-        modelName: "gpt-35-turbo", 
-        modelVersion: "0125");
+        name: "gpt-5-nano",
+        modelName: "gpt-5-nano", 
+        modelVersion: "2024-11-01");
     
-    // GPT-4 Turbo - Advanced reasoning capabilities
+    // GPT-4.1 Series - Fast-response models
+    // GPT-4.1 - Fast response with 1M context
     openaiResource.AddDeployment(
-        name: "gpt-4-turbo",
-        modelName: "gpt-4-turbo", 
-        modelVersion: "2024-04-09");
+        name: "gpt-41",
+        modelName: "gpt-4.1", 
+        modelVersion: "2024-11-01");
+    
+    // GPT-4.1 Mini - Balanced performance and cost
+    openaiResource.AddDeployment(
+        name: "gpt-41-mini",
+        modelName: "gpt-4.1-mini", 
+        modelVersion: "2024-11-01");
+    
+    // GPT-4.1 Nano - Lowest cost and latency
+    openaiResource.AddDeployment(
+        name: "gpt-41-nano",
+        modelName: "gpt-4.1-nano", 
+        modelVersion: "2024-11-01");
 }
 
 // Add Azure Storage with Azurite emulator for local development

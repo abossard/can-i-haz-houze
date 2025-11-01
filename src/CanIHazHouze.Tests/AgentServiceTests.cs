@@ -16,7 +16,7 @@ public class AgentServiceTests
         Assert.NotNull(agent.Config);
         Assert.NotNull(agent.Tools);
         Assert.NotNull(agent.InputVariables);
-        Assert.Equal("gpt-4o-mini", agent.Config.Model);
+        Assert.Equal("gpt-41-mini", agent.Config.Model);
         Assert.Equal(0.7, agent.Config.Temperature);
         Assert.Equal(1.0, agent.Config.TopP);
         Assert.Equal(2000, agent.Config.MaxTokens);
@@ -29,7 +29,7 @@ public class AgentServiceTests
         var config = new AgentConfig();
 
         // Assert
-        Assert.Equal("gpt-4o-mini", config.Model);
+        Assert.Equal("gpt-41-mini", config.Model);
         Assert.Equal(0.7, config.Temperature);
         Assert.Equal(1.0, config.TopP);
         Assert.Equal(2000, config.MaxTokens);

@@ -36,8 +36,8 @@ public class Agent
 public class AgentConfig
 {
     // Deployment name (must match one of the configured deployments in AppHost)
-    // Available options: gpt-4o-mini, gpt-4o, gpt-35-turbo, gpt-4-turbo
-    public string Model { get; set; } = "gpt-4o-mini";
+    // Available options: gpt-5, gpt-5-mini, gpt-5-nano, gpt-41, gpt-41-mini, gpt-41-nano
+    public string Model { get; set; } = "gpt-41-mini";
     
     public double Temperature { get; set; } = 0.7;
     
@@ -62,27 +62,39 @@ public static class AvailableModels
     {
         new ModelDeployment 
         { 
-            DeploymentName = "gpt-4o-mini", 
-            DisplayName = "GPT-4o Mini", 
-            Description = "Fast and efficient for most tasks" 
+            DeploymentName = "gpt-5", 
+            DisplayName = "GPT-5", 
+            Description = "Flagship reasoning model for logic-heavy tasks, deep analytics, and code generation" 
         },
         new ModelDeployment 
         { 
-            DeploymentName = "gpt-4o", 
-            DisplayName = "GPT-4o", 
-            Description = "More capable for complex reasoning" 
+            DeploymentName = "gpt-5-mini", 
+            DisplayName = "GPT-5 Mini", 
+            Description = "Lightweight GPT-5 for cost-sensitive use cases with reasoning capabilities" 
         },
         new ModelDeployment 
         { 
-            DeploymentName = "gpt-35-turbo", 
-            DisplayName = "GPT-3.5 Turbo", 
-            Description = "Cost-effective for simple tasks" 
+            DeploymentName = "gpt-5-nano", 
+            DisplayName = "GPT-5 Nano", 
+            Description = "Optimized for speed and low latency with reasoning" 
         },
         new ModelDeployment 
         { 
-            DeploymentName = "gpt-4-turbo", 
-            DisplayName = "GPT-4 Turbo", 
-            Description = "Advanced reasoning capabilities" 
+            DeploymentName = "gpt-41", 
+            DisplayName = "GPT-4.1", 
+            Description = "Fast-response model excelling at technical coding and instruction-following (1M context)" 
+        },
+        new ModelDeployment 
+        { 
+            DeploymentName = "gpt-41-mini", 
+            DisplayName = "GPT-4.1 Mini", 
+            Description = "Balanced performance and cost with 1M context support" 
+        },
+        new ModelDeployment 
+        { 
+            DeploymentName = "gpt-41-nano", 
+            DisplayName = "GPT-4.1 Nano", 
+            Description = "Lowest cost and latency for high-throughput workloads" 
         }
     };
 }
