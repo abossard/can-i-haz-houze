@@ -26,7 +26,7 @@ jobs:
     - name: Build solution
       run: dotnet build src/CanIHazHouze.sln --no-restore --configuration Release
       
-    - name: Run unit tests
+    - name: Run unit tests (no infrastructure required)
       run: dotnet test src/CanIHazHouze.sln --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName~MCPServerTests"
       
     - name: Test summary

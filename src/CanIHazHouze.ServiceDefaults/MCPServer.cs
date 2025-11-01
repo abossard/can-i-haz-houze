@@ -87,7 +87,12 @@ public class AspireMCPServer : IMCPServer
         {
             try
             {
-                var typedArgs = JsonSerializer.Deserialize<T>(args.GetRawText());
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
+                var typedArgs = JsonSerializer.Deserialize<T>(args.GetRawText(), options);
                 if (typedArgs == null)
                     throw new ArgumentException($"Invalid arguments for tool {name}");
                 
