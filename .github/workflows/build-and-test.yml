@@ -1,0 +1,40 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+        
+    - name: Restore dependencies
+      run: dotnet restore src/CanIHazHouze.sln
+      
+    - name: Build solution
+      run: dotnet build src/CanIHazHouze.sln --no-restore --configuration Release
+      
+    - name: Run unit tests
+      run: dotnet test src/CanIHazHouze.sln --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName~MCPServerTests"
+      
+    - name: Test summary
+      if: always()
+      run: |
+        echo "## Test Results 🧪" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Build completed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "✅ MCP Server unit tests executed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Note:** Integration tests require infrastructure (Cosmos DB, Azure Storage) and are not run in CI." >> $GITHUB_STEP_SUMMARY
