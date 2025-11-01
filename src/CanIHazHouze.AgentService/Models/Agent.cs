@@ -7,6 +7,13 @@ public class Agent
     [Required]
     public string Id { get; set; } = Guid.NewGuid().ToString();
     
+    // Partition key - same as Id for agent entities
+    [Required]
+    public string AgentId { get; set; } = string.Empty;
+    
+    // Entity type discriminator for mixed collection
+    public string EntityType { get; set; } = "agent";
+    
     [Required]
     public string Name { get; set; } = string.Empty;
     

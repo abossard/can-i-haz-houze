@@ -111,6 +111,12 @@ public class Agent
     [JsonPropertyName("id")]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
+    [JsonPropertyName("agentId")]
+    public string AgentId { get; set; } = string.Empty;
+
+    [JsonPropertyName("entityType")]
+    public string EntityType { get; set; } = "agent";
+
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 
@@ -185,6 +191,9 @@ public class AgentRun
 
     [JsonPropertyName("agentId")]
     public string AgentId { get; set; } = string.Empty;
+
+    [JsonPropertyName("entityType")]
+    public string EntityType { get; set; } = "agent-run";
 
     [JsonPropertyName("inputValues")]
     public Dictionary<string, string> InputValues { get; set; } = new();

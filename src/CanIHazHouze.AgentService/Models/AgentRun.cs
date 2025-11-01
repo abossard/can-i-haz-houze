@@ -10,6 +10,9 @@ public class AgentRun
     [Required]
     public string AgentId { get; set; } = string.Empty;
     
+    // Entity type discriminator for mixed collection
+    public string EntityType { get; set; } = "agent-run";
+    
     public Dictionary<string, string> InputValues { get; set; } = new();
     
     public string Status { get; set; } = "pending"; // pending, running, paused, completed, failed

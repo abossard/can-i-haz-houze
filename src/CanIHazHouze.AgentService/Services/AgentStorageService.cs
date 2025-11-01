@@ -8,8 +8,7 @@ namespace CanIHazHouze.AgentService.Services;
 public class AgentStorageOptions
 {
     public string DatabaseName { get; set; } = "houze";
-    public string AgentContainerName { get; set; } = "agents";
-    public string RunContainerName { get; set; } = "agent-runs";
+    public string ContainerName { get; set; } = "agents";
 }
 
 public class AgentStorageService : IAgentStorageService
@@ -17,8 +16,7 @@ public class AgentStorageService : IAgentStorageService
     private readonly CosmosClient _cosmosClient;
     private readonly AgentStorageOptions _options;
     private readonly ILogger<AgentStorageService> _logger;
-    private Container? _agentContainer;
-    private Container? _runContainer;
+    private Container? _container;
 
     public AgentStorageService(
         CosmosClient cosmosClient,
@@ -30,32 +28,24 @@ public class AgentStorageService : IAgentStorageService
         _logger = logger;
     }
 
-    private Task<Container> GetAgentContainerAsync()
+    private Task<Container> GetContainerAsync()
     {
-        if (_agentContainer == null)
+        if (_container == null)
         {
             var database = _cosmosClient.GetDatabase(_options.DatabaseName);
-            _agentContainer = database.GetContainer(_options.AgentContainerName);
+            _container = database.GetContainer(_options.ContainerName);
         }
-        return Task.FromResult(_agentContainer);
-    }
-
-    private Task<Container> GetRunContainerAsync()
-    {
-        if (_runContainer == null)
-        {
-            var database = _cosmosClient.GetDatabase(_options.DatabaseName);
-            _runContainer = database.GetContainer(_options.RunContainerName);
-        }
-        return Task.FromResult(_runContainer);
+        return Task.FromResult(_container);
     }
 
     public async Task<Agent> CreateAgentAsync(Agent agent)
     {
-        var container = await GetAgentContainerAsync();
+        var container = await GetContainerAsync();
+        agent.AgentId = agent.Id; // Set partition key to agent's own ID
+        agent.EntityType = "agent";
         agent.CreatedAt = DateTime.UtcNow;
         agent.UpdatedAt = DateTime.UtcNow;
-        var response = await container.CreateItemAsync(agent, new PartitionKey(agent.Id));
+        var response = await container.CreateItemAsync(agent, new PartitionKey(agent.AgentId));
         _logger.LogInformation("Created agent {AgentId}", LogSanitizer.Sanitize(agent.Id));
         return response.Resource;
     }
@@ -64,7 +54,7 @@ public class AgentStorageService : IAgentStorageService
     {
         try
         {
-            var container = await GetAgentContainerAsync();
+            var container = await GetContainerAsync();
             var response = await container.ReadItemAsync<Agent>(id, new PartitionKey(id));
             return response.Resource;
         }
@@ -76,8 +66,9 @@ public class AgentStorageService : IAgentStorageService
 
     public async Task<List<Agent>> GetAllAgentsAsync()
     {
-        var container = await GetAgentContainerAsync();
-        var query = new QueryDefinition("SELECT * FROM c");
+        var container = await GetContainerAsync();
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.entityType = @entityType")
+            .WithParameter("@entityType", "agent");
         
         var iterator = container.GetItemQueryIterator<Agent>(query);
         var agents = new List<Agent>();
@@ -93,23 +84,25 @@ public class AgentStorageService : IAgentStorageService
 
     public async Task<Agent> UpdateAgentAsync(Agent agent)
     {
-        var container = await GetAgentContainerAsync();
+        var container = await GetContainerAsync();
+        agent.AgentId = agent.Id; // Ensure partition key is set
         agent.UpdatedAt = DateTime.UtcNow;
-        var response = await container.ReplaceItemAsync(agent, agent.Id, new PartitionKey(agent.Id));
+        var response = await container.ReplaceItemAsync(agent, agent.Id, new PartitionKey(agent.AgentId));
         _logger.LogInformation("Updated agent {AgentId}", LogSanitizer.Sanitize(agent.Id));
         return response.Resource;
     }
 
     public async Task DeleteAgentAsync(string id)
     {
-        var container = await GetAgentContainerAsync();
+        var container = await GetContainerAsync();
         await container.DeleteItemAsync<Agent>(id, new PartitionKey(id));
         _logger.LogInformation("Deleted agent {AgentId}", LogSanitizer.Sanitize(id));
     }
 
     public async Task<AgentRun> CreateRunAsync(AgentRun run)
     {
-        var container = await GetRunContainerAsync();
+        var container = await GetContainerAsync();
+        run.EntityType = "agent-run";
         run.StartedAt = DateTime.UtcNow;
         var response = await container.CreateItemAsync(run, new PartitionKey(run.AgentId));
         _logger.LogInformation("Created run {RunId} for agent {AgentId}", LogSanitizer.Sanitize(run.Id), LogSanitizer.Sanitize(run.AgentId));
@@ -120,7 +113,7 @@ public class AgentStorageService : IAgentStorageService
     {
         try
         {
-            var container = await GetRunContainerAsync();
+            var container = await GetContainerAsync();
             var response = await container.ReadItemAsync<AgentRun>(id, new PartitionKey(agentId));
             return response.Resource;
         }
@@ -132,11 +125,15 @@ public class AgentStorageService : IAgentStorageService
 
     public async Task<List<AgentRun>> GetRunsByAgentAsync(string agentId)
     {
-        var container = await GetRunContainerAsync();
-        var query = new QueryDefinition("SELECT * FROM c WHERE c.agentId = @agentId ORDER BY c.startedAt DESC")
-            .WithParameter("@agentId", agentId);
+        var container = await GetContainerAsync();
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.agentId = @agentId AND c.entityType = @entityType ORDER BY c.startedAt DESC")
+            .WithParameter("@agentId", agentId)
+            .WithParameter("@entityType", "agent-run");
         
-        var iterator = container.GetItemQueryIterator<AgentRun>(query);
+        var iterator = container.GetItemQueryIterator<AgentRun>(query, requestOptions: new QueryRequestOptions 
+        { 
+            PartitionKey = new PartitionKey(agentId) 
+        });
         var runs = new List<AgentRun>();
         
         while (iterator.HasMoreResults)
@@ -150,7 +147,7 @@ public class AgentStorageService : IAgentStorageService
 
     public async Task<AgentRun> UpdateRunAsync(AgentRun run)
     {
-        var container = await GetRunContainerAsync();
+        var container = await GetContainerAsync();
         var response = await container.ReplaceItemAsync(run, run.Id, new PartitionKey(run.AgentId));
         _logger.LogInformation("Updated run {RunId} for agent {AgentId}", LogSanitizer.Sanitize(run.Id), LogSanitizer.Sanitize(run.AgentId));
         return response.Resource;
