@@ -135,3 +135,70 @@ h1:focus {
 .card:hover {
     box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
+
+/* Background Activity Indicator */
+.background-activity-indicator {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(13, 110, 253, 0.95);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    z-index: 1000;
+    animation: slideInLeft 0.3s ease-out;
+}
+
+.activity-pulse {
+    width: 8px;
+    height: 8px;
+    background: white;
+    border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.activity-text {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.activity-text i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes slideInLeft {
+    from {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(1.2);
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}

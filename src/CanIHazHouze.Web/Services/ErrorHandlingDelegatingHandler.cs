@@ -5,16 +5,22 @@ namespace CanIHazHouze.Web.Services;
 public class ErrorHandlingDelegatingHandler : DelegatingHandler
 {
     private readonly ToastService _toastService;
+    private readonly BackgroundActivityService _activityService;
     private readonly ILogger<ErrorHandlingDelegatingHandler> _logger;
 
-    public ErrorHandlingDelegatingHandler(ToastService toastService, ILogger<ErrorHandlingDelegatingHandler> logger)
+    public ErrorHandlingDelegatingHandler(
+        ToastService toastService, 
+        BackgroundActivityService activityService,
+        ILogger<ErrorHandlingDelegatingHandler> logger)
     {
         _toastService = toastService;
+        _activityService = activityService;
         _logger = logger;
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        _activityService.StartActivity();
         try
         {
             var response = await base.SendAsync(request, cancellationToken);
@@ -65,6 +71,10 @@ public class ErrorHandlingDelegatingHandler : DelegatingHandler
             _logger.LogError(ex, "Unexpected error in HTTP request");
             _toastService.ShowError("An unexpected error occurred");
             throw;
+        }
+        finally
+        {
+            _activityService.EndActivity();
         }
     }
 

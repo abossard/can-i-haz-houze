@@ -21,6 +21,9 @@ builder.Services.AddOutputCache();
 // Add toast notification service
 builder.Services.AddScoped<ToastService>();
 
+// Add background activity tracking service
+builder.Services.AddScoped<BackgroundActivityService>();
+
 // Add error handling delegating handler
 builder.Services.AddTransient<ErrorHandlingDelegatingHandler>();
 
