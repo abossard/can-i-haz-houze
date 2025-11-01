@@ -4,6 +4,29 @@
 
 Can I Haz Houze is a mortgage approval system built with **.NET 9.0** and **.NET Aspire 9.3.1**. It's a distributed microservices application that combines document management, ledger tracking, CRM functionality, and AI-powered mortgage approval decisions.
 
+## MCP Server Configuration
+
+This repository is configured with Model Context Protocol (MCP) servers that extend Copilot's capabilities:
+
+- **Docker**: Run Docker commands for container management and debugging
+- **Docker Compose**: Support for Docker Compose commands (when needed)
+- **Web Search**: Search the web using Brave Search API for documentation, examples, and solutions
+
+For detailed setup instructions, see [MCP_SETUP.md](.github/MCP_SETUP.md).
+
+### Quick Start with MCP Tools
+
+```bash
+# Aspire automatically starts containers when you run:
+cd src
+dotnet run --project CanIHazHouze.AppHost
+
+# With MCP configured, you can ask Copilot to:
+# - List running containers: "show me all docker containers"
+# - Check logs: "what are the latest logs from the cosmos container"
+# - Search docs: "search for .NET Aspire cosmos db configuration"
+```
+
 ## Architecture
 
 ### Multi-Service Application
@@ -54,6 +77,8 @@ dotnet test
 cd src
 dotnet build
 ```
+
+**Note on Docker**: .NET Aspire automatically manages Docker containers for development dependencies (Cosmos DB emulator, Azurite storage emulator) when you run the AppHost. You don't need to manually start these services.
 
 ### Code Conventions
 
