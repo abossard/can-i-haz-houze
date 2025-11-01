@@ -503,10 +503,64 @@ app.MapDelete("/complaints/{id:guid}/comments/{commentId:guid}", async (
 
 app.MapDefaultEndpoints();
 
+// Register MCP tools for CrmService
+var mcpServer = app.Services.GetRequiredService<IMCPServer>();
+var crmService = app.Services.GetRequiredService<ICrmService>();
+
+// Register create complaint tool
+mcpServer.RegisterTool<CreateComplaintMcpRequest>("create_complaint",
+    "Create a new customer complaint in the CRM system",
+    async req => await crmService.CreateComplaintAsync(req.CustomerName, req.Title, req.Description));
+
+// Register get complaints tool
+mcpServer.RegisterTool<GetComplaintsMcpRequest>("get_complaints",
+    "Retrieve all complaints for a specific customer",
+    async req => await crmService.GetComplaintsAsync(req.CustomerName));
+
+// Register get recent complaints tool
+mcpServer.RegisterTool<GetRecentComplaintsMcpRequest>("get_recent_complaints",
+    "Retrieve recent complaints across all customers with configurable limit",
+    async req => await crmService.GetRecentComplaintsAsync(req.Limit ?? 10));
+
+// Register get specific complaint tool
+mcpServer.RegisterTool<GetComplaintMcpRequest>("get_complaint",
+    "Retrieve a specific complaint by ID for a customer",
+    async req => await crmService.GetComplaintAsync(req.Id, req.CustomerName));
+
+// Register update complaint status tool
+mcpServer.RegisterTool<UpdateComplaintStatusMcpRequest>("update_complaint_status",
+    "Update the status of a complaint (New, InProgress, Solved, Rejected)",
+    async req => await crmService.UpdateComplaintStatusAsync(req.Id, req.CustomerName, req.Status));
+
+// Register add comment tool
+mcpServer.RegisterTool<AddCommentMcpRequest>("add_complaint_comment",
+    "Add a support comment to an existing complaint",
+    async req => await crmService.AddCommentAsync(req.Id, req.CustomerName, req.AuthorName, req.Text));
+
+// Register add approval tool
+mcpServer.RegisterTool<AddApprovalMcpRequest>("add_complaint_approval",
+    "Add an approval decision to a complaint (Pending, Approved, Rejected)",
+    async req => await crmService.AddApprovalAsync(req.Id, req.CustomerName, req.ApproverName, req.Decision, req.Comments));
+
+// Register delete complaint tool
+mcpServer.RegisterTool<DeleteComplaintMcpRequest>("delete_complaint",
+    "Permanently delete a complaint and all associated data",
+    async req => await crmService.DeleteComplaintAsync(req.Id, req.CustomerName));
+
+// Register MCP resources for CrmService
+mcpServer.RegisterResource("crm://complaints/summary", "Complaints Summary",
+    "Summary of CRM complaint management system",
+    async () => new { message = "CRM complaints resource - use tools to query specific complaints or customers" });
+
+app.Logger.LogInformation("Registered MCP tools and resources for CrmService");
+
 app.Run();
 
 // Make Program class accessible for testing
-public partial class Program { }
+namespace CanIHazHouze.CrmService
+{
+    public partial class Program { }
+}
 
 // Data models with OpenAPI annotations
 /// <summary>
@@ -916,3 +970,65 @@ public class CrmServiceImpl : ICrmService
         return complaint;
     }
 }
+
+// MCP Tool Request Models
+/// <summary>
+/// Request model for creating a complaint via MCP
+/// </summary>
+/// <param name="CustomerName">Name or identifier of the customer</param>
+/// <param name="Title">Brief title of the complaint</param>
+/// <param name="Description">Detailed description of the complaint</param>
+public record CreateComplaintMcpRequest(string CustomerName, string Title, string Description);
+
+/// <summary>
+/// Request model for getting complaints via MCP
+/// </summary>
+/// <param name="CustomerName">Name or identifier of the customer</param>
+public record GetComplaintsMcpRequest(string CustomerName);
+
+/// <summary>
+/// Request model for getting recent complaints via MCP
+/// </summary>
+/// <param name="Limit">Maximum number of complaints to return (default: 10, max: 100)</param>
+public record GetRecentComplaintsMcpRequest(int? Limit = 10);
+
+/// <summary>
+/// Request model for getting a specific complaint via MCP
+/// </summary>
+/// <param name="Id">Unique GUID identifier of the complaint</param>
+/// <param name="CustomerName">Name or identifier of the customer</param>
+public record GetComplaintMcpRequest(Guid Id, string CustomerName);
+
+/// <summary>
+/// Request model for updating complaint status via MCP
+/// </summary>
+/// <param name="Id">Unique GUID identifier of the complaint</param>
+/// <param name="CustomerName">Name or identifier of the customer</param>
+/// <param name="Status">New status for the complaint</param>
+public record UpdateComplaintStatusMcpRequest(Guid Id, string CustomerName, ComplaintStatus Status);
+
+/// <summary>
+/// Request model for adding a comment via MCP
+/// </summary>
+/// <param name="Id">Unique GUID identifier of the complaint</param>
+/// <param name="CustomerName">Name or identifier of the customer</param>
+/// <param name="AuthorName">Name of the comment author</param>
+/// <param name="Text">Comment text</param>
+public record AddCommentMcpRequest(Guid Id, string CustomerName, string AuthorName, string Text);
+
+/// <summary>
+/// Request model for adding an approval via MCP
+/// </summary>
+/// <param name="Id">Unique GUID identifier of the complaint</param>
+/// <param name="CustomerName">Name or identifier of the customer</param>
+/// <param name="ApproverName">Name of the approver</param>
+/// <param name="Decision">Approval decision</param>
+/// <param name="Comments">Optional comments about the decision</param>
+public record AddApprovalMcpRequest(Guid Id, string CustomerName, string ApproverName, ApprovalDecision Decision, string? Comments);
+
+/// <summary>
+/// Request model for deleting a complaint via MCP
+/// </summary>
+/// <param name="Id">Unique GUID identifier of the complaint</param>
+/// <param name="CustomerName">Name or identifier of the customer</param>
+public record DeleteComplaintMcpRequest(Guid Id, string CustomerName);

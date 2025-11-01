@@ -10,8 +10,11 @@ Welcome to the ultimate .NET Aspire-powered mortgage approval system! This baby 
 - **📄 Document Service**: Where your PDFs go to get analyzed by AI 
 - **📊 Ledger Service**: Tracks your financial shenanigans
 - **🏦 Mortgage Approver**: The final boss that says "yes" or "no"
+- **🎫 CRM Service**: Manage customer complaints and support workflows
 - **🌐 Web Frontend**: Pretty UI for humans to click buttons
 - **🤖 Azure OpenAI Integration**: Because humans are terrible at reading documents
+- **🔌 MCP Server Support**: Model Context Protocol for AI assistant integration
+- **🔌 MCP Server Support**: Model Context Protocol for AI assistant integration
 
 ## 🛠️ Prerequisites (The Boring Stuff)
 # 🎬🏠🚀 **WATCH THIS FIRST!** 🤩📺✨
@@ -205,6 +208,20 @@ dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=<endpoint>;ApiKey=<
 - **Cross-Platform Scripts**: Works on macOS and Linux (requires bash)
 - **Zero Manual Setup**: No need to copy/paste connection strings
 
+### MCP (Model Context Protocol) Support 🔌
+- **AI Assistant Integration**: Connect Claude Desktop and other AI tools directly
+- **20+ MCP Tools**: Complete API access via standardized protocol across all services
+- **Real-time Communication**: WebSocket-based protocol with JSON-RPC 2.0
+- **Parallel REST APIs**: MCP and REST APIs work simultaneously
+- **Built-in Documentation**: `/mcp/capabilities` endpoint for tool discovery
+
+### MCP (Model Context Protocol) Support 🔌
+- **AI Assistant Integration**: Connect Claude Desktop and other AI tools directly
+- **16+ MCP Tools**: Complete API access via standardized protocol
+- **Real-time Communication**: WebSocket-based protocol with JSON-RPC 2.0
+- **Parallel REST APIs**: MCP and REST APIs work simultaneously
+- **Built-in Documentation**: `/mcp/capabilities` endpoint for tool discovery
+
 ### Document Service 📄
 - **Upload documents** with drag & drop
 - **AI-powered analysis** extracts metadata automatically
@@ -221,6 +238,41 @@ dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=<endpoint>;ApiKey=<
 - Automated approval workflow
 - Document verification checks
 - AI-assisted decision making
+
+### CRM Service 🎫
+- Customer complaint management
+- Comment threads for support conversations
+- Approval workflows for complaint resolution
+- Recent complaints tracking across all customers
+
+## 🤖 AI Assistant Integration
+
+CanIHazHouze now supports **Model Context Protocol (MCP)** for seamless AI assistant integration!
+
+### Quick MCP Setup for Claude Desktop
+
+1. **Start the application**: `dotnet run --project src/CanIHazHouze.AppHost`
+2. **Add to Claude Desktop config**:
+   ```json
+   {
+     "mcpServers": {
+       "canihazhouze": {
+         "command": "websocket",
+         "args": ["ws://localhost:5001/mcp"]
+       }
+     }
+   }
+   ```
+3. **Chat with your mortgage system**: Ask Claude to check balances, upload documents, or process applications!
+
+### Available MCP Tools
+- **Financial Management**: Check balances, process transactions, view history
+- **Document Processing**: Upload, analyze, and verify mortgage documents  
+- **Mortgage Applications**: Create, update, and track application status
+- **CRM Management**: Create, update, and manage customer complaints
+- **Cross-Service Integration**: Automated verification across all services
+
+📚 **Full MCP Documentation**: See [`MCP_IMPLEMENTATION.md`](src/MCP_IMPLEMENTATION.md) and [`MCP_USAGE_GUIDE.md`](src/MCP_USAGE_GUIDE.md)
 
 ### API Documentation for Azure AI Foundry 🔌
 **NEW!** Build AI agents with our comprehensive API documentation page!
