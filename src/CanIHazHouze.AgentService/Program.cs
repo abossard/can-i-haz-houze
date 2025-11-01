@@ -1,3 +1,4 @@
+using CanIHazHouze.AgentService.BackgroundServices;
 using CanIHazHouze.AgentService.Models;
 using CanIHazHouze.AgentService.Security;
 using CanIHazHouze.AgentService.Services;
@@ -59,6 +60,11 @@ if (!string.IsNullOrEmpty(openAiConnectionString))
 // Add agent services
 builder.Services.AddScoped<IAgentStorageService, AgentStorageService>();
 builder.Services.AddScoped<IAgentExecutionService, AgentExecutionService>();
+builder.Services.AddScoped<MultiTurnAgentExecutor>();
+
+// Add background service for long-running agent tasks
+builder.Services.AddSingleton<AgentExecutionBackgroundService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AgentExecutionBackgroundService>());
 
 var app = builder.Build();
 
@@ -282,5 +288,174 @@ app.MapGet("/agents/{agentId}/runs", async (string agentId, IAgentStorageService
     return operation;
 })
 .Produces<List<AgentRun>>(StatusCodes.Status200OK);
+
+// Background execution endpoints
+app.MapPost("/agents/{id}/run-async", async (
+    string id,
+    [FromBody] Dictionary<string, string> inputValues,
+    AgentExecutionBackgroundService backgroundService,
+    IAgentStorageService storage) =>
+{
+    try
+    {
+        var agent = await storage.GetAgentAsync(id);
+        if (agent == null)
+        {
+            return Results.NotFound($"Agent {id} not found");
+        }
+
+        var runId = await backgroundService.QueueAgentExecutionAsync(id, inputValues);
+        return Results.Accepted($"/runs/{id}/{runId}", new { runId, agentId = id, status = "queued" });
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error queuing agent {Id} for execution", LogSanitizer.Sanitize(id));
+        return Results.Problem($"An error occurred while queuing the agent: {ex.Message}");
+    }
+})
+.WithName("RunAgentAsync")
+.WithSummary("Execute an agent asynchronously")
+.WithDescription("Queues an AI agent for background execution and returns immediately with a run ID.")
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Agent Execution" }];
+    return operation;
+})
+.Produces(StatusCodes.Status202Accepted);
+
+app.MapPost("/runs/{agentId}/{id}/pause", async (
+    string agentId,
+    string id,
+    AgentExecutionBackgroundService backgroundService,
+    IAgentStorageService storage) =>
+{
+    try
+    {
+        var run = await storage.GetRunAsync(id, agentId);
+        if (run == null)
+        {
+            return Results.NotFound($"Run {id} not found");
+        }
+
+        if (backgroundService.PauseAgent(id))
+        {
+            run.Status = "paused";
+            run.PausedAt = DateTime.UtcNow;
+            await storage.UpdateRunAsync(run);
+            return Results.Ok(new { message = "Run paused successfully", runId = id });
+        }
+
+        return Results.BadRequest("Run is not currently running");
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error pausing run {Id}", LogSanitizer.Sanitize(id));
+        return Results.Problem($"An error occurred while pausing the run: {ex.Message}");
+    }
+})
+.WithName("PauseRun")
+.WithSummary("Pause a running agent")
+.WithDescription("Pauses an actively running agent execution.")
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Agent Execution" }];
+    return operation;
+})
+.Produces(StatusCodes.Status200OK);
+
+app.MapPost("/runs/{agentId}/{id}/resume", async (
+    string agentId,
+    string id,
+    AgentExecutionBackgroundService backgroundService,
+    IAgentStorageService storage) =>
+{
+    try
+    {
+        var run = await storage.GetRunAsync(id, agentId);
+        if (run == null)
+        {
+            return Results.NotFound($"Run {id} not found");
+        }
+
+        if (run.Status != "paused")
+        {
+            return Results.BadRequest("Run is not paused");
+        }
+
+        run.Status = "running";
+        run.PausedAt = null;
+        await storage.UpdateRunAsync(run);
+
+        // Note: This updates the status, but the background service needs to check and continue
+        return Results.Ok(new { message = "Run status updated to running", runId = id });
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error resuming run {Id}", LogSanitizer.Sanitize(id));
+        return Results.Problem($"An error occurred while resuming the run: {ex.Message}");
+    }
+})
+.WithName("ResumeRun")
+.WithSummary("Resume a paused agent")
+.WithDescription("Resumes a paused agent execution.")
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Agent Execution" }];
+    return operation;
+})
+.Produces(StatusCodes.Status200OK);
+
+app.MapPost("/runs/{agentId}/{id}/cancel", (
+    string agentId,
+    string id,
+    AgentExecutionBackgroundService backgroundService) =>
+{
+    try
+    {
+        if (backgroundService.CancelAgent(id))
+        {
+            return Results.Ok(new { message = "Run cancellation requested", runId = id });
+        }
+
+        return Results.NotFound("Run not found or not currently running");
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error cancelling run {Id}", LogSanitizer.Sanitize(id));
+        return Results.Problem($"An error occurred while cancelling the run: {ex.Message}");
+    }
+})
+.WithName("CancelRun")
+.WithSummary("Cancel a running agent")
+.WithDescription("Cancels an actively running agent execution.")
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Agent Execution" }];
+    return operation;
+})
+.Produces(StatusCodes.Status200OK);
+
+app.MapGet("/runs/active", (AgentExecutionBackgroundService backgroundService) =>
+{
+    try
+    {
+        var runningAgents = backgroundService.GetRunningAgentIds();
+        return Results.Ok(new { activeRuns = runningAgents, count = runningAgents.Count });
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error retrieving active runs");
+        return Results.Problem("An error occurred while retrieving active runs");
+    }
+})
+.WithName("GetActiveRuns")
+.WithSummary("Get all active agent runs")
+.WithDescription("Retrieves a list of all currently running agent execution IDs.")
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Agent Execution" }];
+    return operation;
+})
+.Produces(StatusCodes.Status200OK);
 
 app.Run();

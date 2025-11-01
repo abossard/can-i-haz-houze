@@ -39,6 +39,12 @@ public class AgentConfig
     public double FrequencyPenalty { get; set; } = 0.0;
     
     public double PresencePenalty { get; set; } = 0.0;
+    
+    public int MaxTurns { get; set; } = 10;
+    
+    public bool EnableMultiTurn { get; set; } = true;
+    
+    public string? GoalCompletionPrompt { get; set; }
 }
 
 public class AgentInputVariable

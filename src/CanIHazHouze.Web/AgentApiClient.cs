@@ -52,6 +52,58 @@ public class AgentApiClient(HttpClient httpClient)
         return await httpClient.GetFromJsonAsync<List<AgentRun>>($"/agents/{agentId}/runs", cancellationToken)
             ?? new List<AgentRun>();
     }
+
+    public async Task<string?> RunAgentAsyncAsync(string agentId, Dictionary<string, string> inputValues, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsJsonAsync($"/agents/{agentId}/run-async", inputValues, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<AsyncRunResponse>(cancellationToken);
+        return result?.RunId;
+    }
+
+    public async Task PauseRunAsync(string agentId, string runId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsync($"/runs/{agentId}/{runId}/pause", null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task ResumeRunAsync(string agentId, string runId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsync($"/runs/{agentId}/{runId}/resume", null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task CancelRunAsync(string agentId, string runId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.PostAsync($"/runs/{agentId}/{runId}/cancel", null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<ActiveRunsResponse?> GetActiveRunsAsync(CancellationToken cancellationToken = default)
+    {
+        return await httpClient.GetFromJsonAsync<ActiveRunsResponse>("/runs/active", cancellationToken);
+    }
+}
+
+public class AsyncRunResponse
+{
+    [JsonPropertyName("runId")]
+    public string RunId { get; set; } = string.Empty;
+
+    [JsonPropertyName("agentId")]
+    public string AgentId { get; set; } = string.Empty;
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+}
+
+public class ActiveRunsResponse
+{
+    [JsonPropertyName("activeRuns")]
+    public List<string> ActiveRuns { get; set; } = new();
+
+    [JsonPropertyName("count")]
+    public int Count { get; set; }
 }
 
 public class Agent
@@ -103,6 +155,15 @@ public class AgentConfig
 
     [JsonPropertyName("presencePenalty")]
     public double PresencePenalty { get; set; } = 0.0;
+
+    [JsonPropertyName("maxTurns")]
+    public int MaxTurns { get; set; } = 10;
+
+    [JsonPropertyName("enableMultiTurn")]
+    public bool EnableMultiTurn { get; set; } = true;
+
+    [JsonPropertyName("goalCompletionPrompt")]
+    public string? GoalCompletionPrompt { get; set; }
 }
 
 public class AgentInputVariable
@@ -140,11 +201,50 @@ public class AgentRun
     [JsonPropertyName("logs")]
     public List<AgentRunLog> Logs { get; set; } = new();
 
+    [JsonPropertyName("conversationHistory")]
+    public List<ConversationTurn> ConversationHistory { get; set; } = new();
+
+    [JsonPropertyName("turnCount")]
+    public int TurnCount { get; set; } = 0;
+
+    [JsonPropertyName("maxTurns")]
+    public int MaxTurns { get; set; } = 10;
+
+    [JsonPropertyName("goal")]
+    public string? Goal { get; set; }
+
+    [JsonPropertyName("goalAchieved")]
+    public bool GoalAchieved { get; set; } = false;
+
     [JsonPropertyName("startedAt")]
     public DateTime StartedAt { get; set; }
 
+    [JsonPropertyName("pausedAt")]
+    public DateTime? PausedAt { get; set; }
+
     [JsonPropertyName("completedAt")]
     public DateTime? CompletedAt { get; set; }
+
+    [JsonPropertyName("lastUpdated")]
+    public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
+}
+
+public class ConversationTurn
+{
+    [JsonPropertyName("turnNumber")]
+    public int TurnNumber { get; set; }
+
+    [JsonPropertyName("role")]
+    public string Role { get; set; } = string.Empty;
+
+    [JsonPropertyName("content")]
+    public string Content { get; set; } = string.Empty;
+
+    [JsonPropertyName("timestamp")]
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+    [JsonPropertyName("metadata")]
+    public Dictionary<string, object>? Metadata { get; set; }
 }
 
 public class AgentRunLog

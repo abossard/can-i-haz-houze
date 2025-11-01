@@ -12,7 +12,7 @@ public class AgentRun
     
     public Dictionary<string, string> InputValues { get; set; } = new();
     
-    public string Status { get; set; } = "pending";
+    public string Status { get; set; } = "pending"; // pending, running, paused, completed, failed
     
     public string? Result { get; set; }
     
@@ -20,9 +20,36 @@ public class AgentRun
     
     public List<AgentRunLog> Logs { get; set; } = new();
     
+    public List<ConversationTurn> ConversationHistory { get; set; } = new();
+    
+    public int TurnCount { get; set; } = 0;
+    
+    public int MaxTurns { get; set; } = 10;
+    
+    public string? Goal { get; set; }
+    
+    public bool GoalAchieved { get; set; } = false;
+    
     public DateTime StartedAt { get; set; } = DateTime.UtcNow;
     
+    public DateTime? PausedAt { get; set; }
+    
     public DateTime? CompletedAt { get; set; }
+    
+    public DateTime LastUpdated { get; set; } = DateTime.UtcNow;
+}
+
+public class ConversationTurn
+{
+    public int TurnNumber { get; set; }
+    
+    public string Role { get; set; } = string.Empty; // user, assistant, system
+    
+    public string Content { get; set; } = string.Empty;
+    
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    
+    public Dictionary<string, object>? Metadata { get; set; }
 }
 
 public class AgentRunLog

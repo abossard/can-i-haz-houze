@@ -101,6 +101,32 @@
                                 <div class="form-text">Encourages new topics</div>
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" @bind="agent.Config.EnableMultiTurn" id="enableMultiTurn" />
+                                    <label class="form-check-label" for="enableMultiTurn">
+                                        <strong>Enable Multi-Turn Conversations</strong>
+                                    </label>
+                                    <div class="form-text">Allow agent to have multiple conversation turns to work towards a goal</div>
+                                </div>
+                            </div>
+                        </div>
+                        @if (agent.Config.EnableMultiTurn)
+                        {
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="maxTurns" class="form-label">Max Turns: @agent.Config.MaxTurns</label>
+                                    <input type="range" class="form-range" id="maxTurns" @bind="agent.Config.MaxTurns" min="1" max="20" step="1" />
+                                    <div class="form-text">Maximum number of conversation turns</div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="goalPrompt" class="form-label">Goal Completion Prompt</label>
+                                    <input type="text" class="form-control" id="goalPrompt" @bind="agent.Config.GoalCompletionPrompt" placeholder="What is the agent trying to achieve?" />
+                                    <div class="form-text">Optional: Define what constitutes success</div>
+                                </div>
+                            </div>
+                        }
                     </div>
                 </div>
 
