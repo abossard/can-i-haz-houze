@@ -1185,14 +1185,17 @@ app.MapDefaultEndpoints();
 
 // Register MCP tools for DocumentService
 var mcpServer = app.Services.GetRequiredService<IMCPServer>();
-var documentService = app.Services.GetRequiredService<IDocumentService>();
-var aiService = app.Services.GetRequiredService<IDocumentAIService>();
+var serviceProvider = app.Services;
 
 // Register upload document tool
 mcpServer.RegisterTool<UploadDocumentMCPRequest>("upload_document",
     "Upload a new document with optional tags and AI suggestions",
     async req => 
     {
+        using var scope = serviceProvider.CreateScope();
+        var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+        var aiService = scope.ServiceProvider.GetRequiredService<IDocumentAIService>();
+        
         // Convert base64 to stream for upload
         var fileBytes = Convert.FromBase64String(req.Base64Content);
         var stream = new MemoryStream(fileBytes);
@@ -1214,28 +1217,51 @@ mcpServer.RegisterTool<UploadDocumentMCPRequest>("upload_document",
 // Register list documents tool
 mcpServer.RegisterTool<ListDocumentsRequest>("list_documents",
     "Get all documents for a user",
-    async req => await documentService.GetDocumentsAsync(req.Owner));
+    async req => 
+    {
+        using var scope = serviceProvider.CreateScope();
+        var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+        return await documentService.GetDocumentsAsync(req.Owner);
+    });
 
 // Register get document tool
 mcpServer.RegisterTool<GetDocumentRequest>("get_document",
     "Get document metadata by ID",
-    async req => await documentService.GetDocumentAsync(req.Id, req.Owner));
+    async req => 
+    {
+        using var scope = serviceProvider.CreateScope();
+        var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+        return await documentService.GetDocumentAsync(req.Id, req.Owner);
+    });
 
 // Register update document tags tool
 mcpServer.RegisterTool<UpdateDocumentTagsRequest>("update_document_tags",
     "Update document tags",
-    async req => await documentService.UpdateDocumentTagsAsync(req.Id, req.Owner, req.Tags));
+    async req => 
+    {
+        using var scope = serviceProvider.CreateScope();
+        var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+        return await documentService.UpdateDocumentTagsAsync(req.Id, req.Owner, req.Tags);
+    });
 
 // Register delete document tool
 mcpServer.RegisterTool<DeleteDocumentRequest>("delete_document",
     "Delete a document",
-    async req => await documentService.DeleteDocumentAsync(req.Id, req.Owner));
+    async req => 
+    {
+        using var scope = serviceProvider.CreateScope();
+        var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+        return await documentService.DeleteDocumentAsync(req.Id, req.Owner);
+    });
 
 // Register verify documents tool
 mcpServer.RegisterTool<VerifyDocumentsRequest>("verify_mortgage_documents",
     "Verify that a user has uploaded all required mortgage documents",
     async req => 
     {
+        using var scope = serviceProvider.CreateScope();
+        var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+        
         var documents = await documentService.GetDocumentsAsync(req.Owner);
         
         var hasIncomeDocuments = documents.Any(d => d.Tags.Any(t => 
@@ -1269,6 +1295,9 @@ mcpServer.RegisterTool<AnalyzeDocumentRequest>("analyze_document_ai",
     "Analyze a document using AI to extract metadata and insights",
     async req => 
     {
+        using var scope = serviceProvider.CreateScope();
+        var documentService = scope.ServiceProvider.GetRequiredService<IDocumentService>();
+        
         var document = await documentService.GetDocumentAsync(req.Id, req.Owner);
         if (document == null) throw new InvalidOperationException("Document not found");
         
@@ -1288,6 +1317,7 @@ mcpServer.RegisterTool<AnalyzeDocumentRequest>("analyze_document_ai",
             textContent = $"Document file: {document.FileName}\nFile type: {extension}";
         }
 
+        var aiService = scope.ServiceProvider.GetRequiredService<IDocumentAIService>();
         var metadata = await aiService.ExtractMetadataAsync(textContent, document.FileName);
         
         return new

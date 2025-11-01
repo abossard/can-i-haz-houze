@@ -391,15 +391,19 @@ app.MapGet("/mortgage-requests/{requestId:guid}/verification-status", async (
 .WithSummary("Get detailed verification status")
 .WithDescription("Returns detailed information about document and financial verification status.");
 
+app.MapDefaultEndpoints();
+
 // Register MCP tools for MortgageApprover
 var mcpServer = app.Services.GetRequiredService<IMCPServer>();
-var mortgageService = app.Services.GetRequiredService<IMortgageApprovalService>();
+var serviceProvider = app.Services;
 
 // Register create mortgage request tool
 mcpServer.RegisterTool<CreateMortgageRequestMCPRequest>("create_mortgage_request",
     "Create a new mortgage application request",
     async req => 
     {
+        using var scope = serviceProvider.CreateScope();
+        var mortgageService = scope.ServiceProvider.GetRequiredService<IMortgageApprovalService>();
         var mortgageRequest = await mortgageService.CreateMortgageRequestAsync(req.UserName);
         return MortgageRequestDto.FromDomain(mortgageRequest);
     });
@@ -409,6 +413,8 @@ mcpServer.RegisterTool<GetMortgageRequestRequest>("get_mortgage_request",
     "Retrieve mortgage application details by request ID",
     async req => 
     {
+        using var scope = serviceProvider.CreateScope();
+        var mortgageService = scope.ServiceProvider.GetRequiredService<IMortgageApprovalService>();
         var mortgageRequest = await mortgageService.GetMortgageRequestAsync(req.RequestId);
         return mortgageRequest != null ? MortgageRequestDto.FromDomain(mortgageRequest) : null;
     });
@@ -418,6 +424,8 @@ mcpServer.RegisterTool<GetMortgageRequestByUserRequest>("get_mortgage_request_by
     "Retrieve mortgage application details by username",
     async req => 
     {
+        using var scope = serviceProvider.CreateScope();
+        var mortgageService = scope.ServiceProvider.GetRequiredService<IMortgageApprovalService>();
         var mortgageRequest = await mortgageService.GetMortgageRequestByUserAsync(req.UserName);
         return mortgageRequest != null ? MortgageRequestDto.FromDomain(mortgageRequest) : null;
     });
@@ -427,6 +435,8 @@ mcpServer.RegisterTool<UpdateMortgageDataMCPRequest>("update_mortgage_data",
     "Update mortgage application data sections",
     async req => 
     {
+        using var scope = serviceProvider.CreateScope();
+        var mortgageService = scope.ServiceProvider.GetRequiredService<IMortgageApprovalService>();
         var updateData = new UpdateMortgageDataStrongDto
         {
             Income = req.Income,
@@ -444,7 +454,9 @@ mcpServer.RegisterTool<VerifyMortgageRequestRequest>("verify_mortgage_request",
     "Trigger cross-service verification for mortgage request including document and ledger checks",
     async req => 
     {
-        var verificationService = app.Services.GetRequiredService<ICrossServiceVerificationService>();
+        using var scope = serviceProvider.CreateScope();
+        var verificationService = scope.ServiceProvider.GetRequiredService<ICrossServiceVerificationService>();
+        var mortgageService = scope.ServiceProvider.GetRequiredService<IMortgageApprovalService>();
         var mortgageRequest = await mortgageService.GetMortgageRequestAsync(req.RequestId);
         if (mortgageRequest == null) return null;
         
