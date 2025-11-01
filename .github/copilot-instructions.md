@@ -155,7 +155,11 @@ When creating issues for Copilot, include:
 
 ### Web (Frontend)
 - Built with Blazor
-- Uses the fun, informal tone from README (emojis encouraged!)
+- Uses a fun, informal tone similar to the README:
+  - Playful section headings (e.g., "The Boring Stuff", "The Fun Part!")
+  - Emojis encouraged (🏠, 💰, 📄, 🤖)
+  - Humorous comments and explanations
+  - Example: "A mortgage approval app so smart, even your credit score gets jealous 🤖💳"
 - Provides UI for all service interactions
 - Includes API documentation page at `/api-docs`
 
@@ -198,7 +202,11 @@ When creating issues for Copilot, include:
 - **Never commit secrets**: Use `dotnet user-secrets` for local development
 - **Connection strings**: Always use secure connection strings in production
 - **API keys**: Managed via Azure Key Vault in production (via azd)
-- **Public access**: Scripts enable public access for DEVELOPMENT ONLY (see `scripts/enable-public-access.sh`)
+- **Public network access**: 
+  - The `scripts/enable-public-access.sh` script enables public endpoints on Storage Account and Cosmos DB
+  - **WARNING**: This is for DEVELOPMENT/TESTING ONLY and should NOT be used in production
+  - Production deployments should use private endpoints and managed identities
+  - The script is automatically run by the `postdeploy` hook to facilitate local development after Azure deployment
 - **Authentication**: Add authentication/authorization when deploying to production
 
 ## Culture and Currency
