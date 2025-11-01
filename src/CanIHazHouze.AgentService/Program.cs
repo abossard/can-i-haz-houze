@@ -1,5 +1,6 @@
 using CanIHazHouze.AgentService.BackgroundServices;
 using CanIHazHouze.AgentService.Configuration;
+using CanIHazHouze.AgentService.Extensions;
 using CanIHazHouze.AgentService.Models;
 using CanIHazHouze.AgentService.Security;
 using CanIHazHouze.AgentService.Services;
@@ -36,25 +37,10 @@ builder.Services.Configure<AgentStorageOptions>(
 // Add Azure Cosmos DB using Aspire
 builder.AddAzureCosmosClient("cosmos");
 
-// Add OpenAI configuration
-var openAiConnectionString = builder.Configuration.GetConnectionString("openai");
-if (!string.IsNullOrEmpty(openAiConnectionString))
-{
-    // Parse connection string format: Endpoint=https://...;Key=...
-    var parts = openAiConnectionString.Split(';');
-    var endpoint = parts.FirstOrDefault(p => p.StartsWith("Endpoint="))?.Split('=')[1];
-    var key = parts.FirstOrDefault(p => p.StartsWith("Key="))?.Split('=')[1];
-    
-    if (!string.IsNullOrEmpty(endpoint) && !string.IsNullOrEmpty(key))
-    {
-        // Store OpenAI configuration for dynamic kernel creation
-        builder.Services.Configure<OpenAIConfiguration>(options =>
-        {
-            options.Endpoint = endpoint;
-            options.ApiKey = key;
-        });
-    }
-}
+// Add Azure OpenAI configuration using Aspire patterns
+// This properly integrates with Aspire's connection string management from AppHost
+// and registers both OpenAIConfiguration (for Semantic Kernel) and AzureOpenAIClient (for direct SDK access)
+builder.AddAzureOpenAIConfiguration("openai");
 
 // Add agent services
 builder.Services.AddScoped<IAgentStorageService, AgentStorageService>();
