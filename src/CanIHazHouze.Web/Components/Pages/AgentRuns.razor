@@ -127,6 +127,65 @@
                                                     </div>
                                                 }
 
+                                                @if (run.ConversationHistory?.Count > 0)
+                                                {
+                                                    <div class="mb-3">
+                                                        <h6>Conversation History:</h6>
+                                                        <div class="conversation-history">
+                                                            @foreach (var turn in run.ConversationHistory)
+                                                            {
+                                                                <div class="conversation-turn @GetTurnClass(turn.Role) mb-3">
+                                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                        <span class="badge @GetRoleBadgeClass(turn.Role)">
+                                                                            @GetRoleIcon(turn.Role) @turn.Role.ToUpper()
+                                                                        </span>
+                                                                        <small class="text-muted">
+                                                                            Turn @turn.TurnNumber | @turn.Timestamp.ToString("HH:mm:ss")
+                                                                        </small>
+                                                                    </div>
+                                                                    <div class="turn-content">
+                                                                        <pre style="white-space: pre-wrap; word-wrap: break-word; background-color: #f8f9fa; padding: 10px; border-radius: 4px; margin: 0;">@turn.Content</pre>
+                                                                    </div>
+                                                                    @if (turn.ToolCalls?.Count > 0)
+                                                                    {
+                                                                        <div class="tool-calls mt-2">
+                                                                            <strong>🔧 Tool Calls:</strong>
+                                                                            @foreach (var toolCall in turn.ToolCalls)
+                                                                            {
+                                                                                <div class="card mt-2" style="background-color: #e7f3ff;">
+                                                                                    <div class="card-body py-2">
+                                                                                        <div class="d-flex justify-content-between align-items-center">
+                                                                                            <strong>@toolCall.Name</strong>
+                                                                                            <code class="text-muted">@toolCall.Id</code>
+                                                                                        </div>
+                                                                                        <div class="mt-2">
+                                                                                            <small class="text-muted">Arguments:</small>
+                                                                                            <pre class="mb-0 mt-1" style="background-color: #fff; padding: 5px; border-radius: 3px; font-size: 0.85em;">@FormatJson(toolCall.Arguments)</pre>
+                                                                                        </div>
+                                                                                        @if (!string.IsNullOrEmpty(toolCall.Result))
+                                                                                        {
+                                                                                            <div class="mt-2">
+                                                                                                <small class="text-muted">Result:</small>
+                                                                                                <pre class="mb-0 mt-1" style="background-color: #fff; padding: 5px; border-radius: 3px; font-size: 0.85em;">@FormatJson(toolCall.Result)</pre>
+                                                                                            </div>
+                                                                                        }
+                                                                                    </div>
+                                                                                </div>
+                                                                            }
+                                                                        </div>
+                                                                    }
+                                                                    @if (!string.IsNullOrEmpty(turn.ToolName))
+                                                                    {
+                                                                        <div class="mt-2">
+                                                                            <span class="badge bg-info">Tool Response: @turn.ToolName</span>
+                                                                        </div>
+                                                                    }
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                }
+
                                                 @if (run.Logs.Count > 0)
                                                 {
                                                     <div class="mb-3">
@@ -229,5 +288,60 @@
     private void GoBack()
     {
         NavigationManager.NavigateTo("/agents");
+    }
+
+    private string GetTurnClass(string role)
+    {
+        return role.ToLower() switch
+        {
+            "system" => "border-start border-secondary border-3 ps-3",
+            "user" => "border-start border-primary border-3 ps-3",
+            "assistant" => "border-start border-success border-3 ps-3",
+            "tool" => "border-start border-info border-3 ps-3",
+            _ => "border-start border-secondary border-3 ps-3"
+        };
+    }
+
+    private string GetRoleBadgeClass(string role)
+    {
+        return role.ToLower() switch
+        {
+            "system" => "bg-secondary",
+            "user" => "bg-primary",
+            "assistant" => "bg-success",
+            "tool" => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetRoleIcon(string role)
+    {
+        return role.ToLower() switch
+        {
+            "system" => "⚙️",
+            "user" => "👤",
+            "assistant" => "🤖",
+            "tool" => "🔧",
+            _ => "💬"
+        };
+    }
+
+    private string FormatJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return string.Empty;
+
+        try
+        {
+            var parsed = System.Text.Json.JsonDocument.Parse(json);
+            return System.Text.Json.JsonSerializer.Serialize(parsed, new System.Text.Json.JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+        }
+        catch
+        {
+            return json;
+        }
     }
 }

@@ -245,6 +245,30 @@ public class ConversationTurn
 
     [JsonPropertyName("metadata")]
     public Dictionary<string, object>? Metadata { get; set; }
+
+    [JsonPropertyName("toolCalls")]
+    public List<ToolCall>? ToolCalls { get; set; }
+
+    [JsonPropertyName("toolCallId")]
+    public string? ToolCallId { get; set; }
+
+    [JsonPropertyName("toolName")]
+    public string? ToolName { get; set; }
+}
+
+public class ToolCall
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("arguments")]
+    public string Arguments { get; set; } = string.Empty;
+
+    [JsonPropertyName("result")]
+    public string? Result { get; set; }
 }
 
 public class AgentRunLog

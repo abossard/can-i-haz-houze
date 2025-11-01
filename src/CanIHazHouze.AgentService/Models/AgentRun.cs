@@ -43,13 +43,30 @@ public class ConversationTurn
 {
     public int TurnNumber { get; set; }
     
-    public string Role { get; set; } = string.Empty; // user, assistant, system
+    public string Role { get; set; } = string.Empty; // user, assistant, system, tool
     
     public string Content { get; set; } = string.Empty;
     
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     
     public Dictionary<string, object>? Metadata { get; set; }
+    
+    public List<ToolCall>? ToolCalls { get; set; }
+    
+    public string? ToolCallId { get; set; }
+    
+    public string? ToolName { get; set; }
+}
+
+public class ToolCall
+{
+    public string Id { get; set; } = string.Empty;
+    
+    public string Name { get; set; } = string.Empty;
+    
+    public string Arguments { get; set; } = string.Empty;
+    
+    public string? Result { get; set; }
 }
 
 public class AgentRunLog

@@ -93,6 +93,26 @@
                         </div>
                     </div>
 
+                    @if (runDetails != null && runDetails.ConversationHistory?.Count > 0)
+                    {
+                        <div class="mt-3">
+                            <strong>Latest Conversation Turn:</strong>
+                            <div class="small" style="max-height: 200px; overflow-y: auto; background-color: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                @{
+                                    var latestTurn = runDetails.ConversationHistory.LastOrDefault();
+                                    if (latestTurn != null)
+                                    {
+                                        <div class="mb-2">
+                                            <span class="badge bg-@GetRoleBadgeColor(latestTurn.Role)">@latestTurn.Role.ToUpper()</span>
+                                            <span class="text-muted ms-2">@latestTurn.Timestamp.ToString("HH:mm:ss")</span>
+                                        </div>
+                                        <pre style="white-space: pre-wrap; word-wrap: break-word; margin: 0; font-size: 0.85em;">@(latestTurn.Content.Length > 200 ? latestTurn.Content.Substring(0, 200) + "..." : latestTurn.Content)</pre>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+
                     @if (runDetails != null && runDetails.Logs.Count > 0)
                     {
                         <div class="mt-3">
@@ -261,6 +281,18 @@
             "error" => "danger",
             "warning" => "warning",
             "info" => "info",
+            _ => "secondary"
+        };
+    }
+
+    private string GetRoleBadgeColor(string role)
+    {
+        return role.ToLower() switch
+        {
+            "system" => "secondary",
+            "user" => "primary",
+            "assistant" => "success",
+            "tool" => "info",
             _ => "secondary"
         };
     }

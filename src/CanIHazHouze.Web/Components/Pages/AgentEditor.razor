@@ -50,9 +50,27 @@
                         </div>
                         <div class="mb-3">
                             <label for="prompt" class="form-label">System Prompt *</label>
-                            <textarea class="form-control" id="prompt" rows="8" @bind="agent.Prompt" 
-                                      placeholder="You are a helpful assistant that...&#10;&#10;Use {{variableName}} to reference input variables."></textarea>
-                            <div class="form-text">Use {{variableName}} syntax to reference input variables in your prompt.</div>
+                            <textarea class="form-control font-monospace" id="prompt" rows="12" @bind="agent.Prompt" 
+                                      style="font-size: 0.9em; line-height: 1.5;"
+                                      placeholder="You are a helpful assistant that...&#10;&#10;Use {{variableName}} to reference input variables.&#10;&#10;You can use markdown formatting:&#10;- **bold**&#10;- *italic*&#10;- Lists&#10;- Code blocks"></textarea>
+                            <div class="form-text">
+                                💡 <strong>Tips:</strong> Use {{variableName}} for input variables. Markdown formatting is supported for better readability.
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(agent.Prompt))
+                            {
+                                <div class="mt-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="TogglePromptPreview">
+                                        @(showPromptPreview ? "Hide Preview" : "Show Preview")
+                                    </button>
+                                </div>
+                                @if (showPromptPreview)
+                                {
+                                    <div class="mt-2 p-3 border rounded" style="background-color: #f8f9fa;">
+                                        <strong class="d-block mb-2">Preview:</strong>
+                                        <pre style="white-space: pre-wrap; word-wrap: break-word; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin: 0;">@agent.Prompt</pre>
+                                    </div>
+                                }
+                            }
                         </div>
                     </div>
                 </div>
@@ -221,6 +239,7 @@
     private bool saving = false;
     private string? error;
     private bool IsEditMode => !string.IsNullOrEmpty(AgentId);
+    private bool showPromptPreview = false;
 
     private bool toolLedgerApi = false;
     private bool toolCrmApi = false;
@@ -331,5 +350,10 @@
     private void GoBack()
     {
         NavigationManager.NavigateTo("/agents");
+    }
+
+    private void TogglePromptPreview()
+    {
+        showPromptPreview = !showPromptPreview;
     }
 }
