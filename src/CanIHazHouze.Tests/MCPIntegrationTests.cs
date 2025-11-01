@@ -173,6 +173,7 @@ public class MCPIntegrationTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("Category", "RequiresDatabase")]
     public async Task RESTAPIs_ShouldStillWork_WithMCPEnabled()
     {
         // Ensure MCP doesn't break existing REST functionality

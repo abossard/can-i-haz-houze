@@ -9,6 +9,7 @@ public class WebTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("Category", "RequiresDocker")]
     public async Task GetWebResourceRootReturnsOkStatusCode()
     {
         // Arrange
@@ -42,6 +43,7 @@ public class WebTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("Category", "RequiresDocker")]
     public async Task GetRecentlyUpdatedAccounts_ReturnsOkWithAccounts()
     {
         // Arrange
@@ -94,6 +96,7 @@ public class WebTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("Category", "RequiresDocker")]
     public async Task GetRecentTransactions_ReturnsOkWithTransactions()
     {
         // Arrange
@@ -145,6 +148,7 @@ public class WebTests
 
     [Fact]
     [Trait("Category", "Integration")]
+    [Trait("Category", "RequiresDocker")]
     public async Task RecentActivityEndpoints_IntegrationTest()
     {
         // Arrange
