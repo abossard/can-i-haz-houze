@@ -14,7 +14,7 @@ Welcome to the ultimate .NET Aspire-powered mortgage approval system! This baby 
 - **🌐 Web Frontend**: Pretty UI for humans to click buttons
 - **🤖 Azure OpenAI Integration**: Because humans are terrible at reading documents
 - **🔌 MCP Server Support**: Model Context Protocol for AI assistant integration
-- **🔌 MCP Server Support**: Model Context Protocol for AI assistant integration
+- **🎯 AI Agent Workbench**: Build and manage AI agents with Semantic Kernel
 
 ## 🛠️ Prerequisites (The Boring Stuff)
 # 🎬🏠🚀 **WATCH THIS FIRST!** 🤩📺✨
@@ -273,6 +273,34 @@ CanIHazHouze now supports **Model Context Protocol (MCP)** for seamless AI assis
 - **Cross-Service Integration**: Automated verification across all services
 
 📚 **Full MCP Documentation**: See [`MCP_IMPLEMENTATION.md`](src/MCP_IMPLEMENTATION.md) and [`MCP_USAGE_GUIDE.md`](src/MCP_USAGE_GUIDE.md)
+
+## 🤖 AI Agent Workbench
+
+**NEW!** Build sophisticated AI agents with Microsoft Semantic Kernel!
+
+The Agent Workbench provides a complete platform for creating, configuring, and managing AI agents powered by Azure OpenAI.
+
+### Key Features
+
+- **🎯 Agent Management**: Create and edit AI agents with custom prompts
+- **🔄 Multi-Turn Conversations**: Agents work iteratively towards defined goals
+- **🤖 Multiple Models**: Choose from GPT-4o, GPT-4o Mini, GPT-3.5 Turbo, GPT-4 Turbo
+- **🔧 Tool Integration**: Connect to Ledger, CRM, and Documents APIs
+- **⚙️ Advanced Config**: Fine-tune temperature, top P, tokens, and penalties
+- **🎛️ Background Processing**: Run agents asynchronously with pause/resume/cancel
+- **📊 Live Monitoring**: Real-time dashboard showing active agents
+- **💬 Conversation History**: Full tracking of turns and tool calls with JSON formatting
+
+### Getting Started
+
+1. Start the application: `dotnet run --project src/CanIHazHouze.AppHost`
+2. Navigate to **🤖 Agent Workbench** in the sidebar
+3. Create your first agent with a custom prompt
+4. Configure model, parameters, and tools
+5. Add input variables for dynamic prompts
+6. Execute and monitor your agent!
+
+📚 **Full Documentation**: See [`AGENT_WORKBENCH.md`](AGENT_WORKBENCH.md) for detailed guide with screenshots, examples, and best practices.
 
 ### API Documentation for Azure AI Foundry 🔌
 **NEW!** Build AI agents with our comprehensive API documentation page!
