@@ -17,11 +17,12 @@ Model Context Protocol (MCP) is an open standard developed by Anthropic that ena
 
 ### Current REST API Structure
 
-The CanIHazHouze application exposes three main services:
+The CanIHazHouze application exposes four main services:
 
 1. **LedgerService**: Financial account and transaction management
 2. **DocumentService**: Document upload, storage, and AI-powered analysis
 3. **MortgageApprover**: Mortgage request processing and approval workflows
+4. **CrmService**: Customer complaint management and support workflows
 
 ### MCP Integration Approach
 
@@ -29,7 +30,7 @@ The implementation will:
 - Maintain existing REST APIs unchanged
 - Add parallel MCP server endpoints
 - Use Aspire Service Defaults for configuration
-- Provide unified access to all three services through MCP
+- Provide unified access to all four services through MCP
 
 ## MCP Server Components
 
@@ -59,6 +60,16 @@ The implementation will:
 - `verify_mortgage_request`: Cross-service verification
 - `get_verification_status`: Detailed verification info
 
+#### CrmService Tools
+- `create_complaint`: Create new customer complaint
+- `get_complaints`: Retrieve all complaints for a customer
+- `get_recent_complaints`: Get recent complaints across all customers
+- `get_complaint`: Retrieve specific complaint by ID
+- `update_complaint_status`: Update complaint status
+- `add_complaint_comment`: Add support comment to complaint
+- `add_complaint_approval`: Add approval decision to complaint
+- `delete_complaint`: Delete complaint and associated data
+
 ### 2. Resources (Data AI Can Access)
 
 #### LedgerService Resources
@@ -75,6 +86,11 @@ The implementation will:
 - Mortgage application statuses
 - Approval criteria and requirements
 - Cross-service verification results
+
+#### CrmService Resources
+- Complaint summaries and metadata
+- Complaint status tracking
+- Customer support history
 
 ## Technical Implementation
 
