@@ -1,0 +1,347 @@
+@page "/agents/runs/{AgentId}"
+@using AgentModel = CanIHazHouze.Web.Agent
+@using AgentRunModel = CanIHazHouze.Web.AgentRun
+@using AgentRunLogModel = CanIHazHouze.Web.AgentRunLog
+@inject AgentApiClient AgentApi
+@inject NavigationManager NavigationManager
+
+<PageTitle>Agent Runs - CanIHazHouze</PageTitle>
+
+<div class="container mt-4">
+    <div class="mb-4">
+        <button class="btn btn-outline-secondary" @onclick="GoBack">
+            ← Back to Agents
+        </button>
+    </div>
+
+    <h1>📊 Execution History</h1>
+
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="alert alert-danger" role="alert">
+            <strong>Error:</strong> @error
+        </div>
+    }
+    else if (agent != null)
+    {
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">@agent.Name</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">@agent.Description</p>
+            </div>
+        </div>
+
+        @if (runs.Count == 0)
+        {
+            <div class="alert alert-info">
+                No execution history found for this agent.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Run ID</th>
+                            <th>Status</th>
+                            <th>Started</th>
+                            <th>Duration</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var run in runs)
+                        {
+                            <tr>
+                                <td><code>@run.Id.Substring(0, 8)</code></td>
+                                <td>
+                                    <span class="badge @GetStatusBadgeClass(run.Status)">
+                                        @run.Status.ToUpper()
+                                    </span>
+                                </td>
+                                <td>@run.StartedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td>
+                                    @if (run.CompletedAt.HasValue)
+                                    {
+                                        <span>@((run.CompletedAt.Value - run.StartedAt).TotalSeconds.ToString("F2"))s</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">-</span>
+                                    }
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ToggleRunDetails(run.Id)">
+                                        @(expandedRunId == run.Id ? "Hide" : "View") Details
+                                    </button>
+                                </td>
+                            </tr>
+                            @if (expandedRunId == run.Id)
+                            {
+                                <tr>
+                                    <td colspan="5">
+                                        <div class="card">
+                                            <div class="card-body">
+                                                @if (!string.IsNullOrEmpty(run.Result))
+                                                {
+                                                    <div class="mb-3">
+                                                        <h6>Result:</h6>
+                                                        <div class="alert alert-success" style="white-space: pre-wrap;">@run.Result</div>
+                                                    </div>
+                                                }
+                                                
+                                                @if (!string.IsNullOrEmpty(run.Error))
+                                                {
+                                                    <div class="mb-3">
+                                                        <h6>Error:</h6>
+                                                        <div class="alert alert-danger">@run.Error</div>
+                                                    </div>
+                                                }
+
+                                                @if (run.InputValues.Count > 0)
+                                                {
+                                                    <div class="mb-3">
+                                                        <h6>Input Values:</h6>
+                                                        <table class="table table-sm">
+                                                            <tbody>
+                                                                @foreach (var kvp in run.InputValues)
+                                                                {
+                                                                    <tr>
+                                                                        <th style="width: 200px;">@kvp.Key</th>
+                                                                        <td>@kvp.Value</td>
+                                                                    </tr>
+                                                                }
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                }
+
+                                                @if (run.ConversationHistory?.Count > 0)
+                                                {
+                                                    <div class="mb-3">
+                                                        <h6>Conversation History:</h6>
+                                                        <div class="conversation-history">
+                                                            @foreach (var turn in run.ConversationHistory)
+                                                            {
+                                                                <div class="conversation-turn @GetTurnClass(turn.Role) mb-3">
+                                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                        <span class="badge @GetRoleBadgeClass(turn.Role)">
+                                                                            @GetRoleIcon(turn.Role) @turn.Role.ToUpper()
+                                                                        </span>
+                                                                        <small class="text-muted">
+                                                                            Turn @turn.TurnNumber | @turn.Timestamp.ToString("HH:mm:ss")
+                                                                        </small>
+                                                                    </div>
+                                                                    <div class="turn-content">
+                                                                        <pre style="white-space: pre-wrap; word-wrap: break-word; background-color: #f8f9fa; padding: 10px; border-radius: 4px; margin: 0;">@turn.Content</pre>
+                                                                    </div>
+                                                                    @if (turn.ToolCalls?.Count > 0)
+                                                                    {
+                                                                        <div class="tool-calls mt-2">
+                                                                            <strong>🔧 Tool Calls:</strong>
+                                                                            @foreach (var toolCall in turn.ToolCalls)
+                                                                            {
+                                                                                <div class="card mt-2" style="background-color: #e7f3ff;">
+                                                                                    <div class="card-body py-2">
+                                                                                        <div class="d-flex justify-content-between align-items-center">
+                                                                                            <strong>@toolCall.Name</strong>
+                                                                                            <code class="text-muted">@toolCall.Id</code>
+                                                                                        </div>
+                                                                                        <div class="mt-2">
+                                                                                            <small class="text-muted">Arguments:</small>
+                                                                                            <pre class="mb-0 mt-1" style="background-color: #fff; padding: 5px; border-radius: 3px; font-size: 0.85em;">@FormatJson(toolCall.Arguments)</pre>
+                                                                                        </div>
+                                                                                        @if (!string.IsNullOrEmpty(toolCall.Result))
+                                                                                        {
+                                                                                            <div class="mt-2">
+                                                                                                <small class="text-muted">Result:</small>
+                                                                                                <pre class="mb-0 mt-1" style="background-color: #fff; padding: 5px; border-radius: 3px; font-size: 0.85em;">@FormatJson(toolCall.Result)</pre>
+                                                                                            </div>
+                                                                                        }
+                                                                                    </div>
+                                                                                </div>
+                                                                            }
+                                                                        </div>
+                                                                    }
+                                                                    @if (!string.IsNullOrEmpty(turn.ToolName))
+                                                                    {
+                                                                        <div class="mt-2">
+                                                                            <span class="badge bg-info">Tool Response: @turn.ToolName</span>
+                                                                        </div>
+                                                                    }
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                }
+
+                                                @if (run.Logs.Count > 0)
+                                                {
+                                                    <div class="mb-3">
+                                                        <h6>Execution Logs:</h6>
+                                                        <div class="list-group">
+                                                            @foreach (var log in run.Logs)
+                                                            {
+                                                                <div class="list-group-item list-group-item-sm">
+                                                                    <div class="d-flex w-100 justify-content-between">
+                                                                        <span class="badge @GetLogLevelBadgeClass(log.Level)">@log.Level.ToUpper()</span>
+                                                                        <small class="text-muted">@log.Timestamp.ToString("HH:mm:ss.fff")</small>
+                                                                    </div>
+                                                                    <p class="mb-0 mt-1">@log.Message</p>
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string? AgentId { get; set; }
+
+    private AgentModel? agent;
+    private List<AgentRunModel> runs = new();
+    private bool loading = true;
+    private string? error;
+    private string? expandedRunId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            loading = true;
+            error = null;
+            
+            agent = await AgentApi.GetAgentAsync(AgentId!);
+            if (agent == null)
+            {
+                error = "Agent not found";
+                return;
+            }
+
+            runs = await AgentApi.GetAgentRunsAsync(AgentId!);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void ToggleRunDetails(string runId)
+    {
+        expandedRunId = expandedRunId == runId ? null : runId;
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status.ToLower() switch
+        {
+            "completed" => "bg-success",
+            "failed" => "bg-danger",
+            "running" => "bg-primary",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetLogLevelBadgeClass(string level)
+    {
+        return level.ToLower() switch
+        {
+            "error" => "bg-danger",
+            "warning" => "bg-warning",
+            "info" => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/agents");
+    }
+
+    private string GetTurnClass(string role)
+    {
+        return role.ToLower() switch
+        {
+            "system" => "border-start border-secondary border-3 ps-3",
+            "user" => "border-start border-primary border-3 ps-3",
+            "assistant" => "border-start border-success border-3 ps-3",
+            "tool" => "border-start border-info border-3 ps-3",
+            _ => "border-start border-secondary border-3 ps-3"
+        };
+    }
+
+    private string GetRoleBadgeClass(string role)
+    {
+        return role.ToLower() switch
+        {
+            "system" => "bg-secondary",
+            "user" => "bg-primary",
+            "assistant" => "bg-success",
+            "tool" => "bg-info",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetRoleIcon(string role)
+    {
+        return role.ToLower() switch
+        {
+            "system" => "⚙️",
+            "user" => "👤",
+            "assistant" => "🤖",
+            "tool" => "🔧",
+            _ => "💬"
+        };
+    }
+
+    private string FormatJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return string.Empty;
+
+        try
+        {
+            var parsed = System.Text.Json.JsonDocument.Parse(json);
+            return System.Text.Json.JsonSerializer.Serialize(parsed, new System.Text.Json.JsonSerializerOptions 
+            { 
+                WriteIndented = true 
+            });
+        }
+        catch
+        {
+            return json;
+        }
+    }
+}

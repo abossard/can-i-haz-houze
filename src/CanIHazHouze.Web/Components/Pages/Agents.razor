@@ -1,0 +1,140 @@
+@page "/agents"
+@using AgentModel = CanIHazHouze.Web.Agent
+@inject AgentApiClient AgentApi
+@inject NavigationManager NavigationManager
+
+<PageTitle>AI Agents - CanIHazHouze</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>🤖 AI Agents</h1>
+        <button class="btn btn-primary" @onclick="CreateNewAgent">
+            <span class="me-2">➕</span> Create Agent
+        </button>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Loading agents...</p>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="alert alert-danger" role="alert">
+            <strong>Error:</strong> @error
+        </div>
+    }
+    else if (agents.Count == 0)
+    {
+        <div class="alert alert-info" role="alert">
+            <h4 class="alert-heading">No agents yet!</h4>
+            <p>Get started by creating your first AI agent. Click the "Create Agent" button above.</p>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            @foreach (var agent in agents)
+            {
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 shadow-sm hover-shadow">
+                        <div class="card-body">
+                            <h5 class="card-title">@agent.Name</h5>
+                            <p class="card-text text-muted">@agent.Description</p>
+                            <div class="mb-2">
+                                <small class="text-muted">
+                                    <strong>Model:</strong> @agent.Config.Model
+                                </small>
+                            </div>
+                            <div class="mb-2">
+                                <small class="text-muted">
+                                    <strong>Tools:</strong> @(agent.Tools.Count > 0 ? string.Join(", ", agent.Tools) : "None")
+                                </small>
+                            </div>
+                            <div class="mb-3">
+                                <small class="text-muted">
+                                    <strong>Input Variables:</strong> @agent.InputVariables.Count
+                                </small>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <div class="btn-group w-100" role="group">
+                                <button class="btn btn-outline-primary btn-sm" @onclick="() => EditAgent(agent.Id)">
+                                    ✏️ Edit
+                                </button>
+                                <button class="btn btn-outline-success btn-sm" @onclick="() => RunAgent(agent.Id)">
+                                    ▶️ Run
+                                </button>
+                                <button class="btn btn-outline-info btn-sm" @onclick="() => ViewRuns(agent.Id)">
+                                    📊 History
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .hover-shadow {
+        transition: box-shadow 0.3s ease;
+    }
+    .hover-shadow:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+</style>
+
+@code {
+    private List<AgentModel> agents = new();
+    private bool loading = true;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAgents();
+    }
+
+    private async Task LoadAgents()
+    {
+        try
+        {
+            loading = true;
+            error = null;
+            agents = await AgentApi.GetAgentsAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+
+    private void CreateNewAgent()
+    {
+        NavigationManager.NavigateTo("/agents/new");
+    }
+
+    private void EditAgent(string agentId)
+    {
+        NavigationManager.NavigateTo($"/agents/edit/{agentId}");
+    }
+
+    private void RunAgent(string agentId)
+    {
+        NavigationManager.NavigateTo($"/agents/run/{agentId}");
+    }
+
+    private void ViewRuns(string agentId)
+    {
+        NavigationManager.NavigateTo($"/agents/runs/{agentId}");
+    }
+}

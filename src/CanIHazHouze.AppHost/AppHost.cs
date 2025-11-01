@@ -28,13 +28,32 @@ var openai = builder.ExecutionContext.IsPublishMode
 // Configure OpenAI resource for production
 if (builder.ExecutionContext.IsPublishMode)
 {
-    // Add model deployments for document processing
+    // Add model deployments for document processing and agent execution
     var openaiResource = (IResourceBuilder<AzureOpenAIResource>)openai;
     
+    // GPT-4o mini - Fast and efficient for most tasks
     openaiResource.AddDeployment(
         name: "gpt-4o-mini",
         modelName: "gpt-4o-mini", 
-        modelVersion: "2024-07-18"); // GPT-4o mini for metadata extraction
+        modelVersion: "2024-07-18");
+    
+    // GPT-4o - More capable for complex reasoning
+    openaiResource.AddDeployment(
+        name: "gpt-4o",
+        modelName: "gpt-4o", 
+        modelVersion: "2024-08-06");
+    
+    // GPT-3.5 Turbo - Cost-effective for simple tasks
+    openaiResource.AddDeployment(
+        name: "gpt-35-turbo",
+        modelName: "gpt-35-turbo", 
+        modelVersion: "0125");
+    
+    // GPT-4 Turbo - Advanced reasoning capabilities
+    openaiResource.AddDeployment(
+        name: "gpt-4-turbo",
+        modelName: "gpt-4-turbo", 
+        modelVersion: "2024-04-09");
 }
 
 // Add Azure Storage with Azurite emulator for local development
@@ -57,6 +76,8 @@ var documentsContainer = houzeDatabase.AddContainer("documents", "/owner");
 var ledgersContainer = houzeDatabase.AddContainer("ledgers", "/owner"); 
 var mortgagesContainer = houzeDatabase.AddContainer("mortgages", "/owner");
 var crmContainer = houzeDatabase.AddContainer("crm", "/customerName");
+// Single container for all agent-related entities with agentId as partition key
+var agentsContainer = houzeDatabase.AddContainer("agents", "/agentId");
 
 var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>("documentservice")
     .WithExternalHttpEndpoints()
@@ -85,6 +106,12 @@ var crmService = builder.AddProject<Projects.CanIHazHouze_CrmService>("crmservic
     .WithReference(cosmos) // Reference the cosmos resource
     .WithHttpHealthCheck("/health");
 
+var agentService = builder.AddProject<Projects.CanIHazHouze_AgentService>("agentservice")
+    .WithExternalHttpEndpoints()
+    .WithReference(cosmos) // Reference the cosmos resource
+    .WithReference(openai) // Add OpenAI reference for agent execution
+    .WithHttpHealthCheck("/health");
+
 builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
@@ -92,9 +119,11 @@ builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")
     .WithReference(ledgerService)
     .WithReference(mortgageService)
     .WithReference(crmService)
+    .WithReference(agentService)
     .WaitFor(documentService)
     .WaitFor(ledgerService)
     .WaitFor(mortgageService)
-    .WaitFor(crmService);
+    .WaitFor(crmService)
+    .WaitFor(agentService);
 
 builder.Build().Run();

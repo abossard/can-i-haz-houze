@@ -8,6 +8,8 @@
     <IsTestProject>true</IsTestProject>
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
     <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <!-- Suppress warnings about transitive dependency version resolution -->
+    <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Testing" Version="9.3.1" />
@@ -21,6 +23,7 @@
     <ProjectReference Include="..\CanIHazHouze.AppHost\CanIHazHouze.AppHost.csproj" />
     <ProjectReference Include="..\CanIHazHouze.DocumentService\CanIHazHouze.DocumentService.csproj" />
     <ProjectReference Include="..\CanIHazHouze.LedgerService\CanIHazHouze.LedgerService.csproj" />
+    <ProjectReference Include="..\CanIHazHouze.AgentService\CanIHazHouze.AgentService.csproj" />
   </ItemGroup>
 
   <ItemGroup>
