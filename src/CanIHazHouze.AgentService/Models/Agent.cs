@@ -35,6 +35,8 @@ public class Agent
 
 public class AgentConfig
 {
+    // Deployment name (must match one of the configured deployments in AppHost)
+    // Available options: gpt-4o-mini, gpt-4o, gpt-35-turbo, gpt-4-turbo
     public string Model { get; set; } = "gpt-4o-mini";
     
     public double Temperature { get; set; } = 0.7;
@@ -52,6 +54,44 @@ public class AgentConfig
     public bool EnableMultiTurn { get; set; } = true;
     
     public string? GoalCompletionPrompt { get; set; }
+}
+
+public static class AvailableModels
+{
+    public static readonly List<ModelDeployment> All = new()
+    {
+        new ModelDeployment 
+        { 
+            DeploymentName = "gpt-4o-mini", 
+            DisplayName = "GPT-4o Mini", 
+            Description = "Fast and efficient for most tasks" 
+        },
+        new ModelDeployment 
+        { 
+            DeploymentName = "gpt-4o", 
+            DisplayName = "GPT-4o", 
+            Description = "More capable for complex reasoning" 
+        },
+        new ModelDeployment 
+        { 
+            DeploymentName = "gpt-35-turbo", 
+            DisplayName = "GPT-3.5 Turbo", 
+            Description = "Cost-effective for simple tasks" 
+        },
+        new ModelDeployment 
+        { 
+            DeploymentName = "gpt-4-turbo", 
+            DisplayName = "GPT-4 Turbo", 
+            Description = "Advanced reasoning capabilities" 
+        }
+    };
+}
+
+public class ModelDeployment
+{
+    public string DeploymentName { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
 }
 
 public class AgentInputVariable

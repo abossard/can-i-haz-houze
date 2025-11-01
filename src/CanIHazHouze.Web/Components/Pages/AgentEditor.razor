@@ -82,13 +82,21 @@
                     <div class="card-body">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="model" class="form-label">Model</label>
+                                <label for="model" class="form-label">Model Deployment</label>
                                 <select class="form-select" id="model" @bind="agent.Config.Model">
-                                    <option value="gpt-4o-mini">GPT-4o Mini</option>
-                                    <option value="gpt-4o">GPT-4o</option>
-                                    <option value="gpt-4">GPT-4</option>
-                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                    @if (availableModels.Any())
+                                    {
+                                        @foreach (var model in availableModels)
+                                        {
+                                            <option value="@model.DeploymentName">@model.DisplayName - @model.Description</option>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <option value="gpt-4o-mini">GPT-4o Mini (Loading...)</option>
+                                    }
                                 </select>
+                                <div class="form-text">Select which AI model to use for this agent</div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="maxTokens" class="form-label">Max Tokens</label>
@@ -244,12 +252,29 @@
     private bool toolLedgerApi = false;
     private bool toolCrmApi = false;
     private bool toolDocumentsApi = false;
+    
+    private List<ModelDeployment> availableModels = new();
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadAvailableModels();
+        
         if (IsEditMode && !string.IsNullOrEmpty(AgentId))
         {
             await LoadAgent();
+        }
+    }
+    
+    private async Task LoadAvailableModels()
+    {
+        try
+        {
+            availableModels = await AgentApi.GetAvailableModelsAsync();
+        }
+        catch (Exception ex)
+        {
+            // If we can't load models, use defaults
+            Console.WriteLine($"Error loading models: {ex.Message}");
         }
     }
 

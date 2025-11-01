@@ -1,5 +1,7 @@
+using CanIHazHouze.AgentService.Configuration;
 using CanIHazHouze.AgentService.Models;
 using CanIHazHouze.AgentService.Security;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
@@ -9,17 +11,27 @@ namespace CanIHazHouze.AgentService.Services;
 public class MultiTurnAgentExecutor
 {
     private readonly IAgentStorageService _storageService;
-    private readonly Kernel _kernel;
+    private readonly OpenAIConfiguration _openAIConfig;
     private readonly ILogger<MultiTurnAgentExecutor> _logger;
 
     public MultiTurnAgentExecutor(
         IAgentStorageService storageService,
-        Kernel kernel,
+        IOptions<OpenAIConfiguration> openAIConfig,
         ILogger<MultiTurnAgentExecutor> logger)
     {
         _storageService = storageService;
-        _kernel = kernel;
+        _openAIConfig = openAIConfig.Value;
         _logger = logger;
+    }
+    
+    private Kernel CreateKernelForModel(string deploymentName)
+    {
+        var builder = Kernel.CreateBuilder();
+        builder.AddAzureOpenAIChatCompletion(
+            deploymentName: deploymentName,
+            endpoint: _openAIConfig.Endpoint,
+            apiKey: _openAIConfig.ApiKey);
+        return builder.Build();
     }
 
     public async Task<AgentRun> ExecuteMultiTurnAsync(
@@ -72,7 +84,10 @@ public class MultiTurnAgentExecutor
             run.MaxTurns = agent.Config.MaxTurns;
             await _storageService.UpdateRunAsync(run);
 
-            await AddLogAsync(run, "info", "Starting multi-turn conversation");
+            await AddLogAsync(run, "info", $"Starting multi-turn conversation with model: {agent.Config.Model}");
+
+            // Create kernel with the agent's specified model deployment
+            var kernel = CreateKernelForModel(agent.Config.Model);
 
             // Configure execution settings
             var executionSettings = new OpenAIPromptExecutionSettings
@@ -84,7 +99,7 @@ public class MultiTurnAgentExecutor
                 PresencePenalty = agent.Config.PresencePenalty
             };
 
-            var chatCompletion = _kernel.GetRequiredService<IChatCompletionService>();
+            var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
             var chatHistory = new ChatHistory();
             
             // Add system message
@@ -119,7 +134,7 @@ public class MultiTurnAgentExecutor
                     var response = await chatCompletion.GetChatMessageContentAsync(
                         chatHistory,
                         executionSettings,
-                        _kernel,
+                        kernel,
                         cancellationToken);
 
                     var assistantMessage = response.Content ?? string.Empty;

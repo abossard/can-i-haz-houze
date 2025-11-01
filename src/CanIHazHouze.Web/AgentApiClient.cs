@@ -4,6 +4,12 @@ namespace CanIHazHouze.Web;
 
 public class AgentApiClient(HttpClient httpClient)
 {
+    public async Task<List<ModelDeployment>> GetAvailableModelsAsync(CancellationToken cancellationToken = default)
+    {
+        return await httpClient.GetFromJsonAsync<List<ModelDeployment>>("/models", cancellationToken)
+            ?? new List<ModelDeployment>();
+    }
+    
     public async Task<List<Agent>> GetAgentsAsync(CancellationToken cancellationToken = default)
     {
         return await httpClient.GetFromJsonAsync<List<Agent>>("/agents", cancellationToken)
@@ -293,4 +299,16 @@ public class AgentRunLog
 
     [JsonPropertyName("data")]
     public Dictionary<string, object>? Data { get; set; }
+}
+
+public class ModelDeployment
+{
+    [JsonPropertyName("deploymentName")]
+    public string DeploymentName { get; set; } = string.Empty;
+    
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } = string.Empty;
+    
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
 }

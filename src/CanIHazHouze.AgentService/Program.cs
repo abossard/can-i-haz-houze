@@ -1,4 +1,5 @@
 using CanIHazHouze.AgentService.BackgroundServices;
+using CanIHazHouze.AgentService.Configuration;
 using CanIHazHouze.AgentService.Models;
 using CanIHazHouze.AgentService.Security;
 using CanIHazHouze.AgentService.Services;
@@ -46,14 +47,12 @@ if (!string.IsNullOrEmpty(openAiConnectionString))
     
     if (!string.IsNullOrEmpty(endpoint) && !string.IsNullOrEmpty(key))
     {
-        // Get deployment name from configuration, default to gpt-4o-mini
-        var deploymentName = builder.Configuration["OpenAI:DeploymentName"] ?? "gpt-4o-mini";
-        
-        var kernelBuilder = builder.Services.AddKernel();
-        kernelBuilder.AddAzureOpenAIChatCompletion(
-            deploymentName: deploymentName,
-            endpoint: endpoint,
-            apiKey: key);
+        // Store OpenAI configuration for dynamic kernel creation
+        builder.Services.Configure<OpenAIConfiguration>(options =>
+        {
+            options.Endpoint = endpoint;
+            options.ApiKey = key;
+        });
     }
 }
 
@@ -88,6 +87,18 @@ app.MapGet("/health", () => Results.Ok("Healthy"))
         return operation;
     })
     .Produces<string>(StatusCodes.Status200OK);
+
+// Get available models endpoint
+app.MapGet("/models", () => Results.Ok(AvailableModels.All))
+    .WithName("GetAvailableModels")
+    .WithSummary("Get available AI models")
+    .WithDescription("Retrieves the list of available AI model deployments that can be used for agent execution.")
+    .WithOpenApi(operation =>
+    {
+        operation.Tags = [new() { Name = "Configuration" }];
+        return operation;
+    })
+    .Produces<List<ModelDeployment>>(StatusCodes.Status200OK);
 
 // Agent CRUD endpoints
 app.MapGet("/agents", async (IAgentStorageService storage) =>

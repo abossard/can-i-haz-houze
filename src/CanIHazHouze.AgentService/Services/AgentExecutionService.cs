@@ -1,5 +1,7 @@
+using CanIHazHouze.AgentService.Configuration;
 using CanIHazHouze.AgentService.Models;
 using CanIHazHouze.AgentService.Security;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
@@ -9,17 +11,27 @@ namespace CanIHazHouze.AgentService.Services;
 public class AgentExecutionService : IAgentExecutionService
 {
     private readonly IAgentStorageService _storageService;
-    private readonly Kernel _kernel;
+    private readonly OpenAIConfiguration _openAIConfig;
     private readonly ILogger<AgentExecutionService> _logger;
 
     public AgentExecutionService(
         IAgentStorageService storageService,
-        Kernel kernel,
+        IOptions<OpenAIConfiguration> openAIConfig,
         ILogger<AgentExecutionService> logger)
     {
         _storageService = storageService;
-        _kernel = kernel;
+        _openAIConfig = openAIConfig.Value;
         _logger = logger;
+    }
+    
+    private Kernel CreateKernelForModel(string deploymentName)
+    {
+        var builder = Kernel.CreateBuilder();
+        builder.AddAzureOpenAIChatCompletion(
+            deploymentName: deploymentName,
+            endpoint: _openAIConfig.Endpoint,
+            apiKey: _openAIConfig.ApiKey);
+        return builder.Build();
     }
 
     public async Task<AgentRun> ExecuteAgentAsync(string agentId, Dictionary<string, string> inputValues)
@@ -90,27 +102,31 @@ public class AgentExecutionService : IAgentExecutionService
                 Message = "Execution settings configured",
                 Data = new Dictionary<string, object>
                 {
+                    { "model", agent.Config.Model },
                     { "temperature", agent.Config.Temperature },
                     { "topP", agent.Config.TopP },
                     { "maxTokens", agent.Config.MaxTokens }
                 }
             });
 
+            // Create kernel with the agent's specified model deployment
+            var kernel = CreateKernelForModel(agent.Config.Model);
+            
             // Execute the agent
-            var chatCompletion = _kernel.GetRequiredService<IChatCompletionService>();
+            var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
             var chatHistory = new ChatHistory();
             chatHistory.AddUserMessage(prompt);
 
             run.Logs.Add(new AgentRunLog
             {
                 Level = "info",
-                Message = "Sending request to AI model"
+                Message = $"Sending request to AI model: {agent.Config.Model}"
             });
 
             var result = await chatCompletion.GetChatMessageContentAsync(
                 chatHistory,
                 executionSettings,
-                _kernel);
+                kernel);
 
             run.Result = result.Content;
             run.Status = "completed";

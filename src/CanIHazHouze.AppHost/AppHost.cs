@@ -28,13 +28,32 @@ var openai = builder.ExecutionContext.IsPublishMode
 // Configure OpenAI resource for production
 if (builder.ExecutionContext.IsPublishMode)
 {
-    // Add model deployments for document processing
+    // Add model deployments for document processing and agent execution
     var openaiResource = (IResourceBuilder<AzureOpenAIResource>)openai;
     
+    // GPT-4o mini - Fast and efficient for most tasks
     openaiResource.AddDeployment(
         name: "gpt-4o-mini",
         modelName: "gpt-4o-mini", 
-        modelVersion: "2024-07-18"); // GPT-4o mini for metadata extraction
+        modelVersion: "2024-07-18");
+    
+    // GPT-4o - More capable for complex reasoning
+    openaiResource.AddDeployment(
+        name: "gpt-4o",
+        modelName: "gpt-4o", 
+        modelVersion: "2024-08-06");
+    
+    // GPT-3.5 Turbo - Cost-effective for simple tasks
+    openaiResource.AddDeployment(
+        name: "gpt-35-turbo",
+        modelName: "gpt-35-turbo", 
+        modelVersion: "0125");
+    
+    // GPT-4 Turbo - Advanced reasoning capabilities
+    openaiResource.AddDeployment(
+        name: "gpt-4-turbo",
+        modelName: "gpt-4-turbo", 
+        modelVersion: "2024-04-09");
 }
 
 // Add Azure Storage with Azurite emulator for local development
