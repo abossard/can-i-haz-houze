@@ -1,4 +1,5 @@
 using CanIHazHouze.AgentService.Models;
+using CanIHazHouze.AgentService.Security;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
@@ -122,7 +123,7 @@ public class AgentExecutionService : IAgentExecutionService
                 Message = "Agent execution completed successfully"
             });
 
-            _logger.LogInformation("Agent {AgentId} executed successfully for run {RunId}", agentId, run.Id);
+            _logger.LogInformation("Agent {AgentId} executed successfully for run {RunId}", LogSanitizer.Sanitize(agentId), LogSanitizer.Sanitize(run.Id));
         }
         catch (Exception ex)
         {
@@ -136,7 +137,7 @@ public class AgentExecutionService : IAgentExecutionService
                 Message = $"Agent execution failed: {ex.Message}"
             });
 
-            _logger.LogError(ex, "Agent {AgentId} execution failed for run {RunId}", agentId, run.Id);
+            _logger.LogError(ex, "Agent {AgentId} execution failed for run {RunId}", LogSanitizer.Sanitize(agentId), LogSanitizer.Sanitize(run.Id));
         }
 
         await _storageService.UpdateRunAsync(run);

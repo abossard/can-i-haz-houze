@@ -1,4 +1,5 @@
 using CanIHazHouze.AgentService.Models;
+using CanIHazHouze.AgentService.Security;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
 
@@ -55,7 +56,7 @@ public class AgentStorageService : IAgentStorageService
         agent.CreatedAt = DateTime.UtcNow;
         agent.UpdatedAt = DateTime.UtcNow;
         var response = await container.CreateItemAsync(agent, new PartitionKey(agent.Owner));
-        _logger.LogInformation("Created agent {AgentId} for owner {Owner}", agent.Id, agent.Owner);
+        _logger.LogInformation("Created agent {AgentId} for owner {Owner}", LogSanitizer.Sanitize(agent.Id), LogSanitizer.Sanitize(agent.Owner));
         return response.Resource;
     }
 
@@ -96,7 +97,7 @@ public class AgentStorageService : IAgentStorageService
         var container = await GetAgentContainerAsync();
         agent.UpdatedAt = DateTime.UtcNow;
         var response = await container.ReplaceItemAsync(agent, agent.Id, new PartitionKey(agent.Owner));
-        _logger.LogInformation("Updated agent {AgentId} for owner {Owner}", agent.Id, agent.Owner);
+        _logger.LogInformation("Updated agent {AgentId} for owner {Owner}", LogSanitizer.Sanitize(agent.Id), LogSanitizer.Sanitize(agent.Owner));
         return response.Resource;
     }
 
@@ -104,7 +105,7 @@ public class AgentStorageService : IAgentStorageService
     {
         var container = await GetAgentContainerAsync();
         await container.DeleteItemAsync<Agent>(id, new PartitionKey(owner));
-        _logger.LogInformation("Deleted agent {AgentId} for owner {Owner}", id, owner);
+        _logger.LogInformation("Deleted agent {AgentId} for owner {Owner}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(owner));
     }
 
     public async Task<AgentRun> CreateRunAsync(AgentRun run)
@@ -112,7 +113,7 @@ public class AgentStorageService : IAgentStorageService
         var container = await GetRunContainerAsync();
         run.StartedAt = DateTime.UtcNow;
         var response = await container.CreateItemAsync(run, new PartitionKey(run.Owner));
-        _logger.LogInformation("Created run {RunId} for agent {AgentId}", run.Id, run.AgentId);
+        _logger.LogInformation("Created run {RunId} for agent {AgentId}", LogSanitizer.Sanitize(run.Id), LogSanitizer.Sanitize(run.AgentId));
         return response.Resource;
     }
 
@@ -153,7 +154,7 @@ public class AgentStorageService : IAgentStorageService
     {
         var container = await GetRunContainerAsync();
         var response = await container.ReplaceItemAsync(run, run.Id, new PartitionKey(run.Owner));
-        _logger.LogInformation("Updated run {RunId} for agent {AgentId}", run.Id, run.AgentId);
+        _logger.LogInformation("Updated run {RunId} for agent {AgentId}", LogSanitizer.Sanitize(run.Id), LogSanitizer.Sanitize(run.AgentId));
         return response.Resource;
     }
 }

@@ -1,4 +1,5 @@
 using CanIHazHouze.AgentService.Models;
+using CanIHazHouze.AgentService.Security;
 using CanIHazHouze.AgentService.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.SemanticKernel;
@@ -92,7 +93,7 @@ app.MapGet("/agents/{owner}", async (string owner, IAgentStorageService storage)
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error retrieving agents for owner {Owner}", owner);
+        app.Logger.LogError(ex, "Error retrieving agents for owner {Owner}", LogSanitizer.Sanitize(owner));
         return Results.Problem("An error occurred while retrieving agents");
     }
 })
@@ -119,7 +120,7 @@ app.MapGet("/agents/{owner}/{id}", async (string owner, string id, IAgentStorage
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error retrieving agent {Id} for owner {Owner}", id, owner);
+        app.Logger.LogError(ex, "Error retrieving agent {Id} for owner {Owner}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(owner));
         return Results.Problem("An error occurred while retrieving the agent");
     }
 })
@@ -143,7 +144,7 @@ app.MapPost("/agents", async ([FromBody] Agent agent, IAgentStorageService stora
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error creating agent for owner {Owner}", agent.Owner);
+        app.Logger.LogError(ex, "Error creating agent for owner {Owner}", LogSanitizer.Sanitize(agent.Owner));
         return Results.Problem("An error occurred while creating the agent");
     }
 })
@@ -168,7 +169,7 @@ app.MapPut("/agents/{owner}/{id}", async (string owner, string id, [FromBody] Ag
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error updating agent {Id} for owner {Owner}", id, owner);
+        app.Logger.LogError(ex, "Error updating agent {Id} for owner {Owner}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(owner));
         return Results.Problem("An error occurred while updating the agent");
     }
 })
@@ -191,7 +192,7 @@ app.MapDelete("/agents/{owner}/{id}", async (string owner, string id, IAgentStor
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error deleting agent {Id} for owner {Owner}", id, owner);
+        app.Logger.LogError(ex, "Error deleting agent {Id} for owner {Owner}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(owner));
         return Results.Problem("An error occurred while deleting the agent");
     }
 })
@@ -219,7 +220,7 @@ app.MapPost("/agents/{owner}/{id}/run", async (
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error executing agent {Id} for owner {Owner}", id, owner);
+        app.Logger.LogError(ex, "Error executing agent {Id} for owner {Owner}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(owner));
         return Results.Problem($"An error occurred while executing the agent: {ex.Message}");
     }
 })
@@ -246,7 +247,7 @@ app.MapGet("/runs/{owner}/{id}", async (string owner, string id, IAgentStorageSe
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error retrieving run {Id} for owner {Owner}", id, owner);
+        app.Logger.LogError(ex, "Error retrieving run {Id} for owner {Owner}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(owner));
         return Results.Problem("An error occurred while retrieving the run");
     }
 })
@@ -270,7 +271,7 @@ app.MapGet("/agents/{owner}/{agentId}/runs", async (string owner, string agentId
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "Error retrieving runs for agent {AgentId} and owner {Owner}", agentId, owner);
+        app.Logger.LogError(ex, "Error retrieving runs for agent {AgentId} and owner {Owner}", LogSanitizer.Sanitize(agentId), LogSanitizer.Sanitize(owner));
         return Results.Problem("An error occurred while retrieving runs");
     }
 })
