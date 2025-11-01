@@ -10,8 +10,10 @@ Welcome to the ultimate .NET Aspire-powered mortgage approval system! This baby 
 - **📄 Document Service**: Where your PDFs go to get analyzed by AI 
 - **📊 Ledger Service**: Tracks your financial shenanigans
 - **🏦 Mortgage Approver**: The final boss that says "yes" or "no"
+- **🎫 CRM Service**: Manage customer complaints and support workflows
 - **🌐 Web Frontend**: Pretty UI for humans to click buttons
 - **🤖 Azure OpenAI Integration**: Because humans are terrible at reading documents
+- **🔌 MCP Server Support**: Model Context Protocol for AI assistant integration
 - **🔌 MCP Server Support**: Model Context Protocol for AI assistant integration
 
 ## 🛠️ Prerequisites (The Boring Stuff)
@@ -121,11 +123,12 @@ azd auth login
 azd up
 ```
 
-### 🤖 Automatic OpenAI Setup (NEW!)
+### 🤖 Automatic Post-Deployment Setup (NEW!)
 
-After running `azd up`, the system **automatically** configures your OpenAI connection for local development! 
+After running `azd up`, the system **automatically** performs post-deployment configuration! 
 
 The post-deploy hook will:
+- 🌐 Enable public network access on Storage Account and Cosmos DB (for development/testing)
 - 🔍 Find your deployed Azure OpenAI resource
 - 🔑 Retrieve the endpoint and API key
 - 🔐 Configure your local user secrets automatically
@@ -207,6 +210,13 @@ dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=<endpoint>;ApiKey=<
 
 ### MCP (Model Context Protocol) Support 🔌
 - **AI Assistant Integration**: Connect Claude Desktop and other AI tools directly
+- **20+ MCP Tools**: Complete API access via standardized protocol across all services
+- **Real-time Communication**: WebSocket-based protocol with JSON-RPC 2.0
+- **Parallel REST APIs**: MCP and REST APIs work simultaneously
+- **Built-in Documentation**: `/mcp/capabilities` endpoint for tool discovery
+
+### MCP (Model Context Protocol) Support 🔌
+- **AI Assistant Integration**: Connect Claude Desktop and other AI tools directly
 - **16+ MCP Tools**: Complete API access via standardized protocol
 - **Real-time Communication**: WebSocket-based protocol with JSON-RPC 2.0
 - **Parallel REST APIs**: MCP and REST APIs work simultaneously
@@ -228,6 +238,12 @@ dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=<endpoint>;ApiKey=<
 - Automated approval workflow
 - Document verification checks
 - AI-assisted decision making
+
+### CRM Service 🎫
+- Customer complaint management
+- Comment threads for support conversations
+- Approval workflows for complaint resolution
+- Recent complaints tracking across all customers
 
 ## 🤖 AI Assistant Integration
 
@@ -253,9 +269,60 @@ CanIHazHouze now supports **Model Context Protocol (MCP)** for seamless AI assis
 - **Financial Management**: Check balances, process transactions, view history
 - **Document Processing**: Upload, analyze, and verify mortgage documents  
 - **Mortgage Applications**: Create, update, and track application status
+- **CRM Management**: Create, update, and manage customer complaints
 - **Cross-Service Integration**: Automated verification across all services
 
 📚 **Full MCP Documentation**: See [`MCP_IMPLEMENTATION.md`](src/MCP_IMPLEMENTATION.md) and [`MCP_USAGE_GUIDE.md`](src/MCP_USAGE_GUIDE.md)
+
+### API Documentation for Azure AI Foundry 🔌
+**NEW!** Build AI agents with our comprehensive API documentation page!
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              🔌 API Documentation Page                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  🏦 Mortgage Service    📋 OpenAPI Spec + System Prompt    │
+│  📄 Document Service    📋 OpenAPI Spec + System Prompt    │
+│  💰 Ledger Service      📋 OpenAPI Spec + System Prompt    │
+│  🎫 CRM Service         📋 OpenAPI Spec + System Prompt    │
+│                                                             │
+│  ✨ One-Click Copy to Clipboard                            │
+│  ✨ Ready for Azure AI Foundry                             │
+│  ✨ Complete System Prompts Included                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- **Dynamic URL Resolution**: OpenAPI URLs automatically resolve to actual FQDNs in production
+- **Four Complete Agents**: Mortgage, Document, Ledger, and CRM agents with detailed system prompts
+- **Copy-to-Clipboard**: Easy copying of URLs and prompts for Azure AI Foundry
+- **Tutorial Ready**: Perfect for learning Azure AI Foundry agent creation
+
+**How to Use:**
+1. Navigate to `/api-docs` or click "🔌 API Documentation" in the sidebar
+2. Copy the OpenAPI specification URL for your desired service
+3. Copy the corresponding system prompt
+4. Create a new agent in Azure AI Foundry with these configs
+5. Your AI agent is ready to interact with CanIHazHouze services!
+
+**Example - Creating a Mortgage Agent:**
+```
+1. Copy: https://mortgageapprover.../openapi/v1.json
+2. Copy: Complete Mortgage Agent system prompt (included on page)
+3. In Azure AI Foundry:
+   - Create new agent
+   - Paste OpenAPI spec URL
+   - Paste system prompt
+   - Configure and deploy!
+```
+
+Each agent includes:
+- **Role & Responsibilities**: Clear definition of agent purpose
+- **Core Directives**: Behavioral guidelines (e.g., "NEVER FABRICATE DATA")
+- **API Features**: Complete documentation of available tools
+- **Workflows**: Example interactions and best practices
+- **Communication Style**: Professional tone guidelines
 
 ## 🔧 Development Tips
 

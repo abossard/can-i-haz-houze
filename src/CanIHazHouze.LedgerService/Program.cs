@@ -372,6 +372,187 @@ app.MapPost("/accounts/{owner}/reset", async (string owner, ILedgerService ledge
 .Produces<AccountInfo>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status500InternalServerError);
 
+app.MapGet("/accounts/recent", async (ILedgerService ledgerService, int take = 10) =>
+{
+    try
+    {
+        var accounts = await ledgerService.GetRecentlyUpdatedAccountsAsync(take);
+        return Results.Ok(accounts);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error retrieving recently updated accounts");
+        return Results.Problem("An error occurred while retrieving recently updated accounts");
+    }
+})
+.WithName("GetRecentlyUpdatedAccounts")
+.WithSummary("Get recently updated user accounts")
+.WithDescription("""
+    Retrieves a list of user accounts ordered by their last update timestamp, showing the most recently active accounts first.
+    
+    **Key Features:**
+    - System-wide view of account activity
+    - Ordered by last update time (most recent first)
+    - Shows account balance and metadata for each user
+    - Useful for monitoring system activity and user engagement
+    - Supports configurable result limit
+    
+    **Parameters:**
+    - `take` (query, optional): Maximum number of accounts to return (default: 10, max: 100)
+    
+    **Use Cases:**
+    - Dashboard showing recent user activity
+    - Monitoring which users are actively using the system
+    - Admin view of system engagement
+    - Identifying most active users
+    - Recent activity feed
+    
+    **Response:**
+    Returns array of account information ordered by most recent activity.
+    
+    **Example Response:**
+    ```json
+    [
+        {
+            "owner": "jane_doe",
+            "balance": 3456.78,
+            "createdAt": "2024-06-10T08:00:00Z",
+            "lastUpdatedAt": "2024-06-14T16:45:00Z"
+        },
+        {
+            "owner": "john_smith",
+            "balance": 1234.56,
+            "createdAt": "2024-06-12T10:00:00Z",
+            "lastUpdatedAt": "2024-06-14T15:30:00Z"
+        },
+        {
+            "owner": "alice_wonder",
+            "balance": 9876.54,
+            "createdAt": "2024-06-11T09:00:00Z",
+            "lastUpdatedAt": "2024-06-14T14:20:00Z"
+        }
+    ]
+    ```
+    
+    **Ordering:**
+    Results are ordered by `lastUpdatedAt` in descending order (newest first).
+    
+    **Activity Tracking:**
+    The last update timestamp is modified when:
+    - Balance is updated (deposit or withdrawal)
+    - Account is reset
+    
+    Initial account creation also sets the last update timestamp.
+    """)
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "System Activity" }];
+    
+    var takeParam = operation.Parameters.FirstOrDefault(p => p.Name == "take");
+    if (takeParam != null)
+    {
+        takeParam.Description = "Maximum number of accounts to return (default: 10, max: 100)";
+        takeParam.Example = new Microsoft.OpenApi.Any.OpenApiInteger(10);
+    }
+    
+    return operation;
+})
+.Produces<IEnumerable<AccountInfo>>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status500InternalServerError);
+
+app.MapGet("/transactions/recent", async (ILedgerService ledgerService, int take = 20) =>
+{
+    try
+    {
+        var transactions = await ledgerService.GetRecentTransactionsAsync(take);
+        return Results.Ok(transactions);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error retrieving recent transactions");
+        return Results.Problem("An error occurred while retrieving recent transactions");
+    }
+})
+.WithName("GetRecentTransactions")
+.WithSummary("Get recent transactions across all users")
+.WithDescription("""
+    Retrieves recent transactions from all users in the system, ordered by timestamp (most recent first).
+    
+    **Key Features:**
+    - System-wide view of all transaction activity
+    - Includes transactions from all user accounts
+    - Ordered by transaction time (most recent first)
+    - Shows transaction details including amount, description, and resulting balance
+    - Useful for monitoring overall system activity
+    
+    **Parameters:**
+    - `take` (query, optional): Maximum number of transactions to return (default: 20, max: 100)
+    
+    **Use Cases:**
+    - Dashboard showing recent system-wide activity
+    - Activity feed across all users
+    - Monitoring transaction patterns
+    - Admin overview of ledger operations
+    - Audit trail for recent changes
+    
+    **Response:**
+    Returns array of transaction records ordered by most recent first.
+    
+    **Example Response:**
+    ```json
+    [
+        {
+            "id": "123e4567-e89b-12d3-a456-426614174000",
+            "owner": "jane_doe",
+            "amount": 250.00,
+            "balanceAfter": 3456.78,
+            "description": "Salary deposit",
+            "createdAt": "2024-06-14T16:45:00Z"
+        },
+        {
+            "id": "987fcdeb-51d2-43a8-b456-426614174001",
+            "owner": "john_smith",
+            "amount": -45.50,
+            "balanceAfter": 1234.56,
+            "description": "Grocery shopping",
+            "createdAt": "2024-06-14T15:30:00Z"
+        },
+        {
+            "id": "456789ab-cdef-1234-5678-90abcdef1234",
+            "owner": "alice_wonder",
+            "amount": 1000.00,
+            "balanceAfter": 9876.54,
+            "description": "Client payment",
+            "createdAt": "2024-06-14T14:20:00Z"
+        }
+    ]
+    ```
+    
+    **Transaction Types:**
+    - Positive amounts indicate deposits/credits
+    - Negative amounts indicate withdrawals/debits
+    - Each transaction shows the resulting balance after the operation
+    
+    **Privacy Note:**
+    This endpoint shows transaction data from all users. In production environments, 
+    consider implementing appropriate access controls based on user roles and permissions.
+    """)
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "System Activity" }];
+    
+    var takeParam = operation.Parameters.FirstOrDefault(p => p.Name == "take");
+    if (takeParam != null)
+    {
+        takeParam.Description = "Maximum number of transactions to return (default: 20, max: 100)";
+        takeParam.Example = new Microsoft.OpenApi.Any.OpenApiInteger(20);
+    }
+    
+    return operation;
+})
+.Produces<IEnumerable<TransactionInfo>>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status500InternalServerError);
+
 app.MapDefaultEndpoints();
 
 // Register MCP tools for LedgerService
@@ -416,6 +597,7 @@ public class LedgerStorageOptions
     public string BaseDirectory { get; set; } = Path.Combine(Directory.GetCurrentDirectory(), "LedgerData");
     public decimal MinInitialBalance { get; set; } = 100.00m;
     public decimal MaxInitialBalance { get; set; } = 10000.00m;
+    public int MaxQueryLimit { get; set; } = 100; // Maximum items to return in list queries
 }
 
 // Data models with OpenAPI annotations
@@ -492,6 +674,8 @@ public interface ILedgerService
     Task<AccountInfo> UpdateBalanceAsync(string owner, decimal amount, string description);
     Task<IEnumerable<TransactionInfo>> GetTransactionsAsync(string owner, int skip = 0, int take = 50);
     Task<AccountInfo> ResetAccountAsync(string owner);
+    Task<IEnumerable<AccountInfo>> GetRecentlyUpdatedAccountsAsync(int take = 10);
+    Task<IEnumerable<TransactionInfo>> GetRecentTransactionsAsync(int take = 20);
 }
 
 public class LedgerServiceImpl : ILedgerService
@@ -635,8 +819,9 @@ public class LedgerServiceImpl : ILedgerService
 
         try
         {
+            // Select only needed fields to reduce RU consumption
             var query = new QueryDefinition(
-                "SELECT * FROM c WHERE c.owner = @owner AND c.Type = @type ORDER BY c.CreatedAt DESC OFFSET @skip LIMIT @take")
+                "SELECT c.TransactionId, c.Owner, c.Amount, c.BalanceAfter, c.Description, c.CreatedAt FROM c WHERE c.owner = @owner AND c.Type = @type ORDER BY c.CreatedAt DESC OFFSET @skip LIMIT @take")
                 .WithParameter("@owner", owner)
                 .WithParameter("@type", "transaction")
                 .WithParameter("@skip", skip)
@@ -724,6 +909,76 @@ public class LedgerServiceImpl : ILedgerService
         var range = _options.MaxInitialBalance - _options.MinInitialBalance;
         var randomValue = (decimal)_random.NextDouble() * range + _options.MinInitialBalance;
         return Math.Round(randomValue, 2);
+    }
+
+    public async Task<IEnumerable<AccountInfo>> GetRecentlyUpdatedAccountsAsync(int take = 10)
+    {
+        take = Math.Min(take, _options.MaxQueryLimit); // Limit to prevent excessive data transfer
+
+        try
+        {
+            // Query for accounts ordered by LastUpdatedAt descending, selecting only needed fields
+            var query = new QueryDefinition(
+                "SELECT c.Owner, c.Balance, c.CreatedAt, c.LastUpdatedAt FROM c WHERE c.Type = @type ORDER BY c.LastUpdatedAt DESC OFFSET 0 LIMIT @take")
+                .WithParameter("@type", "account")
+                .WithParameter("@take", take);
+
+            var iterator = _container.GetItemQueryIterator<AccountEntity>(query);
+            var accounts = new List<AccountEntity>();
+
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                accounts.AddRange(response);
+            }
+
+            return accounts.Select(a => new AccountInfo(
+                a.Owner,
+                a.Balance,
+                a.CreatedAt,
+                a.LastUpdatedAt));
+        }
+        catch (CosmosException ex)
+        {
+            _logger.LogError(ex, "Error retrieving recently updated accounts");
+            throw;
+        }
+    }
+
+    public async Task<IEnumerable<TransactionInfo>> GetRecentTransactionsAsync(int take = 20)
+    {
+        take = Math.Min(take, _options.MaxQueryLimit); // Limit to prevent excessive data transfer
+
+        try
+        {
+            // Query for transactions ordered by CreatedAt descending, selecting only needed fields
+            var query = new QueryDefinition(
+                "SELECT c.TransactionId, c.Owner, c.Amount, c.BalanceAfter, c.Description, c.CreatedAt FROM c WHERE c.Type = @type ORDER BY c.CreatedAt DESC OFFSET 0 LIMIT @take")
+                .WithParameter("@type", "transaction")
+                .WithParameter("@take", take);
+
+            var iterator = _container.GetItemQueryIterator<TransactionEntity>(query);
+            var transactions = new List<TransactionEntity>();
+
+            while (iterator.HasMoreResults)
+            {
+                var response = await iterator.ReadNextAsync();
+                transactions.AddRange(response);
+            }
+
+            return transactions.Select(t => new TransactionInfo(
+                t.TransactionId,
+                t.Owner,
+                t.Amount,
+                t.BalanceAfter,
+                t.Description,
+                t.CreatedAt));
+        }
+        catch (CosmosException ex)
+        {
+            _logger.LogError(ex, "Error retrieving recent transactions");
+            throw;
+        }
     }
 }
 

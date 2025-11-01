@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CanIHazHouze.LedgerService"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CanIHazHouze.MortgageApprover", "CanIHazHouze.MortgageApprover\CanIHazHouze.MortgageApprover.csproj", "{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CanIHazHouze.CrmService", "CanIHazHouze.CrmService\CanIHazHouze.CrmService.csproj", "{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -111,6 +113,18 @@ Global
 		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Release|x64.Build.0 = Release|Any CPU
 		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Release|x86.ActiveCfg = Release|Any CPU
 		{F7B8C6A1-9E2D-4A18-8F3C-1D5E6F7A8B9C}.Release|x86.Build.0 = Release|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Debug|x64.Build.0 = Debug|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Debug|x86.Build.0 = Debug|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Release|x64.ActiveCfg = Release|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Release|x64.Build.0 = Release|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Release|x86.ActiveCfg = Release|Any CPU
+		{A981E9F9-BE6A-4AD4-B2DB-499BBC65C91E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

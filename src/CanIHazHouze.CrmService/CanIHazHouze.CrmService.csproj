@@ -2,19 +2,18 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\CanIHazHouze.ServiceDefaults\CanIHazHouze.ServiceDefaults.csproj" />
-  </ItemGroup>  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.2" />
+  </ItemGroup>
+  
+  <ItemGroup>
     <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="9.3.1" />
-    <PackageReference Include="Aspire.Azure.AI.OpenAI" Version="9.3.1-preview.1.25305.6" />
-    <PackageReference Include="Aspire.Azure.Storage.Blobs" Version="9.3.1" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.2" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.4.16" />
-    <PackageReference Include="System.Text.Json" Version="9.0.5" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,6 @@
+@CanIHazHouze.CrmService_HostAddress = http://localhost:5127
+
+GET {{CanIHazHouze.CrmService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
