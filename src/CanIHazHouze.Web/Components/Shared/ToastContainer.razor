@@ -1,0 +1,103 @@
+@using CanIHazHouze.Web.Services
+@inject ToastService ToastService
+@implements IDisposable
+
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    @foreach (var toast in toasts)
+    {
+        <div class="toast show @GetToastClass(toast.Type)" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="bi @GetToastIcon(toast.Type) me-2"></i>
+                <strong class="me-auto">@GetToastTitle(toast.Type)</strong>
+                <small>@GetTimeAgo(toast.CreatedAt)</small>
+                <button type="button" class="btn-close" @onclick="() => RemoveToast(toast)" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                @toast.Message
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ToastMessage> toasts = new();
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnShow += OnToastShow;
+    }
+
+    private void OnToastShow(ToastMessage toast)
+    {
+        toasts.Add(toast);
+        StateHasChanged();
+        
+        // Auto-remove after duration
+        Task.Delay(TimeSpan.FromSeconds(toast.DurationSeconds)).ContinueWith(_ =>
+        {
+            InvokeAsync(() =>
+            {
+                RemoveToast(toast);
+            });
+        });
+    }
+
+    private void RemoveToast(ToastMessage toast)
+    {
+        toasts.Remove(toast);
+        StateHasChanged();
+    }
+
+    private string GetToastClass(ToastType type)
+    {
+        return type switch
+        {
+            ToastType.Success => "bg-success text-white",
+            ToastType.Error => "bg-danger text-white",
+            ToastType.Warning => "bg-warning",
+            ToastType.Info => "bg-info text-white",
+            _ => "bg-light"
+        };
+    }
+
+    private string GetToastIcon(ToastType type)
+    {
+        return type switch
+        {
+            ToastType.Success => "bi-check-circle-fill",
+            ToastType.Error => "bi-exclamation-triangle-fill",
+            ToastType.Warning => "bi-exclamation-circle-fill",
+            ToastType.Info => "bi-info-circle-fill",
+            _ => "bi-bell-fill"
+        };
+    }
+
+    private string GetToastTitle(ToastType type)
+    {
+        return type switch
+        {
+            ToastType.Success => "Success",
+            ToastType.Error => "Error",
+            ToastType.Warning => "Warning",
+            ToastType.Info => "Information",
+            _ => "Notification"
+        };
+    }
+
+    private string GetTimeAgo(DateTime createdAt)
+    {
+        var elapsed = DateTime.UtcNow - createdAt;
+        if (elapsed.TotalSeconds < 5)
+            return "just now";
+        if (elapsed.TotalSeconds < 60)
+            return $"{(int)elapsed.TotalSeconds}s ago";
+        if (elapsed.TotalMinutes < 60)
+            return $"{(int)elapsed.TotalMinutes}m ago";
+        return $"{(int)elapsed.TotalHours}h ago";
+    }
+
+    public void Dispose()
+    {
+        ToastService.OnShow -= OnToastShow;
+    }
+}
