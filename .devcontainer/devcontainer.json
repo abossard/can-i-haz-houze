@@ -1,0 +1,67 @@
+{
+  "name": "Can I Haz Houze - .NET Aspire Development",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true,
+      "dockerDashComposeVersion": "v2"
+    },
+    "ghcr.io/devcontainers/features/azure-cli:1": {
+      "version": "latest"
+    },
+    "ghcr.io/azure/azure-dev/azd:latest": {}
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "ms-dotnettools.csharp",
+        "ms-azuretools.vscode-docker",
+        "ms-azuretools.azure-dev",
+        "GitHub.copilot",
+        "GitHub.copilot-chat"
+      ],
+      "settings": {
+        "dotnet.defaultSolution": "src/CanIHazHouze.sln"
+      }
+    }
+  },
+
+  "forwardPorts": [
+    17001,
+    8081,
+    10000,
+    10001,
+    10002
+  ],
+
+  "portsAttributes": {
+    "17001": {
+      "label": "Aspire Dashboard",
+      "onAutoForward": "notify"
+    },
+    "8081": {
+      "label": "Cosmos DB Emulator",
+      "onAutoForward": "silent"
+    },
+    "10000": {
+      "label": "Azurite Blob",
+      "onAutoForward": "silent"
+    },
+    "10001": {
+      "label": "Azurite Queue",
+      "onAutoForward": "silent"
+    },
+    "10002": {
+      "label": "Azurite Table",
+      "onAutoForward": "silent"
+    }
+  },
+
+  "postCreateCommand": "dotnet restore src/CanIHazHouze.sln",
+
+  "remoteUser": "vscode"
+}

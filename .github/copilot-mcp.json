@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "docker": {
+      "command": "docker",
+      "description": "Docker CLI for running and managing containers",
+      "tools": ["*"]
+    },
+    "docker-compose": {
+      "command": "docker-compose",
+      "description": "Docker Compose for orchestrating multi-container applications",
+      "tools": ["*"]
+    },
+    "web-search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "${COPILOT_MCP_BRAVE_API_KEY}"
+      },
+      "description": "Web search capabilities using Brave Search API",
+      "tools": ["brave_web_search", "brave_local_search"]
+    }
+  }
+}
