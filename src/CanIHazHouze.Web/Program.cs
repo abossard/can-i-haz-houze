@@ -73,6 +73,13 @@ builder.Services.AddHttpClient<CrmApiClient>(client =>
     })
     .AddHttpMessageHandler<ErrorHandlingDelegatingHandler>();
 
+builder.Services.AddHttpClient<AgentApiClient>(client =>
+    {
+        // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+        // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+        client.BaseAddress = new("https+http://agentservice");
+    });
+
 var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())

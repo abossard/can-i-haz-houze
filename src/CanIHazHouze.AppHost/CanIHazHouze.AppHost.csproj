@@ -8,13 +8,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UserSecretsId>108c1a85-9df2-485b-8313-b8370994728b</UserSecretsId>
-  </PropertyGroup>  <ItemGroup>
+  </PropertyGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\CanIHazHouze.DocumentService\CanIHazHouze.DocumentService.csproj" />
     <ProjectReference Include="..\CanIHazHouze.CrmService\CanIHazHouze.CrmService.csproj" />
     <ProjectReference Include="..\CanIHazHouze.LedgerService\CanIHazHouze.LedgerService.csproj" />
     <ProjectReference Include="..\CanIHazHouze.MortgageApprover\CanIHazHouze.MortgageApprover.csproj" />
+    <ProjectReference Include="..\CanIHazHouze.AgentService\CanIHazHouze.AgentService.csproj" />
     <ProjectReference Include="..\CanIHazHouze.Web\CanIHazHouze.Web.csproj" />
-  </ItemGroup>  <ItemGroup>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" Version="9.3.1" />
     <PackageReference Include="Aspire.Hosting.Azure.AppContainers" Version="9.3.1" />
     <PackageReference Include="Aspire.Hosting.Azure.CosmosDB" Version="9.3.1" />

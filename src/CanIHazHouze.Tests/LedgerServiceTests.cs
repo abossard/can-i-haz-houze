@@ -18,7 +18,6 @@ public class LedgerServiceTests
     {
         // Arrange
         // TODO: Update test to use Cosmos DB test client
-        var owner = "testuser";
         
         // This test is currently disabled pending Cosmos DB test infrastructure setup
         await Task.CompletedTask;
