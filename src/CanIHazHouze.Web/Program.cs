@@ -1,5 +1,6 @@
 using CanIHazHouze.Web;
 using CanIHazHouze.Web.Components;
+using CanIHazHouze.Web.Services;
 using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,33 +18,60 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddOutputCache();
 
+// Add toast notification service
+builder.Services.AddScoped<ToastService>();
+
+// Add background activity tracking service
+builder.Services.AddScoped<BackgroundActivityService>();
+
+// Add error handling delegating handler
+builder.Services.AddTransient<ErrorHandlingDelegatingHandler>();
+
+// Configure circuit options for better performance and reconnection
+builder.Services.AddServerSideBlazor(options =>
+{
+    options.DetailedErrors = builder.Environment.IsDevelopment();
+    options.DisconnectedCircuitMaxRetained = 100;
+    options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(3);
+    options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(1);
+    options.MaxBufferedUnacknowledgedRenderBatches = 10;
+});
+
 builder.Services.AddHttpClient<DocumentApiClient>(client =>
     {
         // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
         client.BaseAddress = new("https+http://documentservice");
-    });
+        client.Timeout = TimeSpan.FromSeconds(30);
+    })
+    .AddHttpMessageHandler<ErrorHandlingDelegatingHandler>();
 
 builder.Services.AddHttpClient<LedgerApiClient>(client =>
     {
         // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
         client.BaseAddress = new("https+http://ledgerservice");
-    });
+        client.Timeout = TimeSpan.FromSeconds(30);
+    })
+    .AddHttpMessageHandler<ErrorHandlingDelegatingHandler>();
 
 builder.Services.AddHttpClient<MortgageApiClient>(client =>
     {
         // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
         client.BaseAddress = new("https+http://mortgageapprover");
-    });
+        client.Timeout = TimeSpan.FromSeconds(30);
+    })
+    .AddHttpMessageHandler<ErrorHandlingDelegatingHandler>();
 
 builder.Services.AddHttpClient<CrmApiClient>(client =>
     {
         // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
         client.BaseAddress = new("https+http://crmservice");
-    });
+        client.Timeout = TimeSpan.FromSeconds(30);
+    })
+    .AddHttpMessageHandler<ErrorHandlingDelegatingHandler>();
 
 var app = builder.Build();
 

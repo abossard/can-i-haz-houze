@@ -1,0 +1,31 @@
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center align-items-center @(FullPage ? "position-fixed top-0 start-0 w-100 h-100" : "my-4")" 
+         style="@(FullPage ? "background: rgba(255,255,255,0.8); z-index: 1040;" : "")">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status" style="width: @Size; height: @Size;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            @if (!string.IsNullOrEmpty(Message))
+            {
+                <div class="mt-3">
+                    <p class="text-muted">@Message</p>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter]
+    public string? Message { get; set; }
+
+    [Parameter]
+    public bool FullPage { get; set; } = false;
+
+    [Parameter]
+    public string Size { get; set; } = "3rem";
+}

@@ -1,0 +1,52 @@
+@using CanIHazHouze.Web.Services
+@inject BackgroundActivityService ActivityService
+@implements IDisposable
+
+@if (hasActivity)
+{
+    <div class="background-activity-indicator">
+        <div class="activity-pulse"></div>
+        <span class="activity-text">
+            <i class="bi bi-arrow-repeat"></i> 
+            @if (activeCount > 1)
+            {
+                <text>@activeCount requests in progress...</text>
+            }
+            else
+            {
+                <text>Loading...</text>
+            }
+        </span>
+    </div>
+}
+
+@code {
+    private bool hasActivity;
+    private int activeCount;
+
+    protected override void OnInitialized()
+    {
+        ActivityService.OnActivityChanged += OnActivityChanged;
+        UpdateState();
+    }
+
+    private void OnActivityChanged()
+    {
+        InvokeAsync(() =>
+        {
+            UpdateState();
+            StateHasChanged();
+        });
+    }
+
+    private void UpdateState()
+    {
+        hasActivity = ActivityService.HasActivity;
+        activeCount = ActivityService.ActiveRequestCount;
+    }
+
+    public void Dispose()
+    {
+        ActivityService.OnActivityChanged -= OnActivityChanged;
+    }
+}
