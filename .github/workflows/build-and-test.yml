@@ -90,3 +90,75 @@ jobs:
         echo "- 1 REST API test requiring actual Cosmos DB" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "Run locally with: \`dotnet test --filter \"Category=RequiresDocker|Category=RequiresDatabase\"\`" >> $GITHUB_STEP_SUMMARY
+
+  docker-integration-tests:
+    name: Docker Integration Tests (with Aspire DCP & Emulators)
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+        
+    # Docker is already available on ubuntu-latest runners
+    # Verify Docker is working
+    - name: Verify Docker
+      run: |
+        docker --version
+        docker ps
+        
+    # Set environment variables to ensure emulator activation
+    - name: Configure environment for emulators
+      run: |
+        echo "ASPNETCORE_ENVIRONMENT=Development" >> $GITHUB_ENV
+        echo "DOTNET_ENVIRONMENT=Development" >> $GITHUB_ENV
+        
+    - name: Restore dependencies
+      run: dotnet restore src/CanIHazHouze.sln
+      
+    - name: Build solution
+      run: dotnet build src/CanIHazHouze.sln --no-restore --configuration Release
+      
+    # Run tests that require Docker and Aspire DCP with emulators
+    - name: Run Docker-dependent integration tests
+      run: dotnet test src/CanIHazHouze.sln --no-build --configuration Release --verbosity normal --filter "Category=Integration&Category=RequiresDocker" --logger "console;verbosity=detailed"
+      timeout-minutes: 10
+      
+    # Capture container logs if tests fail
+    - name: Capture Docker container logs on failure
+      if: failure()
+      run: |
+        echo "## Docker Container Logs" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        docker ps -a
+        for container in $(docker ps -a --format '{{.Names}}'); do
+          echo "### Logs for container: $container" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          docker logs $container --tail 100 2>&1 | head -50 >> $GITHUB_STEP_SUMMARY || echo "Could not retrieve logs for $container" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        done
+        
+    - name: Docker integration test summary
+      if: always()
+      run: |
+        echo "## Docker Integration Test Results 🐳" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Environment Configuration:**" >> $GITHUB_STEP_SUMMARY
+        echo "- ASPNETCORE_ENVIRONMENT: Development" >> $GITHUB_STEP_SUMMARY
+        echo "- Docker Version: $(docker --version)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Tests Run:**" >> $GITHUB_STEP_SUMMARY
+        echo "- WebTests using DistributedApplicationTestingBuilder" >> $GITHUB_STEP_SUMMARY
+        echo "- Tests with Cosmos DB Preview Emulator" >> $GITHUB_STEP_SUMMARY
+        echo "- Tests with Azurite Storage Emulator" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Infrastructure:**" >> $GITHUB_STEP_SUMMARY
+        echo "- Aspire DCP (Distributed Control Plane)" >> $GITHUB_STEP_SUMMARY
+        echo "- Cosmos DB Linux Emulator (vnext-preview)" >> $GITHUB_STEP_SUMMARY
+        echo "- Azure Storage Emulator (Azurite)" >> $GITHUB_STEP_SUMMARY
