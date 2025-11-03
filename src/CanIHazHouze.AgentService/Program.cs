@@ -34,37 +34,52 @@ builder.Services.Configure<AgentStorageOptions>(
 // Add Azure Cosmos DB using Aspire
 builder.AddAzureCosmosClient("cosmos");
 
-// Keyless Azure OpenAI client (DefaultAzureCredential) using endpoint from connection string with graceful fallback
-var openAiConn = builder.Configuration.GetConnectionString("openai");
-string? openAiEndpoint = openAiConn?.Split(';', StringSplitOptions.RemoveEmptyEntries)
-    .FirstOrDefault(p => p.StartsWith("Endpoint=", StringComparison.OrdinalIgnoreCase))?
-    .Substring("Endpoint=".Length);
-if (string.IsNullOrWhiteSpace(openAiEndpoint))
+// Keyless Azure OpenAI client (DefaultAzureCredential) using endpoint from connection string with robust validation & graceful fallback
+string? ExtractEndpoint(string? conn)
 {
-    // Fallback: register dummy execution services so tests/local runs without secrets still work
+    if (string.IsNullOrWhiteSpace(conn)) return null;
+    foreach (var part in conn.Split(';', StringSplitOptions.RemoveEmptyEntries))
+    {
+        if (part.StartsWith("Endpoint=", StringComparison.OrdinalIgnoreCase))
+        {
+            var ep = part.Substring("Endpoint=".Length).Trim();
+            return string.IsNullOrWhiteSpace(ep) ? null : ep;
+        }
+    }
+    return null;
+}
+
+var openAiConn = builder.Configuration.GetConnectionString("openai");
+var openAiEndpoint = ExtractEndpoint(openAiConn) ?? builder.Configuration["OpenAI:Endpoint"]?.Trim();
+
+bool IsValidEndpoint(string? ep) =>
+    !string.IsNullOrWhiteSpace(ep) && Uri.TryCreate(ep, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps);
+
+if (!IsValidEndpoint(openAiEndpoint))
+{
     builder.Logging.AddFilter("DummyAgentExecutionService", LogLevel.Information);
-    Console.WriteLine("[AgentService] OpenAI endpoint missing. Using dummy agent execution services. Set ConnectionStrings:openai secret with 'Endpoint=...' to enable real AI features.");
+    Console.WriteLine("[AgentService] OpenAI endpoint not configured or invalid. Using dummy agent execution services. Set user secret 'ConnectionStrings:openai' with 'Endpoint=YOUR_URL;ApiKey=...' to enable real AI features.");
     builder.Services.AddSingleton<IAgentExecutionService, DummyAgentExecutionService>();
     builder.Services.AddSingleton<MultiTurnAgentExecutor, DummyMultiTurnAgentExecutor>();
-    // Provide dummy OpenAIConfiguration so options binding is satisfied
     builder.Services.Configure<CanIHazHouze.AgentService.Configuration.OpenAIConfiguration>(opt =>
     {
         opt.Endpoint = "https://dummy.local";
         opt.ApiKey = "dummy-key";
     });
+    openAiEndpoint = null; // mark invalid so we skip real registration below
 }
 else
 {
     builder.Services.AddSingleton(sp =>
     {
         var credential = new Azure.Identity.DefaultAzureCredential();
-        return new Azure.AI.OpenAI.AzureOpenAIClient(new Uri(openAiEndpoint), credential);
+        return new Azure.AI.OpenAI.AzureOpenAIClient(new Uri(openAiEndpoint!), credential);
     });
 }
 
 // Add agent services
 builder.Services.AddScoped<IAgentStorageService, AgentStorageService>();
-if (!string.IsNullOrWhiteSpace(openAiEndpoint))
+if (IsValidEndpoint(openAiEndpoint))
 {
     builder.Services.AddScoped<IAgentExecutionService, AgentExecutionService>();
     builder.Services.AddScoped<MultiTurnAgentExecutor>();
