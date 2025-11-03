@@ -54,29 +54,42 @@ builder.AddAzureCosmosClient("cosmos");
 logger.LogInformation("📁 Adding Azure Blob Storage client...");
 builder.AddAzureBlobClient("blobs");
 
-// Keyless Azure OpenAI client (DefaultAzureCredential) using endpoint from connection string
-logger.LogInformation("🤖 Configuring keyless Azure OpenAI client (DefaultAzureCredential)...");
+// Keyless Azure OpenAI client (DefaultAzureCredential) using endpoint from connection string (with graceful fallback for tests/local)
+logger.LogInformation("🤖 Configuring Azure OpenAI client (DefaultAzureCredential) or dummy fallback...");
 var openAiConn = builder.Configuration.GetConnectionString("openai");
 string? openAiEndpoint = openAiConn?.Split(';', StringSplitOptions.RemoveEmptyEntries)
     .FirstOrDefault(p => p.StartsWith("Endpoint=", StringComparison.OrdinalIgnoreCase))?
     .Substring("Endpoint=".Length);
+
 if (string.IsNullOrWhiteSpace(openAiEndpoint))
 {
-    throw new InvalidOperationException("OpenAI endpoint missing. Ensure ConnectionStrings:openai user secret contains 'Endpoint=...'");
+    // Fallback: register a dummy AI service so tests and local runs without secrets still succeed
+    logger.LogWarning("OpenAI endpoint missing. Registering DummyDocumentAIService. Set ConnectionStrings:openai secret with 'Endpoint=...' to enable real AI features.");
+    builder.Services.AddSingleton<IDocumentAIService, CanIHazHouze.DocumentService.DummyDocumentAIService>();
 }
-builder.Services.AddSingleton(sp =>
+else
 {
-    var credential = new Azure.Identity.DefaultAzureCredential();
-    return new Azure.AI.OpenAI.AzureOpenAIClient(new Uri(openAiEndpoint), credential);
-});
+    builder.Services.AddSingleton(sp =>
+    {
+        var credential = new Azure.Identity.DefaultAzureCredential();
+        return new Azure.AI.OpenAI.AzureOpenAIClient(new Uri(openAiEndpoint), credential);
+    });
+}
 
 // Add document service
 logger.LogInformation("📄 Registering document service...");
 builder.Services.AddScoped<IDocumentService, DocumentServiceImpl>();
 
-// Add AI document analysis service
-logger.LogInformation("🧠 Registering AI document analysis service...");
-builder.Services.AddScoped<IDocumentAIService, DocumentAIService>();
+// Add AI document analysis service only when real endpoint configured (dummy registered above otherwise)
+if (!string.IsNullOrWhiteSpace(openAiEndpoint))
+{
+    logger.LogInformation("🧠 Registering real AI document analysis service (Azure OpenAI backed)...");
+    builder.Services.AddScoped<IDocumentAIService, DocumentAIService>();
+}
+else
+{
+    logger.LogInformation("🧠 Using DummyDocumentAIService (no Azure OpenAI endpoint provided)");
+}
 
 logger.LogInformation("✅ Service configuration completed");
 logger.LogInformation("🏗️  Building application...");
