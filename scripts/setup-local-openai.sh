@@ -146,29 +146,34 @@ if [ -z "$OPENAI_ENDPOINT" ]; then
     exit 1
 fi
 
-# Get the API key
-echo "🔑 Retrieving OpenAI API key..."
-OPENAI_KEY=$(az cognitiveservices account keys list \
-    --name "$OPENAI_RESOURCE_NAME" \
-    --resource-group "$AZURE_RESOURCE_GROUP" \
-    --query "key1" \
-    --output tsv 2>/dev/null)
-
-if [ -z "$OPENAI_KEY" ]; then
-    echo "❌ Error: Could not retrieve OpenAI API key for resource '$OPENAI_RESOURCE_NAME'"
-    echo "   This might be due to:"
-    echo "   • Insufficient permissions to read keys (need Cognitive Services Contributor role)"
-    echo "   • The resource is still being provisioned"
-    echo "   • The resource is in an error state"
-    exit 1
-fi
-
-# Construct the connection string
-CONNECTION_STRING="Endpoint=${OPENAI_ENDPOINT};ApiKey=${OPENAI_KEY}"
+# Force keyless (AAD / Managed Identity) usage: do not attempt key retrieval
+echo "🔑 Using keyless Azure OpenAI authentication (no API key retrieval)."
+echo "   • Ensure: az login (local) or managed identity (deployment)."
+echo "   • Connection string will contain only Endpoint=..."
+CONNECTION_STRING="Endpoint=${OPENAI_ENDPOINT}"
+KEYLESS_AUTH=true
 
 echo "✅ OpenAI connection details retrieved successfully!"
 echo ""
 echo "🛠️  Setting up local development configuration..."
+
+# Persist resource identification into azd environment for Aspire parameters
+echo "🌐 Updating azd environment parameters for existing OpenAI resource..."
+if command -v azd &> /dev/null; then
+    if azd env set existingOpenAIName "$OPENAI_RESOURCE_NAME" &> /dev/null && \
+       azd env set existingOpenAIResourceGroup "$AZURE_RESOURCE_GROUP" &> /dev/null; then
+        echo "✅ Stored existingOpenAIName=$OPENAI_RESOURCE_NAME"
+        echo "✅ Stored existingOpenAIResourceGroup=$AZURE_RESOURCE_GROUP"
+    else
+        echo "⚠️  Warning: Failed to set azd environment parameters (existingOpenAIName / existingOpenAIResourceGroup)."
+        echo "    You can set them manually with:"
+        echo "    azd env set existingOpenAIName $OPENAI_RESOURCE_NAME"
+        echo "    azd env set existingOpenAIResourceGroup $AZURE_RESOURCE_GROUP"
+    fi
+else
+    echo "⚠️  Warning: azd CLI not available, skipping azd environment parameter storage."
+    echo "    Install azd: https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd"
+fi
 
 # Set the user secrets for the AppHost project
 APPHOST_PROJECT="./src/CanIHazHouze.AppHost/CanIHazHouze.AppHost.csproj"
@@ -194,7 +199,11 @@ echo ""
 echo "📋 Summary:"
 echo "   • Resource: $OPENAI_RESOURCE_NAME"
 echo "   • Endpoint: $OPENAI_ENDPOINT"
+echo "   • Auth Mode: Keyless (AAD / Managed Identity / AzureCli)"
 echo "   • Connection configured in: CanIHazHouze.AppHost user secrets"
+echo "   • azd env existingOpenAIName: $OPENAI_RESOURCE_NAME"
+echo "   • azd env existingOpenAIResourceGroup: $AZURE_RESOURCE_GROUP"
+echo "   • NOTE: Services must use DefaultAzureCredential (no ApiKey)."
 echo ""
 echo "🚀 You can now run your app locally with:"
 echo "   cd src && dotnet run --project CanIHazHouze.AppHost"

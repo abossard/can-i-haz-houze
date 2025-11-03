@@ -51,9 +51,21 @@ builder.AddAzureCosmosClient("cosmos");
 logger.LogInformation("📁 Adding Azure Blob Storage client...");
 builder.AddAzureBlobClient("blobs");
 
-// Add Azure OpenAI client for document processing
-logger.LogInformation("🤖 Adding Azure OpenAI client...");
-builder.AddAzureOpenAIClient("openai");
+// Keyless Azure OpenAI client (DefaultAzureCredential) using endpoint from connection string
+logger.LogInformation("🤖 Configuring keyless Azure OpenAI client (DefaultAzureCredential)...");
+var openAiConn = builder.Configuration.GetConnectionString("openai");
+string? openAiEndpoint = openAiConn?.Split(';', StringSplitOptions.RemoveEmptyEntries)
+    .FirstOrDefault(p => p.StartsWith("Endpoint=", StringComparison.OrdinalIgnoreCase))?
+    .Substring("Endpoint=".Length);
+if (string.IsNullOrWhiteSpace(openAiEndpoint))
+{
+    throw new InvalidOperationException("OpenAI endpoint missing. Ensure ConnectionStrings:openai user secret contains 'Endpoint=...'");
+}
+builder.Services.AddSingleton(sp =>
+{
+    var credential = new Azure.Identity.DefaultAzureCredential();
+    return new Azure.AI.OpenAI.AzureOpenAIClient(new Uri(openAiEndpoint), credential);
+});
 
 // Add document service
 logger.LogInformation("📄 Registering document service...");

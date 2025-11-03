@@ -18,30 +18,33 @@ var cosmos = builder.AddAzureCosmosDB("cosmos")
     });
 #pragma warning restore ASPIRECOSMOSDB001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
-// Add Azure OpenAI for document processing
-// For local development, you can use a connection string to an existing OpenAI service
-// For production, this will provision a new Azure OpenAI resource
-var openai = builder.ExecutionContext.IsPublishMode
-    ? builder.AddAzureOpenAI("openai")
-    : builder.AddConnectionString("openai");
-
-// Configure OpenAI resource for production
+// OpenAI handling:
+//  - Publish mode: provision Azure OpenAI and register model deployments.
+//  - Local dev: use existing resource via connection string (set by setup-local-openai.sh).
+IResourceBuilder<IResourceWithConnectionString> openai;
 if (builder.ExecutionContext.IsPublishMode)
 {
+    var openaiAzure = builder.AddAzureOpenAI("openai");
     // Add model deployments for document processing and agent execution
-    var openaiResource = (IResourceBuilder<AzureOpenAIResource>)openai;
-  
-    openaiResource.AddDeployment(
+    openaiAzure.AddDeployment(
         name: "gpt-4o",
-        modelName: "gpt-4o", 
+        modelName: "gpt-4o",
         modelVersion: "2024-11-20");
-    
-    
-    openaiResource.AddDeployment(
+
+    openaiAzure.AddDeployment(
         name: "gpt-4o-mini",
-        modelName: "gpt-4o-mini", 
+        modelName: "gpt-4o-mini",
         modelVersion: "2024-07-18");
+
+    openai = openaiAzure; // AzureOpenAIResource implements IResourceWithConnectionString
 }
+else
+{
+    openai = builder.AddConnectionString("openai");
+}
+
+// Configure OpenAI resource for production
+// (Deployments moved into publish-mode branch above.)
 
 // Add Azure Storage with Azurite emulator for local development
 // Automatically uses real Azure Storage in production
@@ -63,7 +66,6 @@ var documentsContainer = houzeDatabase.AddContainer("documents", "/owner");
 var ledgersContainer = houzeDatabase.AddContainer("ledgers", "/owner"); 
 var mortgagesContainer = houzeDatabase.AddContainer("mortgages", "/owner");
 var crmContainer = houzeDatabase.AddContainer("crm", "/customerName");
-// Single container for all agent-related entities with agentId as partition key
 var agentsContainer = houzeDatabase.AddContainer("agents", "/agentId");
 
 var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>("documentservice")
@@ -95,8 +97,8 @@ var crmService = builder.AddProject<Projects.CanIHazHouze_CrmService>("crmservic
 
 var agentService = builder.AddProject<Projects.CanIHazHouze_AgentService>("agentservice")
     .WithExternalHttpEndpoints()
-    .WithReference(cosmos) // Reference the cosmos resource
-    .WithReference(openai) // Add OpenAI reference for agent execution
+    .WithReference(cosmos) 
+    .WithReference(openai)
     .WithHttpHealthCheck("/health");
 
 builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")

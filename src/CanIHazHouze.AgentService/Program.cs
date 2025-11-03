@@ -1,11 +1,8 @@
 using CanIHazHouze.AgentService.BackgroundServices;
-using CanIHazHouze.AgentService.Configuration;
-using CanIHazHouze.AgentService.Extensions;
 using CanIHazHouze.AgentService.Models;
 using CanIHazHouze.AgentService.Security;
 using CanIHazHouze.AgentService.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.SemanticKernel;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,15 +34,26 @@ builder.Services.Configure<AgentStorageOptions>(
 // Add Azure Cosmos DB using Aspire
 builder.AddAzureCosmosClient("cosmos");
 
-// Add Azure OpenAI configuration using Aspire patterns
-// This properly integrates with Aspire's connection string management from AppHost
-// and registers both OpenAIConfiguration (for Semantic Kernel) and AzureOpenAIClient (for direct SDK access)
-builder.AddAzureOpenAIConfiguration("openai");
+// Keyless Azure OpenAI client (DefaultAzureCredential) using endpoint from connection string
+var openAiConn = builder.Configuration.GetConnectionString("openai");
+string? openAiEndpoint = openAiConn?.Split(';', StringSplitOptions.RemoveEmptyEntries)
+    .FirstOrDefault(p => p.StartsWith("Endpoint=", StringComparison.OrdinalIgnoreCase))?
+    .Substring("Endpoint=".Length);
+if (string.IsNullOrWhiteSpace(openAiEndpoint))
+{
+    throw new InvalidOperationException("OpenAI endpoint missing. Ensure ConnectionStrings:openai user secret contains 'Endpoint=...'");
+}
+builder.Services.AddSingleton(sp =>
+{
+    var credential = new Azure.Identity.DefaultAzureCredential();
+    return new Azure.AI.OpenAI.AzureOpenAIClient(new Uri(openAiEndpoint), credential);
+});
 
 // Add agent services
 builder.Services.AddScoped<IAgentStorageService, AgentStorageService>();
 builder.Services.AddScoped<IAgentExecutionService, AgentExecutionService>();
 builder.Services.AddScoped<MultiTurnAgentExecutor>();
+// Remove incorrect Cosmos client registration for openai; we now added explicit AzureOpenAIClient above.
 
 // Add background service for long-running agent tasks
 builder.Services.AddSingleton<AgentExecutionBackgroundService>();
