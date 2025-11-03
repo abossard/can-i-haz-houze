@@ -1,10 +1,13 @@
 using System.ComponentModel.DataAnnotations;
+using Newtonsoft.Json; // Cosmos SDK uses Newtonsoft serialization
 
 namespace CanIHazHouze.AgentService.Models;
 
 public class AgentRun
 {
+    // Ensure Cosmos stores run documents with required lowercase 'id'
     [Required]
+    [JsonProperty(PropertyName = "id")]
     public string Id { get; set; } = Guid.NewGuid().ToString();
     
     [Required]

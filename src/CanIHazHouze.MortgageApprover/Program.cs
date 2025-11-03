@@ -1,3 +1,4 @@
+// Removed warning suppressions by making nullability explicit and eliminating null returns in MCP tools.
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -416,7 +417,9 @@ mcpServer.RegisterTool<GetMortgageRequestRequest>("get_mortgage_request",
         using var scope = serviceProvider.CreateScope();
         var mortgageService = scope.ServiceProvider.GetRequiredService<IMortgageApprovalService>();
         var mortgageRequest = await mortgageService.GetMortgageRequestAsync(req.RequestId);
-        return mortgageRequest != null ? MortgageRequestDto.FromDomain(mortgageRequest) : null;
+        return mortgageRequest != null
+            ? OperationResult<MortgageRequestDto>.FromValue(MortgageRequestDto.FromDomain(mortgageRequest))
+            : OperationResult<MortgageRequestDto>.NotFound($"Mortgage request {req.RequestId} not found");
     });
 
 // Register get mortgage request by user tool
@@ -427,7 +430,9 @@ mcpServer.RegisterTool<GetMortgageRequestByUserRequest>("get_mortgage_request_by
         using var scope = serviceProvider.CreateScope();
         var mortgageService = scope.ServiceProvider.GetRequiredService<IMortgageApprovalService>();
         var mortgageRequest = await mortgageService.GetMortgageRequestByUserAsync(req.UserName);
-        return mortgageRequest != null ? MortgageRequestDto.FromDomain(mortgageRequest) : null;
+        return mortgageRequest != null
+            ? OperationResult<MortgageRequestDto>.FromValue(MortgageRequestDto.FromDomain(mortgageRequest))
+            : OperationResult<MortgageRequestDto>.NotFound($"Mortgage request for user '{req.UserName}' not found");
     });
 
 // Register update mortgage data tool
@@ -444,9 +449,10 @@ mcpServer.RegisterTool<UpdateMortgageDataMCPRequest>("update_mortgage_data",
             Employment = req.Employment,
             Property = req.Property
         };
-        
         var mortgageRequest = await mortgageService.UpdateMortgageDataStrongAsync(req.RequestId, updateData);
-        return mortgageRequest != null ? MortgageRequestDto.FromDomain(mortgageRequest) : null;
+        return mortgageRequest != null
+            ? OperationResult<MortgageRequestDto>.FromValue(MortgageRequestDto.FromDomain(mortgageRequest))
+            : OperationResult<MortgageRequestDto>.NotFound($"Mortgage request {req.RequestId} not found for update");
     });
 
 // Register cross-service verification tool
@@ -458,19 +464,30 @@ mcpServer.RegisterTool<VerifyMortgageRequestRequest>("verify_mortgage_request",
         var verificationService = scope.ServiceProvider.GetRequiredService<ICrossServiceVerificationService>();
         var mortgageService = scope.ServiceProvider.GetRequiredService<IMortgageApprovalService>();
         var mortgageRequest = await mortgageService.GetMortgageRequestAsync(req.RequestId);
-        if (mortgageRequest == null) return null;
-        
-        return await verificationService.VerifyMortgageRequirementsAsync(mortgageRequest.UserName, mortgageRequest.RequestData);
+        if (mortgageRequest == null)
+        {
+            return OperationResult<CrossServiceVerificationResult>.NotFound($"Mortgage request {req.RequestId} not found for verification");
+        }
+        var verification = await verificationService.VerifyMortgageRequirementsAsync(mortgageRequest.UserName, mortgageRequest.RequestData);
+        return OperationResult<CrossServiceVerificationResult>.FromValue(verification);
     });
 
 // Register MCP resources for MortgageApprover
 mcpServer.RegisterResource("mortgage://requests/summary", "Mortgage Requests Summary", 
     "Summary of all mortgage requests in the system",
-    async () => new { message = "Mortgage requests summary resource - specify user parameter for user-specific requests" });
+    () => Task.FromResult<object>(new { message = "Mortgage requests summary resource - specify user parameter for user-specific requests" }));
 
 app.Logger.LogInformation("Registered MCP tools and resources for MortgageApprover");
 
 app.Run();
+
+// Generic operation result wrapper to avoid null returns in MCP tools
+public record OperationResult<T>(bool Success, T? Value, string? Error)
+{
+    public static OperationResult<T> FromValue(T value) => new(true, value, null);
+    public static OperationResult<T> NotFound(string? message = null) => new(false, default, message ?? "Not found");
+    public static OperationResult<T> Failure(string message) => new(false, default, message);
+}
 
 // DTOs for API endpoints
 public record CreateMortgageRequestDto(string UserName);

@@ -1,3 +1,5 @@
+// Temporary suppression of async no-await warnings; lambdas use awaited service calls but some helper methods intentionally synchronous
+#pragma warning disable CS1998 // Async method lacks 'await'
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
@@ -607,6 +609,8 @@ mcpServer.RegisterResource("ledger://accounts/summary", "Account Summary",
 app.Logger.LogInformation("Registered MCP tools and resources for LedgerService");
 
 app.Run();
+
+#pragma warning restore CS1998
 
 // Make Program class accessible for testing
 namespace CanIHazHouze.LedgerService

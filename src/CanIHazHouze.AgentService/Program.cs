@@ -118,6 +118,72 @@ app.MapGet("/agents", async (IAgentStorageService storage) =>
 })
 .Produces<List<Agent>>(StatusCodes.Status200OK);
 
+// Diagnostics: raw agent documents (including runs) for troubleshooting listing issues
+app.MapGet("/agents/raw", async (IAgentStorageService storage, Microsoft.Azure.Cosmos.CosmosClient cosmosClient) =>
+{
+    try
+    {
+        var db = cosmosClient.GetDatabase("houze");
+        var container = db.GetContainer("agents");
+        var query = new Microsoft.Azure.Cosmos.QueryDefinition("SELECT * FROM c");
+        var iterator = container.GetItemQueryIterator<dynamic>(query);
+        var docs = new List<object>();
+        while (iterator.HasMoreResults)
+        {
+            var response = await iterator.ReadNextAsync();
+            docs.AddRange(response);
+        }
+        return Results.Ok(docs);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error retrieving raw agent documents");
+        return Results.Problem("Diagnostics failed retrieving raw documents");
+    }
+})
+.WithName("GetRawAgentDocuments")
+.WithSummary("Diagnostics: Get all raw documents in agents container")
+.WithDescription("Returns every document from the agents container regardless of entityType to debug missing entries.")
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Diagnostics" }];
+    return operation;
+})
+.Produces<List<object>>(StatusCodes.Status200OK);
+
+// Diagnostics: counts by entityType
+app.MapGet("/agents/counts", async (IAgentStorageService storage, Microsoft.Azure.Cosmos.CosmosClient cosmosClient) =>
+{
+    try
+    {
+        var db = cosmosClient.GetDatabase("houze");
+        var container = db.GetContainer("agents");
+        var query = new Microsoft.Azure.Cosmos.QueryDefinition("SELECT c.entityType AS entityType, COUNT(1) AS count FROM c GROUP BY c.entityType");
+        var iterator = container.GetItemQueryIterator<dynamic>(query);
+        var results = new List<object>();
+        while (iterator.HasMoreResults)
+        {
+            var response = await iterator.ReadNextAsync();
+            results.AddRange(response);
+        }
+        return Results.Ok(results);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error retrieving entity type counts");
+        return Results.Problem("Diagnostics failed retrieving counts");
+    }
+})
+.WithName("GetAgentEntityCounts")
+.WithSummary("Diagnostics: Get counts by entityType")
+.WithDescription("Returns counts of documents grouped by entityType to verify agent documents exist.")
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Diagnostics" }];
+    return operation;
+})
+.Produces<List<object>>(StatusCodes.Status200OK);
+
 app.MapGet("/agents/{id}", async (string id, IAgentStorageService storage) =>
 {
     try

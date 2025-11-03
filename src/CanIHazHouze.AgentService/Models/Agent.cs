@@ -1,10 +1,13 @@
 using System.ComponentModel.DataAnnotations;
+using Newtonsoft.Json; // Cosmos SDK uses Newtonsoft serialization
 
 namespace CanIHazHouze.AgentService.Models;
 
 public class Agent
 {
+    // Cosmos DB requires a lowercase 'id' property – attribute ensures correct JSON field name
     [Required]
+    [JsonProperty(PropertyName = "id")]
     public string Id { get; set; } = Guid.NewGuid().ToString();
     
     // Partition key - same as Id for agent entities

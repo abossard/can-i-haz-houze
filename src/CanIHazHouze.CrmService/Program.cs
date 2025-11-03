@@ -1,3 +1,6 @@
+// Suppress specific nullable return and async warnings until refactor adds explicit non-null contracts
+#pragma warning disable CS8603 // Possible null reference return
+#pragma warning disable CS1998 // Async method lacks 'await'
 using Microsoft.AspNetCore.Mvc;
 using Scalar.AspNetCore;
 using System.ComponentModel.DataAnnotations;
@@ -595,6 +598,9 @@ mcpServer.RegisterResource("crm://complaints/summary", "Complaints Summary",
 app.Logger.LogInformation("Registered MCP tools and resources for CrmService");
 
 app.Run();
+
+#pragma warning restore CS8603
+#pragma warning restore CS1998
 
 // Make Program class accessible for testing
 namespace CanIHazHouze.CrmService

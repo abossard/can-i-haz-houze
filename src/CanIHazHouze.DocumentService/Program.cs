@@ -1,3 +1,6 @@
+// Temporary suppression of nullable return and async warnings until proper nullability annotations are added
+#pragma warning disable CS8603 // Possible null reference return
+#pragma warning disable CS1998 // Async method lacks 'await'
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
@@ -1353,6 +1356,9 @@ app.Logger.LogInformation("🚀 Starting CanIHazHouze.DocumentService...");
 app.Logger.LogInformation("📍 The application will be available once Aspire dependencies are ready");
 
 app.Run();
+
+#pragma warning restore CS8603
+#pragma warning restore CS1998
 
 /// <summary>
 /// Configures Unix signal handling to capture and log signals without terminating the application
