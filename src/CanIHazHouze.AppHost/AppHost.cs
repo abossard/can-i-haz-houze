@@ -30,44 +30,17 @@ if (builder.ExecutionContext.IsPublishMode)
 {
     // Add model deployments for document processing and agent execution
     var openaiResource = (IResourceBuilder<AzureOpenAIResource>)openai;
-    
-    // GPT-5 Series - Advanced reasoning models
-    // GPT-5 - Flagship reasoning model for logic-heavy tasks
+  
     openaiResource.AddDeployment(
-        name: "gpt-5",
-        modelName: "gpt-5", 
-        modelVersion: "2024-11-01");
+        name: "gpt-4o",
+        modelName: "gpt-4o", 
+        modelVersion: "2024-11-20");
     
-    // GPT-5 Mini - Lightweight reasoning model
-    openaiResource.AddDeployment(
-        name: "gpt-5-mini",
-        modelName: "gpt-5-mini", 
-        modelVersion: "2024-11-01");
     
-    // GPT-5 Nano - Speed and low latency reasoning
     openaiResource.AddDeployment(
-        name: "gpt-5-nano",
-        modelName: "gpt-5-nano", 
-        modelVersion: "2024-11-01");
-    
-    // GPT-4.1 Series - Fast-response models
-    // GPT-4.1 - Fast response with 1M context
-    openaiResource.AddDeployment(
-        name: "gpt-41",
-        modelName: "gpt-4.1", 
-        modelVersion: "2024-11-01");
-    
-    // GPT-4.1 Mini - Balanced performance and cost
-    openaiResource.AddDeployment(
-        name: "gpt-41-mini",
-        modelName: "gpt-4.1-mini", 
-        modelVersion: "2024-11-01");
-    
-    // GPT-4.1 Nano - Lowest cost and latency
-    openaiResource.AddDeployment(
-        name: "gpt-41-nano",
-        modelName: "gpt-4.1-nano", 
-        modelVersion: "2024-11-01");
+        name: "gpt-4o-mini",
+        modelName: "gpt-4o-mini", 
+        modelVersion: "2024-07-18");
 }
 
 // Add Azure Storage with Azurite emulator for local development

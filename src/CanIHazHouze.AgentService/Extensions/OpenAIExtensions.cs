@@ -18,34 +18,84 @@ public static class OpenAIExtensions
     public static void AddAzureOpenAIConfiguration(this WebApplicationBuilder builder, string connectionName = "openai")
     {
         var connectionString = builder.Configuration.GetConnectionString(connectionName);
-        if (string.IsNullOrEmpty(connectionString))
+
+        // Fallback to environment-style variables if connection string not present
+        if (string.IsNullOrWhiteSpace(connectionString))
         {
-            throw new InvalidOperationException($"OpenAI connection string '{connectionName}' not found in configuration.");
+            var envEndpoint = builder.Configuration["OPENAI_ENDPOINT"] ?? Environment.GetEnvironmentVariable("OPENAI_ENDPOINT");
+            var envKey = builder.Configuration["OPENAI_API_KEY"]
+                        ?? builder.Configuration["OPENAI_KEY"]
+                        ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+                        ?? Environment.GetEnvironmentVariable("OPENAI_KEY");
+
+            if (!string.IsNullOrWhiteSpace(envEndpoint) && !string.IsNullOrWhiteSpace(envKey))
+            {
+                Register(builder, envEndpoint, envKey, source: "environment variables");
+                return;
+            }
+
+            throw new InvalidOperationException($"OpenAI connection string '{connectionName}' not found. Set user-secret 'ConnectionStrings:{connectionName}' to 'Endpoint=<url>;Key=<key>' or provide OPENAI_ENDPOINT + OPENAI_API_KEY environment variables.");
         }
 
-        // Parse Aspire connection string format: Endpoint=https://...;Key=...
+        // Parse flexible connection string: supports Endpoint= / Url= and Key=/ApiKey=/Api-Key=
         var parts = connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
-        var endpoint = parts.FirstOrDefault(p => p.StartsWith("Endpoint=", StringComparison.OrdinalIgnoreCase))
-            ?.Split('=', 2)[1];
-        var key = parts.FirstOrDefault(p => p.StartsWith("Key=", StringComparison.OrdinalIgnoreCase))
-            ?.Split('=', 2)[1];
+        var kvPairs = parts
+            .Select(p => p.Split('=', 2))
+            .Where(a => a.Length == 2)
+            .ToDictionary(a => a[0].Trim(), a => a[1].Trim(), StringComparer.OrdinalIgnoreCase);
 
-        if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(key))
+        kvPairs.TryGetValue("Endpoint", out var endpoint);
+        if (string.IsNullOrWhiteSpace(endpoint) && kvPairs.TryGetValue("Url", out var altEndpoint))
         {
-            throw new InvalidOperationException($"Invalid OpenAI connection string format. Expected: Endpoint=<url>;Key=<key>");
+            endpoint = altEndpoint;
         }
 
-        // Register OpenAI configuration for Semantic Kernel dynamic kernel creation
+        string? key = null;
+        if (!kvPairs.TryGetValue("Key", out key))
+        {
+            kvPairs.TryGetValue("ApiKey", out key);
+        }
+        if (string.IsNullOrWhiteSpace(key) && kvPairs.TryGetValue("Api-Key", out var dashKey))
+        {
+            key = dashKey;
+        }
+
+        // Additional fallback to environment if parts missing
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            endpoint = builder.Configuration["OPENAI_ENDPOINT"] ?? Environment.GetEnvironmentVariable("OPENAI_ENDPOINT") ?? string.Empty;
+        }
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            key = builder.Configuration["OPENAI_API_KEY"]
+                   ?? builder.Configuration["OPENAI_KEY"]
+                   ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+                   ?? Environment.GetEnvironmentVariable("OPENAI_KEY")
+                   ?? string.Empty;
+        }
+
+        if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(key))
+        {
+            var presentKeys = string.Join(", ", kvPairs.Keys.OrderBy(k => k));
+            throw new InvalidOperationException($"Invalid OpenAI connection string. Provided keys: [{presentKeys}]. Expected at minimum 'Endpoint' (or 'Url') and 'Key' (or 'ApiKey'). Actual string format: Endpoint=<url>;Key=<key>");
+        }
+
+        Register(builder, endpoint, key, source: "connection string");
+    }
+
+    private static void Register(WebApplicationBuilder builder, string endpoint, string apiKey, string source)
+    {
+        // Basic sanitization for logs (do not log full key)
+        var sanitizedKey = apiKey.Length <= 8 ? "***" : apiKey[..4] + "***" + apiKey[^4..];
+        // Using Console.WriteLine here because ILoggerFactory isn't available yet at this configuration stage.
+        Console.WriteLine($"[OpenAI] Configuring Azure OpenAI from {source} at {endpoint} with key fragment {sanitizedKey}");
+
         builder.Services.Configure<OpenAIConfiguration>(options =>
         {
             options.Endpoint = endpoint;
-            options.ApiKey = key;
+            options.ApiKey = apiKey;
         });
 
-        // Also register AzureOpenAIClient for direct Azure SDK access if needed
-        builder.Services.AddSingleton(sp =>
-        {
-            return new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(key));
-        });
+        builder.Services.AddSingleton(_ => new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(apiKey)));
     }
 }

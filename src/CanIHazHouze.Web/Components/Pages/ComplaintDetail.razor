@@ -105,7 +105,7 @@ else if (complaint != null)
                                     <div class="flex-grow-1">
                                         <h6 class="mb-1">@comment.AuthorName</h6>
                                         <small class="text-muted">@comment.CreatedAt.ToString("MMM dd, yyyy h:mm tt")</small>
-                                        <p class="mb-0 mt-2">@comment.Text</p>
+                                        <pre class="mb-0 mt-2" style="white-space:pre-wrap;">@comment.Text</pre>
                                     </div>
                                     <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteComment(comment.Id)">
                                         <i class="bi bi-trash"></i>
