@@ -72,40 +72,16 @@ public static class AvailableModels
     {
         new ModelDeployment 
         { 
-            DeploymentName = "gpt-5", 
-            DisplayName = "GPT-5", 
+            DeploymentName = "gpt-4o", 
+            DisplayName = "gpt-4o", 
             Description = "Flagship reasoning model for logic-heavy tasks, deep analytics, and code generation" 
         },
         new ModelDeployment 
         { 
-            DeploymentName = "gpt-5-mini", 
-            DisplayName = "GPT-5 Mini", 
-            Description = "Lightweight GPT-5 for cost-sensitive use cases with reasoning capabilities" 
+            DeploymentName = "gpt-4o-mini", 
+            DisplayName = "gpt-4o Mini", 
+            Description = "Lightweight gpt-4o for cost-sensitive use cases with reasoning capabilities" 
         },
-        new ModelDeployment 
-        { 
-            DeploymentName = "gpt-5-nano", 
-            DisplayName = "GPT-5 Nano", 
-            Description = "Optimized for speed and low latency with reasoning" 
-        },
-        new ModelDeployment 
-        { 
-            DeploymentName = "gpt-41", 
-            DisplayName = "GPT-4.1", 
-            Description = "Fast-response model excelling at technical coding and instruction-following (1M context)" 
-        },
-        new ModelDeployment 
-        { 
-            DeploymentName = "gpt-41-mini", 
-            DisplayName = "GPT-4.1 Mini", 
-            Description = "Balanced performance and cost with 1M context support" 
-        },
-        new ModelDeployment 
-        { 
-            DeploymentName = "gpt-41-nano", 
-            DisplayName = "GPT-4.1 Nano", 
-            Description = "Lowest cost and latency for high-throughput workloads" 
-        }
     };
 }
 
