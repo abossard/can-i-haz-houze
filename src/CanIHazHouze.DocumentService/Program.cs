@@ -20,6 +20,7 @@ logger.LogInformation("🔧 Building CanIHazHouze.DocumentService...");
 // Add service defaults & Aspire client integrations.
 logger.LogInformation("➕ Adding Aspire service defaults...");
 builder.AddServiceDefaults();
+builder.AddMCPSupport();
 
 // Add services to the container.
 logger.LogInformation("➕ Adding problem details support...");
@@ -1209,8 +1210,12 @@ app.MapPut("/documents/{id}/enhance-tags", async (
 
 app.MapDefaultEndpoints();
 
-// Register MCP tools for DocumentService
-var mcpServer = app.Services.GetRequiredService<IMCPServer>();
+// TODO: MCP tool registration needs migration to official SDK
+// The official SDK requires using [McpServerToolType] and [McpServerTool] attributes
+// or registering tools via builder.Services.AddMcpServer().WithTools<TToolsClass>()
+// For now, tools are exposed via REST API endpoints above and can be called directly via HTTP
+/*
+var mcpServer = app.Services.GetRequiredService<McpServer>();
 var serviceProvider = app.Services;
 
 // Register upload document tool
@@ -1361,6 +1366,7 @@ mcpServer.RegisterResource("documents://all", "All Documents",
     async () => new { message = "Document catalog resource - specify owner parameter for user documents" });
 
 app.Logger.LogInformation("🔧 Registered MCP tools and resources for DocumentService");
+*/
 
 app.Logger.LogInformation("🎯 All endpoints configured successfully");
 app.Logger.LogInformation("🚀 Starting CanIHazHouze.DocumentService...");

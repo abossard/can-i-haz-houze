@@ -66,6 +66,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
+builder.AddMCPSupport();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
@@ -394,8 +395,12 @@ app.MapGet("/mortgage-requests/{requestId:guid}/verification-status", async (
 
 app.MapDefaultEndpoints();
 
-// Register MCP tools for MortgageApprover
-var mcpServer = app.Services.GetRequiredService<IMCPServer>();
+// TODO: MCP tool registration needs migration to official SDK
+// The official SDK requires using [McpServerToolType] and [McpServerTool] attributes
+// or registering tools via builder.Services.AddMcpServer().WithTools<TToolsClass>()
+// For now, tools are exposed via REST API endpoints above and can be called directly via HTTP
+/*
+var mcpServer = app.Services.GetRequiredService<McpServer>();
 var serviceProvider = app.Services;
 
 // Register create mortgage request tool
@@ -478,6 +483,7 @@ mcpServer.RegisterResource("mortgage://requests/summary", "Mortgage Requests Sum
     () => Task.FromResult<object>(new { message = "Mortgage requests summary resource - specify user parameter for user-specific requests" }));
 
 app.Logger.LogInformation("Registered MCP tools and resources for MortgageApprover");
+*/
 
 app.Run();
 

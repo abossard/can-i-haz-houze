@@ -12,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
+builder.AddMCPSupport();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
@@ -557,56 +558,11 @@ app.MapGet("/transactions/recent", async (ILedgerService ledgerService, int take
 
 app.MapDefaultEndpoints();
 
-// Register MCP tools for LedgerService
-var mcpServer = app.Services.GetRequiredService<IMCPServer>();
-var serviceProvider = app.Services;
-
-// Register get account info tool
-mcpServer.RegisterTool<GetAccountRequest>("get_account_info", 
-    "Retrieve account information including balance and timestamps",
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var ledgerService = scope.ServiceProvider.GetRequiredService<ILedgerService>();
-        return await ledgerService.GetAccountAsync(req.Owner);
-    });
-
-// Register update balance tool  
-mcpServer.RegisterTool<UpdateBalanceRequest>("update_account_balance",
-    "Update account balance by adding or subtracting the specified amount", 
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var ledgerService = scope.ServiceProvider.GetRequiredService<ILedgerService>();
-        return await ledgerService.UpdateBalanceAsync(req.Owner, req.Amount, req.Description);
-    });
-
-// Register get transactions tool
-mcpServer.RegisterTool<GetTransactionsRequest>("get_transaction_history",
-    "Retrieve transaction history for a user account with pagination support",
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var ledgerService = scope.ServiceProvider.GetRequiredService<ILedgerService>();
-        return await ledgerService.GetTransactionsAsync(req.Owner, req.Skip, req.Take);
-    });
-
-// Register reset account tool
-mcpServer.RegisterTool<ResetAccountRequest>("reset_account",
-    "Reset account to initial state with new random balance", 
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var ledgerService = scope.ServiceProvider.GetRequiredService<ILedgerService>();
-        return await ledgerService.ResetAccountAsync(req.Owner);
-    });
-
-// Register MCP resources for LedgerService
-mcpServer.RegisterResource("ledger://accounts/summary", "Account Summary", 
-    "Summary of all account information",
-    async () => new { message = "Account summary resource - specify owner parameter for specific account" });
-
-app.Logger.LogInformation("Registered MCP tools and resources for LedgerService");
+// TODO: MCP tool registration needs migration to official SDK
+// The official SDK requires using [McpServerToolType] and [McpServerTool] attributes
+// or registering tools via builder.Services.AddMcpServer().WithTools<TToolsClass>()
+// For now, tools are exposed via REST API endpoints above and can be called directly via HTTP
+app.Logger.LogInformation("LedgerService REST API endpoints registered (MCP tools pending migration)");
 
 app.Run();
 

@@ -13,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations
 builder.AddServiceDefaults();
+builder.AddMCPSupport();
 
 // Add services to the container
 builder.Services.AddProblemDetails();
@@ -506,96 +507,11 @@ app.MapDelete("/complaints/{id:guid}/comments/{commentId:guid}", async (
 
 app.MapDefaultEndpoints();
 
-// Register MCP tools for CrmService
-var mcpServer = app.Services.GetRequiredService<IMCPServer>();
-var serviceProvider = app.Services;
-
-// Register create complaint tool
-mcpServer.RegisterTool<CreateComplaintMcpRequest>("create_complaint",
-    "Create a new customer complaint in the CRM system",
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var crmService = scope.ServiceProvider.GetRequiredService<ICrmService>();
-        return await crmService.CreateComplaintAsync(req.CustomerName, req.Title, req.Description);
-    });
-
-// Register get complaints tool
-mcpServer.RegisterTool<GetComplaintsMcpRequest>("get_complaints",
-    "Retrieve all complaints for a specific customer",
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var crmService = scope.ServiceProvider.GetRequiredService<ICrmService>();
-        return await crmService.GetComplaintsAsync(req.CustomerName);
-    });
-
-// Register get recent complaints tool
-mcpServer.RegisterTool<GetRecentComplaintsMcpRequest>("get_recent_complaints",
-    "Retrieve recent complaints across all customers with configurable limit",
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var crmService = scope.ServiceProvider.GetRequiredService<ICrmService>();
-        return await crmService.GetRecentComplaintsAsync(req.Limit ?? 10);
-    });
-
-// Register get specific complaint tool
-mcpServer.RegisterTool<GetComplaintMcpRequest>("get_complaint",
-    "Retrieve a specific complaint by ID for a customer",
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var crmService = scope.ServiceProvider.GetRequiredService<ICrmService>();
-        return await crmService.GetComplaintAsync(req.Id, req.CustomerName);
-    });
-
-// Register update complaint status tool
-mcpServer.RegisterTool<UpdateComplaintStatusMcpRequest>("update_complaint_status",
-    "Update the status of a complaint (New, InProgress, Solved, Rejected)",
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var crmService = scope.ServiceProvider.GetRequiredService<ICrmService>();
-        return await crmService.UpdateComplaintStatusAsync(req.Id, req.CustomerName, req.Status);
-    });
-
-// Register add comment tool
-mcpServer.RegisterTool<AddCommentMcpRequest>("add_complaint_comment",
-    "Add a support comment to an existing complaint",
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var crmService = scope.ServiceProvider.GetRequiredService<ICrmService>();
-        return await crmService.AddCommentAsync(req.Id, req.CustomerName, req.AuthorName, req.Text);
-    });
-
-// Register add approval tool
-mcpServer.RegisterTool<AddApprovalMcpRequest>("add_complaint_approval",
-    "Add an approval decision to a complaint (Pending, Approved, Rejected)",
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var crmService = scope.ServiceProvider.GetRequiredService<ICrmService>();
-        return await crmService.AddApprovalAsync(req.Id, req.CustomerName, req.ApproverName, req.Decision, req.Comments);
-    });
-
-// Register delete complaint tool
-mcpServer.RegisterTool<DeleteComplaintMcpRequest>("delete_complaint",
-    "Permanently delete a complaint and all associated data",
-    async req => 
-    {
-        using var scope = serviceProvider.CreateScope();
-        var crmService = scope.ServiceProvider.GetRequiredService<ICrmService>();
-        return await crmService.DeleteComplaintAsync(req.Id, req.CustomerName);
-    });
-
-// Register MCP resources for CrmService
-mcpServer.RegisterResource("crm://complaints/summary", "Complaints Summary",
-    "Summary of CRM complaint management system",
-    async () => new { message = "CRM complaints resource - use tools to query specific complaints or customers" });
-
-app.Logger.LogInformation("Registered MCP tools and resources for CrmService");
+// TODO: MCP tool registration needs migration to official SDK
+// The official SDK requires using [McpServerToolType] and [McpServerTool] attributes
+// or registering tools via builder.Services.AddMcpServer().WithTools<TToolsClass>()
+// For now, tools are exposed via REST API endpoints above and can be called directly via HTTP
+app.Logger.LogInformation("CrmService REST API endpoints registered (MCP tools pending migration)");
 
 app.Run();
 

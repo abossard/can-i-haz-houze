@@ -99,6 +99,9 @@ var agentService = builder.AddProject<Projects.CanIHazHouze_AgentService>("agent
     .WithExternalHttpEndpoints()
     .WithReference(cosmos) 
     .WithReference(openai)
+    .WithReference(ledgerService)   // ← Add reference for MCP endpoint discovery
+    .WithReference(crmService)      // ← Add reference for MCP endpoint discovery
+    .WithReference(documentService) // ← Add reference for MCP endpoint discovery
     .WithHttpHealthCheck("/health");
 
 builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")

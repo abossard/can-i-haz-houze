@@ -30,7 +30,7 @@ public class AgentExecutionService : IAgentExecutionService
         _logger = logger;
     }
     
-    private async Task<Kernel> CreateKernelForModelAsync(string deploymentName, List<string> tools, CancellationToken cancellationToken)
+    private async Task<Kernel> CreateKernelForModelAsync(string deploymentName, List<string> tools, AgentRun run, CancellationToken cancellationToken)
     {
         var builder = Kernel.CreateBuilder();
         
@@ -39,14 +39,20 @@ public class AgentExecutionService : IAgentExecutionService
             deploymentName: deploymentName,
             azureOpenAIClient: _openAIClient);
         
-        // Map of tool names to their MCP endpoints (from service discovery)
+        // Map of tool names to their MCP endpoints using Aspire service discovery format
+        // Format: https+http://servicename/path allows Aspire to resolve the service URL
         var mcpEndpoints = new Dictionary<string, string>
         {
-            ["ledgerapi"] = _configuration.GetConnectionString("ledgerservice") + "/mcp",
-            ["crmapi"] = _configuration.GetConnectionString("crmservice") + "/mcp",
-            ["documentsapi"] = _configuration.GetConnectionString("documentservice") + "/mcp",
-            // Add more services as needed
+            ["ledgerapi"] = "https+http://ledgerservice/mcp",
+            ["crmapi"] = "https+http://crmservice/mcp",
+            ["documentsapi"] = "https+http://documentservice/mcp"
         };
+        
+        run.Logs.Add(new AgentRunLog
+        {
+            Level = "info",
+            Message = $"Configured MCP endpoints: {string.Join(", ", mcpEndpoints.Select(kvp => $"{kvp.Key}={kvp.Value}"))}"
+        });
         
         // Register MCP plugins based on agent's tool configuration
         foreach (var tool in tools)
@@ -55,6 +61,12 @@ public class AgentExecutionService : IAgentExecutionService
             
             if (mcpEndpoints.TryGetValue(toolKey, out var mcpEndpoint))
             {
+                run.Logs.Add(new AgentRunLog
+                {
+                    Level = "info",
+                    Message = $"Attempting to load MCP tools for {tool} from {mcpEndpoint}"
+                });
+                
                 try
                 {
                     await builder.AddMcpToolsAsync(
@@ -63,15 +75,30 @@ public class AgentExecutionService : IAgentExecutionService
                         tool, // Use original casing for plugin name
                         _logger,
                         cancellationToken);
+                    
+                    run.Logs.Add(new AgentRunLog
+                    {
+                        Level = "info",
+                        Message = $"Successfully loaded MCP plugin: {tool}"
+                    });
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Failed to load MCP tools for {Tool} from {Endpoint}", tool, mcpEndpoint);
+                    run.Logs.Add(new AgentRunLog
+                    {
+                        Level = "error",
+                        Message = $"Failed to load MCP tools for {tool}: {ex.Message}"
+                    });
                 }
             }
             else
             {
-                _logger.LogWarning("Unknown tool or no MCP endpoint configured: {Tool}", tool);
+                run.Logs.Add(new AgentRunLog
+                {
+                    Level = "warning",
+                    Message = $"Unknown tool or no MCP endpoint configured: {tool}. Available: {string.Join(", ", mcpEndpoints.Keys)}"
+                });
             }
         }
         
@@ -154,7 +181,22 @@ public class AgentExecutionService : IAgentExecutionService
             });
 
             // Create kernel with the agent's specified model deployment and tools
-            var kernel = await CreateKernelForModelAsync(agent.Config.Model, agent.Tools, CancellationToken.None);
+            var kernel = await CreateKernelForModelAsync(agent.Config.Model, agent.Tools, run, CancellationToken.None);
+            
+            // Log available functions after kernel is built
+            var availableFunctions = kernel.Plugins.SelectMany(p => p.Select(f => $"{p.Name}.{f.Name}")).ToList();
+            if (availableFunctions.Any())
+            {
+                run.Logs.Add(new AgentRunLog
+                {
+                    Level = "info",
+                    Message = $"Kernel has {availableFunctions.Count} functions available",
+                    Data = new Dictionary<string, object>
+                    {
+                        { "functions", availableFunctions }
+                    }
+                });
+            }
             
             // Enable automatic function calling if tools are configured
             if (agent.Tools.Any())

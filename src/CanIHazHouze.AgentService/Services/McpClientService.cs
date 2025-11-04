@@ -43,12 +43,29 @@ public class McpClientService : IMcpClientService
 
         _logger.LogInformation("Creating MCP client for endpoint: {Endpoint}", mcpEndpointUrl);
         
-        // Create HTTP transport for MCP (supports both SSE and Streamable HTTP)
+        // Create HTTP client configured with Aspire service discovery
+        // The HttpClientFactory will handle Aspire's service discovery format (https+http://)
         var httpClient = _httpClientFactory.CreateClient();
+        
+        // For Aspire service discovery URLs, we need to make an initial request to get the actual URL
+        // But for MCP, we'll use the URI directly and let HttpClient resolve it
+        Uri endpoint;
+        if (mcpEndpointUrl.StartsWith("https+http://", StringComparison.OrdinalIgnoreCase))
+        {
+            // Convert Aspire service discovery format to standard HTTPS for the transport
+            // The actual resolution will happen via the HttpClient
+            var servicePath = mcpEndpointUrl.Substring("https+http://".Length);
+            endpoint = new Uri($"http://{servicePath}");
+        }
+        else
+        {
+            endpoint = new Uri(mcpEndpointUrl);
+        }
+        
         var transport = new HttpClientTransport(
             new HttpClientTransportOptions
             {
-                Endpoint = new Uri(mcpEndpointUrl),
+                Endpoint = endpoint,
                 TransportMode = HttpTransportMode.AutoDetect // Try Streamable HTTP first, fall back to SSE
             },
             httpClient,

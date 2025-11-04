@@ -33,7 +33,9 @@ public static class McpToSemanticKernelConverter
                 return;
             }
             
-            logger.LogInformation("Found {Count} tools from MCP server", mcpTools.Count);
+            logger.LogInformation("Found {Count} tools from MCP server: {Tools}", 
+                mcpTools.Count, 
+                string.Join(", ", mcpTools.Select(t => t.Name)));
             
             // Convert each MCP tool to a Semantic Kernel function
             var plugin = new List<KernelFunction>();
@@ -48,7 +50,9 @@ public static class McpToSemanticKernelConverter
                     
                 plugin.Add(kernelFunction);
                 
-                logger.LogInformation("Registered MCP tool '{Tool}' as SK function", mcpTool.Name);
+                logger.LogInformation("Registered MCP tool: {Tool} - {Description}", 
+                    mcpTool.Name, 
+                    mcpTool.Description ?? "No description");
             }
             
             // Add all functions as a plugin
@@ -74,7 +78,10 @@ public static class McpToSemanticKernelConverter
         {
             try
             {
-                logger.LogInformation("Invoking MCP tool '{Tool}' via Semantic Kernel", mcpTool.Name);
+                var argsList = string.Join(", ", arguments.Select(a => $"{a.Key}={a.Value}"));
+                logger.LogInformation("Invoking MCP tool '{Tool}' with arguments: {Arguments}", 
+                    mcpTool.Name, 
+                    argsList);
                 
                 // Convert KernelArguments to dictionary for MCP
                 var mcpArguments = new Dictionary<string, object>();
@@ -90,7 +97,9 @@ public static class McpToSemanticKernelConverter
                     mcpArguments,
                     CancellationToken.None);
                 
-                logger.LogInformation("MCP tool '{Tool}' executed successfully", mcpTool.Name);
+                logger.LogInformation("MCP tool '{Tool}' returned: {Result}", 
+                    mcpTool.Name, 
+                    result.Length > 200 ? result.Substring(0, 200) + "..." : result);
                 return result;
             }
             catch (Exception ex)
