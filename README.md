@@ -14,15 +14,77 @@ Welcome to the ultimate .NET Aspire-powered mortgage approval system! This baby 
 
 ## 🚀 What's Inside This Magical Box?
 
-- **🏢 AppHost**: The orchestrator that keeps everyone in line
-- **📄 Document Service**: Where your PDFs go to get analyzed by AI 
-- **📊 Ledger Service**: Tracks your financial shenanigans
-- **🏦 Mortgage Approver**: The final boss that says "yes" or "no"
-- **🎫 CRM Service**: Manage customer complaints and support workflows
-- **🌐 Web Frontend**: Pretty UI for humans to click buttons
-- **🤖 Azure OpenAI Integration**: Because humans are terrible at reading documents
-- **🔌 MCP Server Support**: Model Context Protocol for AI assistant integration
-- **🎯 AI Agent Workbench**: Build and manage AI agents with Semantic Kernel
+```mermaid
+graph TB
+    subgraph Frontend["🌐 Frontend Layer"]
+        Web["Web UI<br/>Blazor Components"]
+        Agent["Agent Workbench<br/>Semantic Kernel"]
+    end
+    
+    subgraph Services["🔧 Core Services"]
+        AppHost["AppHost<br/>Orchestrator"]
+        Doc["Document Service<br/>AI Analysis"]
+        Ledger["Ledger Service<br/>Transactions"]
+        Mortgage["Mortgage Approver<br/>Decisions"]
+        CRM["CRM Service<br/>Support"]
+    end
+    
+    subgraph Integration["🤖 AI & Integration"]
+        OpenAI["Azure OpenAI<br/>GPT-4o-mini"]
+        MCP["MCP Server<br/>AI Assistants"]
+    end
+    
+    subgraph Data["💾 Data Layer"]
+        Cosmos["Cosmos DB"]
+        Blob["Blob Storage"]
+    end
+    
+    Web --> AppHost
+    Agent --> AppHost
+    AppHost --> Doc
+    AppHost --> Ledger
+    AppHost --> Mortgage
+    AppHost --> CRM
+    Doc --> OpenAI
+    Agent --> OpenAI
+    Mortgage --> OpenAI
+    MCP --> Doc
+    MCP --> Ledger
+    MCP --> Mortgage
+    MCP --> CRM
+    Doc --> Blob
+    Doc --> Cosmos
+    Ledger --> Cosmos
+    Mortgage --> Cosmos
+    CRM --> Cosmos
+    
+    style Frontend fill:#2d3748,stroke:#4299e1,stroke-width:2px,color:#fff
+    style Services fill:#2d3748,stroke:#48bb78,stroke-width:2px,color:#fff
+    style Integration fill:#2d3748,stroke:#9f7aea,stroke-width:2px,color:#fff
+    style Data fill:#2d3748,stroke:#ed8936,stroke-width:2px,color:#fff
+    style Web fill:#1a202c,stroke:#4299e1,color:#63b3ed
+    style Agent fill:#1a202c,stroke:#4299e1,color:#63b3ed
+    style AppHost fill:#1a202c,stroke:#48bb78,color:#68d391
+    style Doc fill:#1a202c,stroke:#48bb78,color:#68d391
+    style Ledger fill:#1a202c,stroke:#48bb78,color:#68d391
+    style Mortgage fill:#1a202c,stroke:#48bb78,color:#68d391
+    style CRM fill:#1a202c,stroke:#48bb78,color:#68d391
+    style OpenAI fill:#1a202c,stroke:#9f7aea,color:#b794f4
+    style MCP fill:#1a202c,stroke:#9f7aea,color:#b794f4
+    style Cosmos fill:#1a202c,stroke:#ed8936,color:#f6ad55
+    style Blob fill:#1a202c,stroke:#ed8936,color:#f6ad55
+```
+
+**Key Components:**
+- **🏢 AppHost**: Orchestrates all services with .NET Aspire
+- **📄 Document Service**: AI-powered PDF analysis and storage
+- **📊 Ledger Service**: Financial transaction management
+- **🏦 Mortgage Approver**: Automated decision-making workflow
+- **🎫 CRM Service**: Customer support and complaint tracking
+- **🌐 Web Frontend**: Blazor-based user interface
+- **🎯 AI Agent Workbench**: Build custom AI agents with Semantic Kernel
+- **🤖 Azure OpenAI**: GPT-4o-mini for intelligent processing
+- **🔌 MCP Server**: Connect Claude, Copilot, and other AI assistants
 
 ## 🛠️ Prerequisites
 
@@ -35,6 +97,20 @@ Before you can haz houze, you need:
 - An IDE that doesn't make you cry ([VS 2022](https://visualstudio.microsoft.com/), [Rider](https://www.jetbrains.com/rider/), or [VS Code](https://code.visualstudio.com/)) 💻
 
 ## 🏃‍♂️ Quick Start (The Fun Part!)
+
+```mermaid
+graph LR
+    A["1️⃣ Clone Repo"] --> B["2️⃣ Set Secrets"]
+    B --> C["3️⃣ Run AppHost"]
+    C --> D["4️⃣ Open Dashboard"]
+    D --> E["🎉 You're Ready!"]
+    
+    style A fill:#2d3748,stroke:#48bb78,stroke-width:2px,color:#68d391
+    style B fill:#2d3748,stroke:#9f7aea,stroke-width:2px,color:#b794f4
+    style C fill:#2d3748,stroke:#ed8936,stroke-width:2px,color:#f6ad55
+    style D fill:#2d3748,stroke:#4299e1,stroke-width:2px,color:#63b3ed
+    style E fill:#1a202c,stroke:#48bb78,stroke-width:3px,color:#68d391
+```
 
 ### 1. Clone & Navigate 📂
 ```bash
@@ -60,7 +136,8 @@ export ConnectionStrings__openai="Endpoint=https://your-openai-resource.openai.a
 dotnet run --project CanIHazHouze.AppHost
 ```
 
-Then open your browser to the Aspire dashboard (usually `https://localhost:17001`) and watch the magic happen! ✨
+### 4. Open the Dashboard 🎯
+Open your browser to the Aspire dashboard (usually `https://localhost:17001`) and watch the magic happen! ✨
 
 ## 🤖 Azure OpenAI Configuration Guide
 
@@ -397,23 +474,56 @@ All documentation has been organized into a comprehensive hub! Visit **[docs/REA
 
 ### 📂 Documentation Structure
 
+```mermaid
+graph LR
+    Hub["📖 docs/README.md<br/><b>START HERE!</b>"]
+    
+    subgraph Tutorials["🎓 tutorials/"]
+        T1["Local OpenAI Setup"]
+        T2["MCP Setup"]
+        T3["Devcontainer"]
+        T4["GitHub Workflows"]
+    end
+    
+    subgraph Guides["📖 guides/"]
+        G1["Agent Workbench"]
+        G2["MCP Usage"]
+        G3["Mortgage Approver"]
+        G4["CRM Service"]
+        G5["Testing & More"]
+    end
+    
+    subgraph Technical["🔧 technical/"]
+        Tech1["Azure OpenAI"]
+        Tech2["MCP Implementation"]
+        Tech3["Cosmos DB"]
+        Tech4["Migrations & More"]
+    end
+    
+    Hub --> Tutorials
+    Hub --> Guides
+    Hub --> Technical
+    
+    style Hub fill:#2d3748,stroke:#4299e1,stroke-width:3px,color:#63b3ed,font-weight:bold
+    style Tutorials fill:#1a202c,stroke:#48bb78,stroke-width:2px,color:#68d391
+    style Guides fill:#1a202c,stroke:#9f7aea,stroke-width:2px,color:#b794f4
+    style Technical fill:#1a202c,stroke:#ed8936,stroke-width:2px,color:#f6ad55
+    style T1 fill:#2d3748,stroke:#48bb78,color:#68d391
+    style T2 fill:#2d3748,stroke:#48bb78,color:#68d391
+    style T3 fill:#2d3748,stroke:#48bb78,color:#68d391
+    style T4 fill:#2d3748,stroke:#48bb78,color:#68d391
+    style G1 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style G2 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style G3 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style G4 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style G5 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style Tech1 fill:#2d3748,stroke:#ed8936,color:#f6ad55
+    style Tech2 fill:#2d3748,stroke:#ed8936,color:#f6ad55
+    style Tech3 fill:#2d3748,stroke:#ed8936,color:#f6ad55
+    style Tech4 fill:#2d3748,stroke:#ed8936,color:#f6ad55
 ```
-docs/
-├── 📖 README.md              # Documentation hub (START HERE!)
-├── 🎓 tutorials/             # Setup and getting started guides
-│   ├── LOCAL_OPENAI_SETUP.md
-│   ├── MCP_SETUP.md
-│   └── devcontainer-setup.md
-├── 📖 guides/                # Feature guides and how-tos
-│   ├── AGENT_WORKBENCH.md
-│   ├── MCP_USAGE_GUIDE.md
-│   ├── mortgage-approver-guide.md
-│   └── crm-service-guide.md
-└── 🔧 technical/             # Implementation details and architecture
-    ├── AZURE_OPENAI_INTEGRATION.md
-    ├── MCP_IMPLEMENTATION.md
-    └── ASPIRE_COSMOS_DB_CONFIGURATION.md
-```
+
+**32 documentation files** organized into 3 categories for easy navigation!
 
 ## 🔗 Useful Links
 

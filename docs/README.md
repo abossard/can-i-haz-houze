@@ -125,6 +125,65 @@ Deep dives into architecture, implementations, and technical decisions.
 
 ### By Role
 
+```mermaid
+graph TD
+    Start["👤 Choose Your Path"]
+    
+    Dev["🎓 New Developer"]
+    AI["🤖 AI Integration"]
+    Arch["🏗️ Architect"]
+    QA["🧪 QA Engineer"]
+    PM["💼 Product Manager"]
+    
+    Start --> Dev
+    Start --> AI
+    Start --> Arch
+    Start --> QA
+    Start --> PM
+    
+    Dev --> Dev1["Local OpenAI Setup"]
+    Dev --> Dev2["Main README"]
+    Dev --> Dev3["Agent Workbench"]
+    
+    AI --> AI1["MCP Setup"]
+    AI --> AI2["MCP Usage Guide"]
+    AI --> AI3["MCP Implementation"]
+    
+    Arch --> Arch1["Cosmos DB Config"]
+    Arch --> Arch2["Azure OpenAI"]
+    Arch --> Arch3["MCP Architecture"]
+    
+    QA --> QA1["Visual Testing"]
+    QA --> QA2["CRM Testing"]
+    QA --> QA3["Docker Tests"]
+    
+    PM --> PM1["Agent Workbench"]
+    PM --> PM2["CRM Service"]
+    PM --> PM3["Mortgage Approver"]
+    
+    style Start fill:#2d3748,stroke:#4299e1,stroke-width:3px,color:#63b3ed
+    style Dev fill:#1a202c,stroke:#48bb78,stroke-width:2px,color:#68d391
+    style AI fill:#1a202c,stroke:#9f7aea,stroke-width:2px,color:#b794f4
+    style Arch fill:#1a202c,stroke:#ed8936,stroke-width:2px,color:#f6ad55
+    style QA fill:#1a202c,stroke:#f56565,stroke-width:2px,color:#fc8181
+    style PM fill:#1a202c,stroke:#4299e1,stroke-width:2px,color:#63b3ed
+    style Dev1 fill:#2d3748,stroke:#48bb78,color:#68d391
+    style Dev2 fill:#2d3748,stroke:#48bb78,color:#68d391
+    style Dev3 fill:#2d3748,stroke:#48bb78,color:#68d391
+    style AI1 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style AI2 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style AI3 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style Arch1 fill:#2d3748,stroke:#ed8936,color:#f6ad55
+    style Arch2 fill:#2d3748,stroke:#ed8936,color:#f6ad55
+    style Arch3 fill:#2d3748,stroke:#ed8936,color:#f6ad55
+    style QA1 fill:#2d3748,stroke:#f56565,color:#fc8181
+    style QA2 fill:#2d3748,stroke:#f56565,color:#fc8181
+    style QA3 fill:#2d3748,stroke:#f56565,color:#fc8181
+    style PM1 fill:#2d3748,stroke:#4299e1,color:#63b3ed
+    style PM2 fill:#2d3748,stroke:#4299e1,color:#63b3ed
+    style PM3 fill:#2d3748,stroke:#4299e1,color:#63b3ed
+```
+
 **🎓 New Developers**: Start with [tutorials/LOCAL_OPENAI_SETUP.md](tutorials/LOCAL_OPENAI_SETUP.md) → [Main README](../README.md) → [Agent Workbench Guide](guides/AGENT_WORKBENCH.md)
 
 **🤖 AI Integration**: [MCP Setup](tutorials/MCP_SETUP.md) → [MCP Usage Guide](guides/MCP_USAGE_GUIDE.md) → [MCP Implementation](technical/MCP_IMPLEMENTATION.md)
