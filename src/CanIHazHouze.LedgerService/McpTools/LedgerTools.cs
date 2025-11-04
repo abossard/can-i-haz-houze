@@ -50,4 +50,20 @@ public class LedgerTools
     {
         return await _ledgerService.ResetAccountAsync(owner);
     }
+
+    [McpServerTool]
+    [Description("Get recently updated user accounts ordered by last update time (system-wide view)")]
+    public async Task<IEnumerable<AccountInfo>> GetRecentlyUpdatedAccounts(
+        [Description("Maximum number of accounts to return (default: 10, max: 100)")] int take = 10)
+    {
+        return await _ledgerService.GetRecentlyUpdatedAccountsAsync(take);
+    }
+
+    [McpServerTool]
+    [Description("Get recent transactions across all users ordered by timestamp (system-wide view)")]
+    public async Task<IEnumerable<TransactionInfo>> GetRecentTransactions(
+        [Description("Maximum number of transactions to return (default: 20, max: 100)")] int take = 20)
+    {
+        return await _ledgerService.GetRecentTransactionsAsync(take);
+    }
 }
