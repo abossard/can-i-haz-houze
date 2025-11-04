@@ -66,7 +66,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
-builder.AddMCPSupport();
+builder.AddMCPSupport().WithTools<CanIHazHouze.MortgageApprover.McpTools.MortgageTools>();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
@@ -395,16 +395,24 @@ app.MapGet("/mortgage-requests/{requestId:guid}/verification-status", async (
 
 app.MapDefaultEndpoints();
 
-// TODO: MCP tool registration needs migration to official SDK
-// The official SDK requires using [McpServerToolType] and [McpServerTool] attributes
-// or registering tools via builder.Services.AddMcpServer().WithTools<TToolsClass>()
-// For now, tools are exposed via REST API endpoints above and can be called directly via HTTP
-/*
-var mcpServer = app.Services.GetRequiredService<McpServer>();
-var serviceProvider = app.Services;
+// MCP tools are registered via MortgageTools class with [McpServerToolType] attributes
+// Tools: create_mortgage_request, get_mortgage_request, get_mortgage_request_by_user,
+//        update_mortgage_data, verify_mortgage_request
+app.Logger.LogInformation("MortgageApprover MCP tools registered at /mcp endpoint");
 
-// Register create mortgage request tool
-mcpServer.RegisterTool<CreateMortgageRequestMCPRequest>("create_mortgage_request",
+app.Run();
+
+#pragma warning restore CS8603
+#pragma warning restore CS1998
+
+// Make Program class accessible for testing
+namespace CanIHazHouze.MortgageApprover
+{
+    public partial class Program { }
+}
+
+// Old MCP registration code removed - now using attribute-based registration via MortgageTools
+/*
     "Create a new mortgage application request",
     async req => 
     {
@@ -484,8 +492,6 @@ mcpServer.RegisterResource("mortgage://requests/summary", "Mortgage Requests Sum
 
 app.Logger.LogInformation("Registered MCP tools and resources for MortgageApprover");
 */
-
-app.Run();
 
 // Generic operation result wrapper to avoid null returns in MCP tools
 public record OperationResult<T>(bool Success, T? Value, string? Error)

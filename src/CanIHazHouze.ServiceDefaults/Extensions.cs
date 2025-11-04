@@ -129,7 +129,7 @@ public static class Extensions
         return builder;
     }
 
-    public static WebApplication MapDefaultEndpoints(this WebApplication app)
+    public static WebApplication MapDefaultEndpoints(this WebApplication app, bool enableMcp = true)
     {
         // Adding health checks endpoints to applications in non-development environments has security implications.
         // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
@@ -145,8 +145,11 @@ public static class Extensions
             });
         }
 
-        // Map MCP endpoints using official SDK
-        app.MapMcp("/mcp");
+        // Map MCP endpoints using official SDK - only for backend services
+        if (enableMcp)
+        {
+            app.MapMcp("/mcp");
+        }
 
         return app;
     }

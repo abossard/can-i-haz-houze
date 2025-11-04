@@ -35,6 +35,17 @@
                 </button>
             </div>
         </div>
+
+        <div class="mb-3">
+            <h5>MCP Endpoint</h5>
+            <div class="input-group">
+                <input type="text" class="form-control" readonly value="@MortgageMcpUrl" id="mortgage-mcp-url" />
+                <button class="btn btn-outline-primary" type="button" @onclick="@(() => CopyToClipboard(MortgageMcpUrl))">
+                    <i class="bi bi-clipboard"></i> Copy
+                </button>
+            </div>
+            <small class="text-muted">Model Context Protocol endpoint for AI agent integration</small>
+        </div>
         
         <div class="mb-3">
             <h5>System Prompt</h5>
@@ -62,6 +73,17 @@
                     <i class="bi bi-clipboard"></i> Copy
                 </button>
             </div>
+        </div>
+
+        <div class="mb-3">
+            <h5>MCP Endpoint</h5>
+            <div class="input-group">
+                <input type="text" class="form-control" readonly value="@DocumentMcpUrl" id="document-mcp-url" />
+                <button class="btn btn-outline-info" type="button" @onclick="@(() => CopyToClipboard(DocumentMcpUrl))">
+                    <i class="bi bi-clipboard"></i> Copy
+                </button>
+            </div>
+            <small class="text-muted">Model Context Protocol endpoint for AI agent integration</small>
         </div>
         
         <div class="mb-3">
@@ -91,6 +113,17 @@
                 </button>
             </div>
         </div>
+
+        <div class="mb-3">
+            <h5>MCP Endpoint</h5>
+            <div class="input-group">
+                <input type="text" class="form-control" readonly value="@LedgerMcpUrl" id="ledger-mcp-url" />
+                <button class="btn btn-outline-success" type="button" @onclick="@(() => CopyToClipboard(LedgerMcpUrl))">
+                    <i class="bi bi-clipboard"></i> Copy
+                </button>
+            </div>
+            <small class="text-muted">Model Context Protocol endpoint for AI agent integration</small>
+        </div>
         
         <div class="mb-3">
             <h5>System Prompt</h5>
@@ -118,6 +151,17 @@
                     <i class="bi bi-clipboard"></i> Copy
                 </button>
             </div>
+        </div>
+
+        <div class="mb-3">
+            <h5>MCP Endpoint</h5>
+            <div class="input-group">
+                <input type="text" class="form-control" readonly value="@CrmMcpUrl" id="crm-mcp-url" />
+                <button class="btn btn-outline-warning" type="button" @onclick="@(() => CopyToClipboard(CrmMcpUrl))">
+                    <i class="bi bi-clipboard"></i> Copy
+                </button>
+            </div>
+            <small class="text-muted">Model Context Protocol endpoint for AI agent integration</small>
         </div>
         
         <div class="mb-3">
@@ -267,6 +311,12 @@
     private string DocumentOpenApiUrl => $"{DocumentApiClient.BaseUrl}/openapi/v1.json";
     private string LedgerOpenApiUrl => $"{LedgerApiClient.BaseUrl}/openapi/v1.json";
     private string CrmOpenApiUrl => $"{CrmApiClient.BaseUrl}/openapi/v1.json";
+
+    // MCP Endpoint URLs - Model Context Protocol endpoints for AI agents
+    private string MortgageMcpUrl => $"{MortgageApiClient.BaseUrl}/mcp";
+    private string DocumentMcpUrl => $"{DocumentApiClient.BaseUrl}/mcp";
+    private string LedgerMcpUrl => $"{LedgerApiClient.BaseUrl}/mcp";
+    private string CrmMcpUrl => $"{CrmApiClient.BaseUrl}/mcp";
 
     // System Prompts - extracted from PROMPTS.md
     private string MortgageSystemPrompt => @"# MORTGAGE AGENT - CanIHazHouze System

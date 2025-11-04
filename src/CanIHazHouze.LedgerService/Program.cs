@@ -12,7 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
-builder.AddMCPSupport();
+builder.AddMCPSupport().WithTools<CanIHazHouze.LedgerService.McpTools.LedgerTools>();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
@@ -558,11 +558,9 @@ app.MapGet("/transactions/recent", async (ILedgerService ledgerService, int take
 
 app.MapDefaultEndpoints();
 
-// TODO: MCP tool registration needs migration to official SDK
-// The official SDK requires using [McpServerToolType] and [McpServerTool] attributes
-// or registering tools via builder.Services.AddMcpServer().WithTools<TToolsClass>()
-// For now, tools are exposed via REST API endpoints above and can be called directly via HTTP
-app.Logger.LogInformation("LedgerService REST API endpoints registered (MCP tools pending migration)");
+// MCP tools are registered via LedgerTools class with [McpServerToolType] attributes
+// Tools: get_account_info, update_account_balance, get_transaction_history, reset_account
+app.Logger.LogInformation("LedgerService MCP tools registered at /mcp endpoint");
 
 app.Run();
 

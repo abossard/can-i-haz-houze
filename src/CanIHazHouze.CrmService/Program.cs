@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults & Aspire client integrations
 builder.AddServiceDefaults();
-builder.AddMCPSupport();
+builder.AddMCPSupport().WithTools<CanIHazHouze.CrmService.McpTools.CrmTools>();
 
 // Add services to the container
 builder.Services.AddProblemDetails();
@@ -507,11 +507,10 @@ app.MapDelete("/complaints/{id:guid}/comments/{commentId:guid}", async (
 
 app.MapDefaultEndpoints();
 
-// TODO: MCP tool registration needs migration to official SDK
-// The official SDK requires using [McpServerToolType] and [McpServerTool] attributes
-// or registering tools via builder.Services.AddMcpServer().WithTools<TToolsClass>()
-// For now, tools are exposed via REST API endpoints above and can be called directly via HTTP
-app.Logger.LogInformation("CrmService REST API endpoints registered (MCP tools pending migration)");
+// MCP tools are registered via CrmTools class with [McpServerToolType] attributes
+// Tools: create_complaint, get_complaints, get_recent_complaints, get_complaint, 
+//        update_complaint_status, add_complaint_comment, add_complaint_approval, delete_complaint
+app.Logger.LogInformation("CrmService MCP tools registered at /mcp endpoint");
 
 app.Run();
 

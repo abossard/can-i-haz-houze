@@ -20,7 +20,7 @@ logger.LogInformation("🔧 Building CanIHazHouze.DocumentService...");
 // Add service defaults & Aspire client integrations.
 logger.LogInformation("➕ Adding Aspire service defaults...");
 builder.AddServiceDefaults();
-builder.AddMCPSupport();
+builder.AddMCPSupport().WithTools<CanIHazHouze.DocumentService.McpTools.DocumentTools>();
 
 // Add services to the container.
 logger.LogInformation("➕ Adding problem details support...");
@@ -1210,12 +1210,13 @@ app.MapPut("/documents/{id}/enhance-tags", async (
 
 app.MapDefaultEndpoints();
 
-// TODO: MCP tool registration needs migration to official SDK
-// The official SDK requires using [McpServerToolType] and [McpServerTool] attributes
-// or registering tools via builder.Services.AddMcpServer().WithTools<TToolsClass>()
-// For now, tools are exposed via REST API endpoints above and can be called directly via HTTP
+// MCP tools are registered via DocumentTools class with [McpServerToolType] attributes
+// Tools: list_documents, get_document, update_document_tags, delete_document,
+//        verify_mortgage_documents, analyze_document_ai
+app.Logger.LogInformation("🔧 DocumentService MCP tools registered at /mcp endpoint");
+
+// Old MCP registration code removed - now using attribute-based registration
 /*
-var mcpServer = app.Services.GetRequiredService<McpServer>();
 var serviceProvider = app.Services;
 
 // Register upload document tool
@@ -1376,6 +1377,11 @@ app.Run();
 
 #pragma warning restore CS8603
 #pragma warning restore CS1998
+
+// Old MCP registration code removed - now using attribute-based registration via DocumentTools
+/*
+...removed for brevity...
+*/
 
 /// <summary>
 /// Configures Unix signal handling to capture and log signals without terminating the application

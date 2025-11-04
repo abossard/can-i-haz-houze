@@ -1,0 +1,16 @@
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+
+namespace CanIHazHouze.Tests;
+
+/// <summary>
+/// Integration tests for MCP endpoints across all services
+/// </summary>
+public class MCPIntegrationTests
+{
+    
+}

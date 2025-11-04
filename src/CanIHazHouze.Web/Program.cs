@@ -100,6 +100,6 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.MapDefaultEndpoints();
+app.MapDefaultEndpoints(enableMcp: false);
 
 app.Run();

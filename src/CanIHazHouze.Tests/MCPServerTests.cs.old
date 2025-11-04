@@ -1,0 +1,15 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System.Text.Json;
+
+namespace CanIHazHouze.Tests;
+
+/// <summary>
+/// Tests for MCP (Model Context Protocol) server functionality
+/// </summary>
+public class MCPServerTests
+{
+    
+}
