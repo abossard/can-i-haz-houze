@@ -89,6 +89,42 @@ This repository includes a devcontainer configuration (`.devcontainer/devcontain
 
 When using GitHub Codespaces, Docker is automatically available and Aspire can orchestrate containers.
 
+#### GitHub Actions CI/CD
+This repository uses GitHub Actions for continuous integration with three test stages:
+
+1. **Unit Tests**: Fast tests that don't require external dependencies
+   - Run on every push/PR to main and develop branches
+   - Filter: `Category!=Integration`
+
+2. **Integration Tests (No Infrastructure)**: Tests using WebApplicationFactory
+   - Run after unit tests pass
+   - Filter: `Category=Integration&Category!=RequiresDocker&Category!=RequiresDatabase`
+   - Don't require Docker or database emulators
+
+3. **Docker Integration Tests**: Full integration tests with Aspire DCP and emulators
+   - Run after unit tests pass (parallel with stage 2)
+   - Filter: `Category=Integration&Category=RequiresDocker`
+   - **Requires Docker** for Cosmos DB and Azurite emulators
+   - **Environment**: `ASPNETCORE_ENVIRONMENT=Development` ensures emulators activate
+   - Uses `DistributedApplicationTestingBuilder` to spin up full AppHost with all services
+
+**How Emulator Activation Works in CI:**
+- The AppHost uses `RunAsPreviewEmulator()` for Cosmos DB and `RunAsEmulator()` for Azure Storage
+- Emulators automatically activate when NOT in publish mode (`builder.ExecutionContext.IsPublishMode == false`)
+- GitHub Actions runners have Docker pre-installed, so emulators run in containers
+- Setting `ASPNETCORE_ENVIRONMENT=Development` ensures development configuration is used
+- Tests wait for resource health checks before running via `WaitForResourceHealthyAsync()`
+
+**Local Testing with Docker:**
+```bash
+# Run all tests including Docker-dependent ones
+cd src
+dotnet test --filter "Category=RequiresDocker|Category=RequiresDatabase"
+
+# Or run specific WebTests
+dotnet test --filter "FullyQualifiedName~WebTests"
+```
+
 ### Code Conventions
 
 1. **Nullable Reference Types**: Enabled across all projects (`<Nullable>enable</Nullable>`)

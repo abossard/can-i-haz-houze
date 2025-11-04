@@ -174,6 +174,7 @@ public class MCPIntegrationTests
     [Fact]
     [Trait("Category", "Integration")]
     [Trait("Category", "RequiresDatabase")]
+    [Trait("Category", "RequiresDocker")]
     public async Task RESTAPIs_ShouldStillWork_WithMCPEnabled()
     {
         // Ensure MCP doesn't break existing REST functionality
