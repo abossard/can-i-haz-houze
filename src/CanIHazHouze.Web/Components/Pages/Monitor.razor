@@ -17,10 +17,13 @@
 
 <div class="events-container">
     <div class="section">
-        <h2>📊 Logs (@_logs.Count)</h2>
-        <button class="btn btn-sm btn-secondary" @onclick="ClearLogs">Clear</button>
+        <h2>📊 Logs (@_filteredLogs.Count() / @_logs.Count)</h2>
+        <div class="controls">
+            <input type="text" class="search-box" placeholder="🔍 Search logs..." @bind="_logSearch" @bind:event="oninput" />
+            <button class="btn btn-sm btn-secondary" @onclick="ClearLogs">Clear</button>
+        </div>
         <div class="events-list">
-            @foreach (var log in _logs.OrderByDescending(l => l.Timestamp).Take(100))
+            @foreach (var log in _filteredLogs.OrderByDescending(l => l.Timestamp).Take(100))
             {
                 <div class="event-item log-@log.Level">
                     <div class="event-time">@log.Timestamp.ToLocalTime().ToString("HH:mm:ss.fff")</div>
@@ -55,10 +58,13 @@
     </div>
 
     <div class="section">
-        <h2>💬 Conversations (@_conversations.Count)</h2>
-        <button class="btn btn-sm btn-secondary" @onclick="ClearConversations">Clear</button>
+        <h2>💬 Conversations (@_filteredConversations.Count() / @_conversations.Count)</h2>
+        <div class="controls">
+            <input type="text" class="search-box" placeholder="🔍 Search conversations..." @bind="_conversationSearch" @bind:event="oninput" />
+            <button class="btn btn-sm btn-secondary" @onclick="ClearConversations">Clear</button>
+        </div>
         <div class="events-list">
-            @foreach (var conv in _conversations.OrderByDescending(c => c.Timestamp).Take(50))
+            @foreach (var conv in _filteredConversations.OrderByDescending(c => c.Timestamp).Take(50))
             {
                 <div class="event-item conversation-@conv.Role">
                     <div class="event-time">@conv.Timestamp.ToLocalTime().ToString("HH:mm:ss.fff")</div>
@@ -214,6 +220,26 @@
     .btn-secondary:hover {
         background: #5a6268;
     }
+
+    .controls {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .search-box {
+        flex: 1;
+        padding: 0.5rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        font-size: 0.875rem;
+    }
+
+    .search-box:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    }
 </style>
 
 @code {
@@ -222,6 +248,25 @@
     private List<ConversationEvent> _conversations = new();
     private string _connectionStatus = "Disconnected";
     private string _connectionClass = "disconnected";
+    private string _logSearch = "";
+    private string _conversationSearch = "";
+
+    private IEnumerable<LogEvent> _filteredLogs => string.IsNullOrWhiteSpace(_logSearch)
+        ? _logs
+        : _logs.Where(l => 
+            l.Message.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+            l.Level.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+            l.RunId.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+            l.AgentId.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+            (l.Data != null && l.Data.Values.Any(v => v?.ToString()?.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) == true)));
+
+    private IEnumerable<ConversationEvent> _filteredConversations => string.IsNullOrWhiteSpace(_conversationSearch)
+        ? _conversations
+        : _conversations.Where(c =>
+            c.Content.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
+            c.Role.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
+            c.RunId.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
+            c.AgentId.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase));
 
     protected override async Task OnInitializedAsync()
     {
