@@ -51,28 +51,35 @@ public class AgentExecutionService : IAgentExecutionService
             deploymentName: deploymentName,
             azureOpenAIClient: _openAIClient);
         
-        // Map of tool names to their MCP endpoints using Aspire service discovery format
-        // Format: https+http://servicename/path allows Aspire to resolve the service URL
-        var mcpEndpoints = new Dictionary<string, string>
+        // Map of tool names to their service names for MCP endpoint resolution
+        var serviceMap = new Dictionary<string, string>
         {
-            ["ledgerapi"] = "https+http://ledgerservice/mcp",
-            ["crmapi"] = "https+http://crmservice/mcp",
-            ["documentsapi"] = "https+http://documentservice/mcp"
+            ["ledgerapi"] = "ledgerservice",
+            ["crmapi"] = "crmservice",
+            ["documentsapi"] = "documentservice"
         };
-        
-        run.Logs.Add(new AgentRunLog
-        {
-            Level = "info",
-            Message = $"Configured MCP endpoints: {string.Join(", ", mcpEndpoints.Select(kvp => $"{kvp.Key}={kvp.Value}"))}"
-        });
         
         // Register MCP plugins based on agent's tool configuration
         foreach (var tool in tools)
         {
             var toolKey = tool.ToLowerInvariant();
             
-            if (mcpEndpoints.TryGetValue(toolKey, out var mcpEndpoint))
+            if (serviceMap.TryGetValue(toolKey, out var serviceName))
             {
+                // Get the connection string from configuration (injected by Aspire)
+                var serviceUrl = _configuration.GetConnectionString(serviceName);
+                if (string.IsNullOrEmpty(serviceUrl))
+                {
+                    run.Logs.Add(new AgentRunLog
+                    {
+                        Level = "warning",
+                        Message = $"No connection string found for service '{serviceName}'. Skipping {tool}."
+                    });
+                    continue;
+                }
+                
+                var mcpEndpoint = $"{serviceUrl}/mcp";
+                
                 run.Logs.Add(new AgentRunLog
                 {
                     Level = "info",
@@ -109,7 +116,7 @@ public class AgentExecutionService : IAgentExecutionService
                 run.Logs.Add(new AgentRunLog
                 {
                     Level = "warning",
-                    Message = $"Unknown tool or no MCP endpoint configured: {tool}. Available: {string.Join(", ", mcpEndpoints.Keys)}"
+                    Message = $"Unknown tool or no service mapping configured: {tool}. Available: {string.Join(", ", serviceMap.Keys)}"
                 });
             }
         }
