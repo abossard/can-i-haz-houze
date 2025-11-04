@@ -11,6 +11,7 @@ public static class McpToSemanticKernelConverter
 {
     /// <summary>
     /// Converts MCP tools to Semantic Kernel functions and adds them to the kernel
+    /// Uses the built-in AsKernelFunction() extension method available in SK 1.44+
     /// </summary>
     public static async Task AddMcpToolsAsync(
         this IKernelBuilder builder,
@@ -25,6 +26,7 @@ public static class McpToSemanticKernelConverter
             logger.LogInformation("Loading MCP tools from {Endpoint} as plugin '{Plugin}'", mcpEndpointUrl, pluginName);
             
             // List all tools from the MCP server
+            // McpClientTool implements AIFunction, so it can be directly converted to KernelFunction
             var mcpTools = await mcpClientService.ListToolsAsync(mcpEndpointUrl, cancellationToken);
             
             if (mcpTools.Count == 0)
@@ -37,26 +39,25 @@ public static class McpToSemanticKernelConverter
                 mcpTools.Count, 
                 string.Join(", ", mcpTools.Select(t => t.Name)));
             
-            // Convert each MCP tool to a Semantic Kernel function
-            var plugin = new List<KernelFunction>();
+            // Convert MCP tools to Kernel functions using the built-in AsKernelFunction() extension
+            // This properly preserves all parameter metadata from the MCP tool's InputSchema
+            var kernelFunctions = mcpTools.Select(tool => tool.AsKernelFunction()).ToList();
             
-            foreach (var mcpTool in mcpTools)
+            // Log function metadata for debugging
+            foreach (var function in kernelFunctions)
             {
-                var kernelFunction = CreateKernelFunctionFromMcpTool(
-                    mcpTool, 
-                    mcpClientService, 
-                    mcpEndpointUrl, 
-                    logger);
-                    
-                plugin.Add(kernelFunction);
+                var paramInfo = function.Metadata.Parameters.Any() 
+                    ? string.Join(", ", function.Metadata.Parameters.Select(p => $"{p.Name} ({p.ParameterType?.Name ?? "string"}, Required: {p.IsRequired})"))
+                    : "No parameters";
                 
-                logger.LogInformation("Registered MCP tool: {Tool} - {Description}", 
-                    mcpTool.Name, 
-                    mcpTool.Description ?? "No description");
+                logger.LogInformation("Registered MCP tool: {Tool} - {Description}. Parameters: {Parameters}", 
+                    function.Name, 
+                    function.Description ?? "No description",
+                    paramInfo);
             }
             
             // Add all functions as a plugin
-            builder.Plugins.AddFromFunctions(pluginName, plugin);
+            builder.Plugins.AddFromFunctions(pluginName, kernelFunctions);
             
             logger.LogInformation("Successfully registered {Count} MCP tools as plugin '{Plugin}'", mcpTools.Count, pluginName);
         }
@@ -66,55 +67,5 @@ public static class McpToSemanticKernelConverter
             throw;
         }
     }
-    
-    private static KernelFunction CreateKernelFunctionFromMcpTool(
-        McpClientTool mcpTool,
-        IMcpClientService mcpClientService,
-        string mcpEndpointUrl,
-        ILogger logger)
-    {
-        // Create the function implementation that calls the MCP tool
-        async Task<string> Implementation(Kernel kernel, KernelArguments arguments)
-        {
-            try
-            {
-                var argsList = string.Join(", ", arguments.Select(a => $"{a.Key}={a.Value}"));
-                logger.LogInformation("Invoking MCP tool '{Tool}' with arguments: {Arguments}", 
-                    mcpTool.Name, 
-                    argsList);
-                
-                // Convert KernelArguments to dictionary for MCP
-                var mcpArguments = new Dictionary<string, object>();
-                foreach (var arg in arguments)
-                {
-                    mcpArguments[arg.Key] = arg.Value ?? string.Empty;
-                }
-                
-                // Call the MCP tool
-                var result = await mcpClientService.CallToolAsync(
-                    mcpEndpointUrl,
-                    mcpTool.Name,
-                    mcpArguments,
-                    CancellationToken.None);
-                
-                logger.LogInformation("MCP tool '{Tool}' returned: {Result}", 
-                    mcpTool.Name, 
-                    result.Length > 200 ? result.Substring(0, 200) + "..." : result);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error executing MCP tool '{Tool}'", mcpTool.Name);
-                throw;
-            }
-        }
-        
-        // Build the function with metadata from MCP tool
-        var functionBuilder = KernelFunctionFactory.CreateFromMethod(
-            Implementation,
-            functionName: mcpTool.Name,
-            description: mcpTool.Description ?? $"MCP tool: {mcpTool.Name}");
-        
-        return functionBuilder;
-    }
+
 }

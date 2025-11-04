@@ -158,13 +158,13 @@ public class AgentExecutionService : IAgentExecutionService
             });
 
             // Configure execution settings
-            var executionSettings = new OpenAIPromptExecutionSettings
+                        var executionSettings = new OpenAIPromptExecutionSettings
             {
-                Temperature = agent.Config.Temperature,
-                TopP = agent.Config.TopP,
-                MaxTokens = agent.Config.MaxTokens,
-                FrequencyPenalty = agent.Config.FrequencyPenalty,
-                PresencePenalty = agent.Config.PresencePenalty
+                Temperature = 0.7,
+                MaxTokens = 2000,
+                ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions,
+                // Pass MCP tools directly - they implement AIFunction
+                // This preserves all parameter metadata from the InputSchema
             };
 
             run.Logs.Add(new AgentRunLog
@@ -187,13 +187,29 @@ public class AgentExecutionService : IAgentExecutionService
             var availableFunctions = kernel.Plugins.SelectMany(p => p.Select(f => $"{p.Name}.{f.Name}")).ToList();
             if (availableFunctions.Any())
             {
+                // Log function details with parameters for debugging
+                var functionsWithParams = kernel.Plugins
+                    .SelectMany(p => p.Select(f => new 
+                    {
+                        name = f.Name,
+                        description = f.Description,
+                        parameters = f.Metadata.Parameters.Select(param => new
+                        {
+                            name = param.Name,
+                            type = param.ParameterType?.Name ?? "string",
+                            required = param.IsRequired,
+                            description = param.Description
+                        }).ToList()
+                    }))
+                    .ToList();
+                
                 run.Logs.Add(new AgentRunLog
                 {
                     Level = "info",
-                    Message = $"Kernel has {availableFunctions.Count} functions available",
+                    Message = $"Kernel has {availableFunctions.Count} functions available: {string.Join(", ", availableFunctions)}",
                     Data = new Dictionary<string, object>
                     {
-                        { "functions", availableFunctions }
+                        { "functions", functionsWithParams }
                     }
                 });
             }
