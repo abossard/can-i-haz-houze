@@ -4,9 +4,8 @@
 @using CanIHazHouze.Web.Services
 @using Newtonsoft.Json
 @inject NavigationManager Navigation
-@inject IHttpClientFactory HttpClientFactory
 @inject AgentApiClient AgentApiClient
-@inject IConfiguration Configuration
+@inject IServiceUrlResolver ServiceUrlResolver
 @implements IAsyncDisposable
 
 <PageTitle>Agent Monitor</PageTitle>
@@ -378,21 +377,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Get the resolved AgentService URL from configuration
-        // Aspire injects this as ConnectionStrings:agentservice
-        var agentServiceUrl = Configuration.GetConnectionString("agentservice");
-        
-        string hubUrl;
-        if (!string.IsNullOrEmpty(agentServiceUrl))
-        {
-            // Use the resolved URL from Aspire configuration
-            hubUrl = $"{agentServiceUrl.TrimEnd('/')}/hubs/agent";
-        }
-        else
-        {
-            // Fallback for local development
-            hubUrl = "https://localhost:7069/hubs/agent";
-        }
+        // Get the resolved AgentService URL from the service URL resolver
+        var agentBaseUrl = ServiceUrlResolver.GetAgentServiceUrl();
+        var hubUrl = $"{agentBaseUrl}/hubs/agent";
             
         _hubConnection = new HubConnectionBuilder()
             .WithUrl(hubUrl)
