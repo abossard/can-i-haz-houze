@@ -34,6 +34,9 @@ public class AgentExecutionService : IAgentExecutionService
     {
         var builder = Kernel.CreateBuilder();
         
+        // Add function invocation filter to log all tool calls
+        builder.Services.AddSingleton<IFunctionInvocationFilter>(new FunctionInvocationLoggingFilter(run, _logger));
+        
         // Use the shared AzureOpenAIClient which already has DefaultAzureCredential configured
         builder.AddAzureOpenAIChatCompletion(
             deploymentName: deploymentName,
@@ -271,5 +274,103 @@ public class AgentExecutionService : IAgentExecutionService
 
         await _storageService.UpdateRunAsync(run);
         return run;
+    }
+}
+
+/// <summary>
+/// Filter that logs all function invocations (tool calls) to the agent run logs
+/// </summary>
+internal class FunctionInvocationLoggingFilter : IFunctionInvocationFilter
+{
+    private readonly AgentRun _run;
+    private readonly ILogger _logger;
+
+    public FunctionInvocationLoggingFilter(AgentRun run, ILogger logger)
+    {
+        _run = run;
+        _logger = logger;
+    }
+
+    public async Task OnFunctionInvocationAsync(FunctionInvocationContext context, Func<FunctionInvocationContext, Task> next)
+    {
+        // Log before function invocation
+        var arguments = context.Arguments.Select(kvp => new
+        {
+            name = kvp.Key,
+            value = kvp.Value?.ToString() ?? "null",
+            type = kvp.Value?.GetType().Name ?? "null"
+        }).ToList();
+
+        _run.Logs.Add(new AgentRunLog
+        {
+            Timestamp = DateTime.UtcNow,
+            Level = "info",
+            Message = $"Tool call started: {context.Function.PluginName}.{context.Function.Name}",
+            Data = new Dictionary<string, object>
+            {
+                { "function", context.Function.Name },
+                { "plugin", context.Function.PluginName ?? "default" },
+                { "description", context.Function.Description ?? "" },
+                { "arguments", arguments }
+            }
+        });
+
+        _logger.LogInformation("Tool call: {Plugin}.{Function} with arguments: {Args}",
+            context.Function.PluginName,
+            context.Function.Name,
+            string.Join(", ", arguments.Select(a => $"{a.name}={a.value}")));
+
+        try
+        {
+            // Execute the function
+            await next(context);
+
+            // Log after successful invocation
+            var resultValue = context.Result?.GetValue<object>()?.ToString();
+            var resultPreview = resultValue?.Length > 200 ? resultValue.Substring(0, 200) + "..." : resultValue;
+
+            _run.Logs.Add(new AgentRunLog
+            {
+                Timestamp = DateTime.UtcNow,
+                Level = "info",
+                Message = $"Tool call completed: {context.Function.PluginName}.{context.Function.Name}",
+                Data = new Dictionary<string, object>
+                {
+                    { "function", context.Function.Name },
+                    { "plugin", context.Function.PluginName ?? "default" },
+                    { "success", true },
+                    { "resultPreview", resultPreview ?? "no result" }
+                }
+            });
+
+            _logger.LogInformation("Tool call completed: {Plugin}.{Function} - Result: {Result}",
+                context.Function.PluginName,
+                context.Function.Name,
+                resultPreview);
+        }
+        catch (Exception ex)
+        {
+            // Log error
+            _run.Logs.Add(new AgentRunLog
+            {
+                Timestamp = DateTime.UtcNow,
+                Level = "error",
+                Message = $"Tool call failed: {context.Function.PluginName}.{context.Function.Name}",
+                Data = new Dictionary<string, object>
+                {
+                    { "function", context.Function.Name },
+                    { "plugin", context.Function.PluginName ?? "default" },
+                    { "success", false },
+                    { "error", ex.Message },
+                    { "errorType", ex.GetType().Name }
+                }
+            });
+
+            _logger.LogError(ex, "Tool call failed: {Plugin}.{Function}",
+                context.Function.PluginName,
+                context.Function.Name);
+
+            throw;
+        }
     }
 }
