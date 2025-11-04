@@ -26,14 +26,6 @@ Welcome to the ultimate .NET Aspire-powered mortgage approval system! This baby 
 
 ## 🛠️ Prerequisites
 
-[![Watch the Ultimate Can I Haz Houze? Walkthrough!](image.png)](https://youtu.be/FjfPg8VdgfA)
-
-> **This video explains EVERYTHING you need to know!**  
-> 👉 Click above to get the full tour, setup, and pro tips in action!  
-> _Don't miss it before you start!_ 🎉
-
-## 🛠️ Prerequisites
-
 Before you can haz houze, you need:
 
 - [.NET 9.0 SDK](https://dotnet.microsoft.com/download) 📦
