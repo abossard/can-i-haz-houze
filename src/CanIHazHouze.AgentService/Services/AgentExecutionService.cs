@@ -16,6 +16,7 @@ public class AgentExecutionService : IAgentExecutionService
     private readonly IConfiguration _configuration;
     private readonly ILogger<AgentExecutionService> _logger;
     private readonly IAgentEventBroadcaster _broadcaster;
+    private readonly IHttpClientFactory _httpClientFactory;
 
     public AgentExecutionService(
         IAgentStorageService storageService,
@@ -23,7 +24,8 @@ public class AgentExecutionService : IAgentExecutionService
         IMcpClientService mcpClientService,
         IConfiguration configuration,
         ILogger<AgentExecutionService> logger,
-        IAgentEventBroadcaster broadcaster)
+        IAgentEventBroadcaster broadcaster,
+        IHttpClientFactory httpClientFactory)
     {
         _storageService = storageService;
         _openAIClient = openAIClient;
@@ -31,6 +33,7 @@ public class AgentExecutionService : IAgentExecutionService
         _configuration = configuration;
         _logger = logger;
         _broadcaster = broadcaster;
+        _httpClientFactory = httpClientFactory;
     }
     
     private async Task AddLogAsync(AgentRun run, AgentRunLog log)
@@ -51,12 +54,13 @@ public class AgentExecutionService : IAgentExecutionService
             deploymentName: deploymentName,
             azureOpenAIClient: _openAIClient);
         
-        // Map of tool names to their service names for MCP endpoint resolution
+        // Map of tool names to their service discovery URLs
+        // Use https+http:// scheme which Aspire resolves at runtime
         var serviceMap = new Dictionary<string, string>
         {
-            ["ledgerapi"] = "ledgerservice",
-            ["crmapi"] = "crmservice",
-            ["documentsapi"] = "documentservice"
+            ["ledgerapi"] = "https+http://ledgerservice",
+            ["crmapi"] = "https+http://crmservice",
+            ["documentsapi"] = "https+http://documentservice"
         };
         
         // Register MCP plugins based on agent's tool configuration
@@ -64,26 +68,38 @@ public class AgentExecutionService : IAgentExecutionService
         {
             var toolKey = tool.ToLowerInvariant();
             
-            if (serviceMap.TryGetValue(toolKey, out var serviceName))
+            if (serviceMap.TryGetValue(toolKey, out var serviceDiscoveryUrl))
             {
-                // Get the connection string from configuration (injected by Aspire)
-                var serviceUrl = _configuration.GetConnectionString(serviceName);
-                if (string.IsNullOrEmpty(serviceUrl))
+                // Create an HttpClient to resolve the service URL via Aspire service discovery
+                var httpClient = _httpClientFactory.CreateClient();
+                httpClient.BaseAddress = new Uri(serviceDiscoveryUrl);
+                
+                // Make a request to resolve the actual URL
+                string mcpEndpoint;
+                try
+                {
+                    // The BaseAddress after service discovery resolution gives us the real URL
+                    var resolvedUrl = httpClient.BaseAddress?.ToString().TrimEnd('/');
+                    if (string.IsNullOrEmpty(resolvedUrl))
+                    {
+                        throw new InvalidOperationException("Service discovery failed to resolve URL");
+                    }
+                    mcpEndpoint = $"{resolvedUrl}/mcp";
+                }
+                catch (Exception ex)
                 {
                     run.Logs.Add(new AgentRunLog
                     {
-                        Level = "warning",
-                        Message = $"No connection string found for service '{serviceName}'. Skipping {tool}."
+                        Level = "error",
+                        Message = $"Failed to resolve service URL for {tool}: {ex.Message}"
                     });
                     continue;
                 }
                 
-                var mcpEndpoint = $"{serviceUrl}/mcp";
-                
                 run.Logs.Add(new AgentRunLog
                 {
                     Level = "info",
-                    Message = $"Attempting to load MCP tools for {tool} from {mcpEndpoint}"
+                    Message = $"Resolved MCP endpoint for {tool}: {mcpEndpoint}"
                 });
                 
                 try
