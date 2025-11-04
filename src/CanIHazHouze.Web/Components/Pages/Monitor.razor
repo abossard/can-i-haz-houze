@@ -15,6 +15,29 @@
     @_connectionStatus
 </div>
 
+<div class="filters">
+    <div class="filter-group">
+        <label>🤖 Agent:</label>
+        <select class="filter-select" @bind="_selectedAgentId">
+            <option value="">All Agents (@_uniqueAgents.Count)</option>
+            @foreach (var agent in _uniqueAgents.OrderBy(a => a.Name))
+            {
+                <option value="@agent.Id">@agent.Name</option>
+            }
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>🔄 Run:</label>
+        <select class="filter-select" @bind="_selectedRunId">
+            <option value="">All Runs (@_uniqueRuns.Count)</option>
+            @foreach (var run in _uniqueRuns.OrderByDescending(r => r.Timestamp))
+            {
+                <option value="@run.Id">@run.Id.Substring(0, 8)... (@run.Timestamp.ToLocalTime().ToString("HH:mm:ss"))</option>
+            }
+        </select>
+    </div>
+</div>
+
 <div class="events-container">
     <div class="section">
         <h2>📊 Logs (@_filteredLogs.Count() / @_logs.Count)</h2>
@@ -240,6 +263,42 @@
         border-color: #007bff;
         box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
     }
+
+    .filters {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+    }
+
+    .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .filter-group label {
+        font-weight: 600;
+        font-size: 0.875rem;
+        margin: 0;
+    }
+
+    .filter-select {
+        padding: 0.5rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        min-width: 200px;
+    }
+
+    .filter-select:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    }
 </style>
 
 @code {
@@ -250,23 +309,70 @@
     private string _connectionClass = "disconnected";
     private string _logSearch = "";
     private string _conversationSearch = "";
+    private string _selectedAgentId = "";
+    private string _selectedRunId = "";
+    private Dictionary<string, string> _agentNames = new();
 
-    private IEnumerable<LogEvent> _filteredLogs => string.IsNullOrWhiteSpace(_logSearch)
-        ? _logs
-        : _logs.Where(l => 
-            l.Message.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
-            l.Level.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
-            l.RunId.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
-            l.AgentId.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
-            (l.Data != null && l.Data.Values.Any(v => v?.ToString()?.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) == true)));
+    private List<(string Id, string Name)> _uniqueAgents => _logs
+        .Select(l => l.AgentId)
+        .Concat(_conversations.Select(c => c.AgentId))
+        .Distinct()
+        .Select(id => (Id: id, Name: _agentNames.GetValueOrDefault(id, id)))
+        .ToList();
 
-    private IEnumerable<ConversationEvent> _filteredConversations => string.IsNullOrWhiteSpace(_conversationSearch)
-        ? _conversations
-        : _conversations.Where(c =>
-            c.Content.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
-            c.Role.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
-            c.RunId.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
-            c.AgentId.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase));
+    private List<(string Id, DateTime Timestamp)> _uniqueRuns => _logs
+        .Select(l => (Id: l.RunId, Timestamp: l.Timestamp))
+        .Concat(_conversations.Select(c => (Id: c.RunId, Timestamp: c.Timestamp)))
+        .GroupBy(r => r.Id)
+        .Select(g => (Id: g.Key, Timestamp: g.Max(x => x.Timestamp)))
+        .ToList();
+
+    private IEnumerable<LogEvent> _filteredLogs
+    {
+        get
+        {
+            var filtered = _logs.AsEnumerable();
+            
+            if (!string.IsNullOrWhiteSpace(_selectedAgentId))
+                filtered = filtered.Where(l => l.AgentId == _selectedAgentId);
+            
+            if (!string.IsNullOrWhiteSpace(_selectedRunId))
+                filtered = filtered.Where(l => l.RunId == _selectedRunId);
+            
+            if (!string.IsNullOrWhiteSpace(_logSearch))
+                filtered = filtered.Where(l => 
+                    l.Message.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+                    l.Level.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+                    l.RunId.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+                    l.AgentId.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+                    (l.Data != null && l.Data.Values.Any(v => v?.ToString()?.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) == true)));
+            
+            return filtered;
+        }
+    }
+
+    private IEnumerable<ConversationEvent> _filteredConversations
+    {
+        get
+        {
+            var filtered = _conversations.AsEnumerable();
+            
+            if (!string.IsNullOrWhiteSpace(_selectedAgentId))
+                filtered = filtered.Where(c => c.AgentId == _selectedAgentId);
+            
+            if (!string.IsNullOrWhiteSpace(_selectedRunId))
+                filtered = filtered.Where(c => c.RunId == _selectedRunId);
+            
+            if (!string.IsNullOrWhiteSpace(_conversationSearch))
+                filtered = filtered.Where(c =>
+                    c.Content.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
+                    c.Role.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
+                    c.RunId.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
+                    c.AgentId.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase));
+            
+            return filtered;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -301,6 +407,13 @@
                 Message = data.log.Message ?? "",
                 Data = data.log.Data
             });
+            
+            // Fetch agent name if we don't have it yet
+            if (!_agentNames.ContainsKey(data.agentId))
+            {
+                _ = FetchAgentNameAsync(data.agentId);
+            }
+            
             InvokeAsync(StateHasChanged);
         });
 
@@ -407,6 +520,31 @@
         catch
         {
             return text;
+        }
+    }
+
+    private async Task FetchAgentNameAsync(string agentId)
+    {
+        try
+        {
+            var httpClient = HttpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri("https+http://agentservice");
+            var response = await httpClient.GetAsync($"/agents/{agentId}");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var json = await response.Content.ReadAsStringAsync();
+                var agent = JsonConvert.DeserializeObject<dynamic>(json);
+                var name = agent?.name?.ToString() ?? agentId;
+                
+                _agentNames[agentId] = name;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch
+        {
+            // If fetch fails, use agentId as name
+            _agentNames[agentId] = agentId;
         }
     }
 
