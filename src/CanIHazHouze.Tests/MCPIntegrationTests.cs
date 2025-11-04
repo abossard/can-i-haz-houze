@@ -22,11 +22,11 @@ public class MCPIntegrationTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/mcp/capabilities");
+        var response = await client.GetAsync("/mcp/capabilities", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var capabilities = JsonDocument.Parse(content);
         
         var tools = capabilities.RootElement.GetProperty("capabilities")
@@ -52,11 +52,11 @@ public class MCPIntegrationTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/mcp/capabilities");
+        var response = await client.GetAsync("/mcp/capabilities", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var capabilities = JsonDocument.Parse(content);
         
         var tools = capabilities.RootElement.GetProperty("capabilities")
@@ -85,11 +85,11 @@ public class MCPIntegrationTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/mcp/capabilities");
+        var response = await client.GetAsync("/mcp/capabilities", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var capabilities = JsonDocument.Parse(content);
         
         var tools = capabilities.RootElement.GetProperty("capabilities")
@@ -114,11 +114,11 @@ public class MCPIntegrationTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/mcp/capabilities");
+        var response = await client.GetAsync("/mcp/capabilities", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var capabilities = JsonDocument.Parse(content);
         
         Assert.True(capabilities.RootElement.TryGetProperty("protocolVersion", out var version));
@@ -137,11 +137,11 @@ public class MCPIntegrationTests
         var client = factory.CreateClient();
 
         // Act
-        var response = await client.GetAsync("/mcp/capabilities");
+        var response = await client.GetAsync("/mcp/capabilities", TestContext.Current.CancellationToken);
 
         // Assert
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         var capabilities = JsonDocument.Parse(content);
         
         var resources = capabilities.RootElement.GetProperty("capabilities")
@@ -181,7 +181,7 @@ public class MCPIntegrationTests
         var client = factory.CreateClient();
 
         // Test existing REST endpoint still works
-        var response = await client.GetAsync("/accounts/test-user");
+        var response = await client.GetAsync("/accounts/test-user", TestContext.Current.CancellationToken);
         
         // Should either return account info or create new account (both are success cases)
         Assert.True(response.IsSuccessStatusCode);
@@ -205,11 +205,11 @@ public class MCPIntegrationTests
         {
             var ledgerFactory = new WebApplicationFactory<CanIHazHouze.LedgerService.Program>();
             var ledgerClient = ledgerFactory.CreateClient();
-            var ledgerResponse = await ledgerClient.GetAsync("/mcp/capabilities");
+            var ledgerResponse = await ledgerClient.GetAsync("/mcp/capabilities", TestContext.Current.CancellationToken);
             
             if (ledgerResponse.IsSuccessStatusCode)
             {
-                var ledgerContent = await ledgerResponse.Content.ReadAsStringAsync();
+                var ledgerContent = await ledgerResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
                 var ledgerCaps = JsonDocument.Parse(ledgerContent);
                 var ledgerTools = ledgerCaps.RootElement.GetProperty("capabilities")
                     .GetProperty("tools").EnumerateArray().Count();
@@ -231,11 +231,11 @@ public class MCPIntegrationTests
         {
             var docFactory = new WebApplicationFactory<CanIHazHouze.DocumentService.Program>();
             var docClient = docFactory.CreateClient();
-            var docResponse = await docClient.GetAsync("/mcp/capabilities");
+            var docResponse = await docClient.GetAsync("/mcp/capabilities", TestContext.Current.CancellationToken);
             
             if (docResponse.IsSuccessStatusCode)
             {
-                var docContent = await docResponse.Content.ReadAsStringAsync();
+                var docContent = await docResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
                 var docCaps = JsonDocument.Parse(docContent);
                 var docTools = docCaps.RootElement.GetProperty("capabilities")
                     .GetProperty("tools").EnumerateArray().Count();
@@ -257,11 +257,11 @@ public class MCPIntegrationTests
         {
             var mortgageFactory = new WebApplicationFactory<CanIHazHouze.MortgageApprover.Program>();
             var mortgageClient = mortgageFactory.CreateClient();
-            var mortgageResponse = await mortgageClient.GetAsync("/mcp/capabilities");
+            var mortgageResponse = await mortgageClient.GetAsync("/mcp/capabilities", TestContext.Current.CancellationToken);
             
             if (mortgageResponse.IsSuccessStatusCode)
             {
-                var mortgageContent = await mortgageResponse.Content.ReadAsStringAsync();
+                var mortgageContent = await mortgageResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
                 var mortgageCaps = JsonDocument.Parse(mortgageContent);
                 var mortgageTools = mortgageCaps.RootElement.GetProperty("capabilities")
                     .GetProperty("tools").EnumerateArray().Count();
@@ -283,11 +283,11 @@ public class MCPIntegrationTests
         {
             var crmFactory = new WebApplicationFactory<CanIHazHouze.CrmService.Program>();
             var crmClient = crmFactory.CreateClient();
-            var crmResponse = await crmClient.GetAsync("/mcp/capabilities");
+            var crmResponse = await crmClient.GetAsync("/mcp/capabilities", TestContext.Current.CancellationToken);
             
             if (crmResponse.IsSuccessStatusCode)
             {
-                var crmContent = await crmResponse.Content.ReadAsStringAsync();
+                var crmContent = await crmResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
                 var crmCaps = JsonDocument.Parse(crmContent);
                 var crmTools = crmCaps.RootElement.GetProperty("capabilities")
                     .GetProperty("tools").EnumerateArray().Count();

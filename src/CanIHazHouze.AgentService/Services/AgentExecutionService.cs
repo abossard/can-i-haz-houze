@@ -11,26 +11,59 @@ namespace CanIHazHouze.AgentService.Services;
 public class AgentExecutionService : IAgentExecutionService
 {
     private readonly IAgentStorageService _storageService;
-    private readonly OpenAIConfiguration _openAIConfig;
+    private readonly Azure.AI.OpenAI.AzureOpenAIClient _openAIClient;
     private readonly ILogger<AgentExecutionService> _logger;
 
     public AgentExecutionService(
         IAgentStorageService storageService,
-        IOptions<OpenAIConfiguration> openAIConfig,
+        Azure.AI.OpenAI.AzureOpenAIClient openAIClient,
         ILogger<AgentExecutionService> logger)
     {
         _storageService = storageService;
-        _openAIConfig = openAIConfig.Value;
+        _openAIClient = openAIClient;
         _logger = logger;
     }
     
-    private Kernel CreateKernelForModel(string deploymentName)
+    private Kernel CreateKernelForModel(string deploymentName, List<string> tools)
     {
         var builder = Kernel.CreateBuilder();
+        
+        // Use the shared AzureOpenAIClient which already has DefaultAzureCredential configured
         builder.AddAzureOpenAIChatCompletion(
             deploymentName: deploymentName,
-            endpoint: _openAIConfig.Endpoint,
-            apiKey: _openAIConfig.ApiKey);
+            azureOpenAIClient: _openAIClient);
+        
+        // Register plugins based on agent's tool configuration
+        foreach (var tool in tools)
+        {
+            switch (tool.ToLowerInvariant())
+            {
+                case "ledgerapi":
+                    // TODO: Implement LedgerAPI plugin
+                    _logger.LogWarning("LedgerAPI plugin not yet implemented");
+                    break;
+                case "crmapi":
+                    // TODO: Implement CRMAPI plugin
+                    _logger.LogWarning("CRMAPI plugin not yet implemented");
+                    break;
+                case "documentsapi":
+                    // TODO: Implement DocumentsAPI plugin
+                    _logger.LogWarning("DocumentsAPI plugin not yet implemented");
+                    break;
+                case "agentworkbench":
+                    // TODO: Implement AgentWorkbench plugin
+                    _logger.LogWarning("AgentWorkbench plugin not yet implemented");
+                    break;
+                case "websearch":
+                    // TODO: Implement WebSearch plugin
+                    _logger.LogWarning("WebSearch plugin not yet implemented");
+                    break;
+                default:
+                    _logger.LogWarning("Unknown tool: {Tool}", tool);
+                    break;
+            }
+        }
+        
         return builder.Build();
     }
 
@@ -109,8 +142,20 @@ public class AgentExecutionService : IAgentExecutionService
                 }
             });
 
-            // Create kernel with the agent's specified model deployment
-            var kernel = CreateKernelForModel(agent.Config.Model);
+            // Create kernel with the agent's specified model deployment and tools
+            var kernel = CreateKernelForModel(agent.Config.Model, agent.Tools);
+            
+            // Enable automatic function calling if tools are configured
+            if (agent.Tools.Any())
+            {
+                executionSettings.ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions;
+                
+                run.Logs.Add(new AgentRunLog
+                {
+                    Level = "info",
+                    Message = $"Enabled automatic tool calling for: {string.Join(", ", agent.Tools)}"
+                });
+            }
             
             // Execute the agent
             var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();

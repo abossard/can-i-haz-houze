@@ -12,31 +12,17 @@ namespace CanIHazHouze.Tests;
 /// <summary>
 /// End-to-end API test exercising AgentService CRUD and run execution path.
 /// Validates: create -> get -> list -> run -> poll status.
+/// 
+/// REQUIRES: Azure OpenAI endpoint configured via user secrets or environment.
+/// Run: dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=https://YOUR-RESOURCE.openai.azure.com/" --project CanIHazHouze.Tests.csproj
 /// </summary>
 public class AgentServiceEndToEndTests
 {
     private static WebApplicationFactory<CanIHazHouze.AgentService.Program> CreateFactory()
     {
-        var factory = new WebApplicationFactory<CanIHazHouze.AgentService.Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.ConfigureAppConfiguration((context, cfg) =>
-                {
-                    var dict = new Dictionary<string,string>
-                    {
-                        {"ConnectionStrings:openai", "Endpoint=https://example.com/;ApiKey=dummy"}
-                    };
-                    cfg.AddInMemoryCollection(dict.Select(kv => new KeyValuePair<string,string?>(kv.Key, kv.Value)));
-                });
-                builder.ConfigureServices(services =>
-                {
-                    services.Configure<OpenAIConfiguration>(cfg =>
-                    {
-                        cfg.Endpoint = "https://example.com"; // stub endpoint
-                        cfg.ApiKey = "test-key";
-                    });
-                });
-            });
+        // Test uses real Azure OpenAI configuration from user secrets or environment variables
+        // No dummy/stub configuration - this ensures tests validate actual Azure integration
+        var factory = new WebApplicationFactory<CanIHazHouze.AgentService.Program>();
         return factory;
     }
 

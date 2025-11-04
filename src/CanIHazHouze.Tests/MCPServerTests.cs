@@ -32,7 +32,7 @@ public class MCPServerTests
         // Act - Register a test tool
         mcpServer.RegisterTool<TestRequest>("test_tool", 
             "A test tool for MCP validation",
-            async req => new { message = $"Hello {req.Name}!", value = req.Value });
+            req => Task.FromResult<object>(new { message = $"Hello {req.Name}!", value = req.Value }));
 
         // Assert - Verify tool is registered
         var tools = mcpServer.GetAvailableTools();
@@ -61,7 +61,7 @@ public class MCPServerTests
 
         mcpServer.RegisterTool<TestRequest>("test_tool",
             "A test tool for MCP validation",
-            async req => new { message = $"Hello {req.Name}!", value = req.Value });
+            req => Task.FromResult<object>(new { message = $"Hello {req.Name}!", value = req.Value }));
 
         var testArgs = JsonDocument.Parse("""{"name": "MCP", "value": 42}""");
 
@@ -95,7 +95,7 @@ public class MCPServerTests
         // Act
         mcpServer.RegisterResource("test://resource", "Test Resource", 
             "A test resource for MCP validation",
-            async () => new { data = "test resource data" });
+            () => Task.FromResult<object>(new { data = "test resource data" }));
 
         // Assert
         var resources = mcpServer.GetAvailableResources();
@@ -124,7 +124,7 @@ public class MCPServerTests
 
         mcpServer.RegisterResource("test://resource", "Test Resource",
             "A test resource for MCP validation",
-            async () => new { data = "test resource data", timestamp = DateTimeOffset.UtcNow });
+            () => Task.FromResult<object>(new { data = "test resource data", timestamp = DateTimeOffset.UtcNow }));
 
         // Act
         var result = await mcpServer.HandleResourceRequestAsync("test://resource");

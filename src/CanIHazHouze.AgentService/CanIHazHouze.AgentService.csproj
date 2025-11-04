@@ -12,10 +12,10 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="9.3.1" />
-    <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
+    <PackageReference Include="Azure.AI.OpenAI" Version="2.2.0-beta.4" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.2" />
-    <PackageReference Include="Microsoft.SemanticKernel" Version="1.33.0" />
-    <PackageReference Include="Microsoft.SemanticKernel.Plugins.Web" Version="1.66.0-alpha" />
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.45.0" />
+    <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI" Version="1.45.0" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.4.16" />
   </ItemGroup>
 

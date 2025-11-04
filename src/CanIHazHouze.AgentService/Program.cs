@@ -34,56 +34,64 @@ builder.Services.Configure<AgentStorageOptions>(
 // Add Azure Cosmos DB using Aspire
 builder.AddAzureCosmosClient("cosmos");
 
-// Keyless Azure OpenAI client (DefaultAzureCredential) using endpoint from connection string with robust validation & graceful fallback
-string? ExtractEndpoint(string? conn)
-{
-    if (string.IsNullOrWhiteSpace(conn)) return null;
-    foreach (var part in conn.Split(';', StringSplitOptions.RemoveEmptyEntries))
-    {
-        if (part.StartsWith("Endpoint=", StringComparison.OrdinalIgnoreCase))
-        {
-            var ep = part.Substring("Endpoint=".Length).Trim();
-            return string.IsNullOrWhiteSpace(ep) ? null : ep;
-        }
-    }
-    return null;
-}
-
+// Keyless Azure OpenAI client (DefaultAzureCredential)
+// REQUIRED: AppHost must be running with ConnectionStrings:openai configured
+// The connection string is injected by Aspire via WithReference(openai)
 var openAiConn = builder.Configuration.GetConnectionString("openai");
-var openAiEndpoint = ExtractEndpoint(openAiConn) ?? builder.Configuration["OpenAI:Endpoint"]?.Trim();
-
-bool IsValidEndpoint(string? ep) =>
-    !string.IsNullOrWhiteSpace(ep) && Uri.TryCreate(ep, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttps);
-
-if (!IsValidEndpoint(openAiEndpoint))
+if (string.IsNullOrWhiteSpace(openAiConn))
 {
-    builder.Logging.AddFilter("DummyAgentExecutionService", LogLevel.Information);
-    Console.WriteLine("[AgentService] OpenAI endpoint not configured or invalid. Using dummy agent execution services. Set user secret 'ConnectionStrings:openai' with 'Endpoint=YOUR_URL;ApiKey=...' to enable real AI features.");
-    builder.Services.AddSingleton<IAgentExecutionService, DummyAgentExecutionService>();
-    builder.Services.AddSingleton<MultiTurnAgentExecutor, DummyMultiTurnAgentExecutor>();
-    builder.Services.Configure<CanIHazHouze.AgentService.Configuration.OpenAIConfiguration>(opt =>
-    {
-        opt.Endpoint = "https://dummy.local";
-        opt.ApiKey = "dummy-key";
-    });
-    openAiEndpoint = null; // mark invalid so we skip real registration below
+    // Enhanced diagnostics to help debug configuration issues
+    var allConnStrings = builder.Configuration.GetSection("ConnectionStrings").GetChildren()
+        .Select(c => $"{c.Key}={(string.IsNullOrWhiteSpace(c.Value) ? "<empty>" : "***")}")
+        .ToList();
+    
+    var configSources = string.Join(", ", builder.Configuration.AsEnumerable()
+        .Where(kvp => kvp.Key.Contains("openai", StringComparison.OrdinalIgnoreCase))
+        .Select(kvp => $"{kvp.Key}={(string.IsNullOrWhiteSpace(kvp.Value) ? "<empty>" : "***")}"));
+    
+    throw new InvalidOperationException(
+        $"OpenAI connection string is required but was not found or is empty.\n" +
+        $"Available connection strings: {(allConnStrings.Any() ? string.Join(", ", allConnStrings) : "none")}\n" +
+        $"OpenAI-related config keys: {(string.IsNullOrEmpty(configSources) ? "none" : configSources)}\n\n" +
+        $"When running via AppHost: Make sure AppHost has the connection string configured:\n" +
+        $"  cd src/CanIHazHouze.AppHost && dotnet user-secrets set \"ConnectionStrings:openai\" \"Endpoint=https://...\"\n\n" +
+        $"When running AgentService directly: Set the secret in this project:\n" +
+        $"  cd src/CanIHazHouze.AgentService && dotnet user-secrets set \"ConnectionStrings:openai\" \"Endpoint=https://...\"");
 }
-else
+
+string? openAiEndpoint = null;
+foreach (var part in openAiConn.Split(';', StringSplitOptions.RemoveEmptyEntries))
 {
-    builder.Services.AddSingleton(sp =>
+    if (part.StartsWith("Endpoint=", StringComparison.OrdinalIgnoreCase))
     {
-        var credential = new Azure.Identity.DefaultAzureCredential();
-        return new Azure.AI.OpenAI.AzureOpenAIClient(new Uri(openAiEndpoint!), credential);
-    });
+        openAiEndpoint = part.Substring("Endpoint=".Length).Trim();
+        break;
+    }
 }
+
+if (string.IsNullOrWhiteSpace(openAiEndpoint) || !Uri.TryCreate(openAiEndpoint, UriKind.Absolute, out var openAiUri) || openAiUri.Scheme != Uri.UriSchemeHttps)
+{
+    throw new InvalidOperationException(
+        $"Invalid OpenAI endpoint: '{openAiEndpoint}'. Must be a valid HTTPS URL.");
+}
+
+builder.Services.AddSingleton(sp =>
+{
+    var credential = new Azure.Identity.DefaultAzureCredential();
+    return new Azure.AI.OpenAI.AzureOpenAIClient(openAiUri, credential);
+});
+
+// Configure OpenAIConfiguration for AgentExecutionService
+builder.Services.Configure<CanIHazHouze.AgentService.Configuration.OpenAIConfiguration>(options =>
+{
+    options.Endpoint = openAiEndpoint;
+    options.ApiKey = string.Empty; // Using keyless authentication with DefaultAzureCredential
+});
 
 // Add agent services
 builder.Services.AddScoped<IAgentStorageService, AgentStorageService>();
-if (IsValidEndpoint(openAiEndpoint))
-{
-    builder.Services.AddScoped<IAgentExecutionService, AgentExecutionService>();
-    builder.Services.AddScoped<MultiTurnAgentExecutor>();
-}
+builder.Services.AddScoped<IAgentExecutionService, AgentExecutionService>();
+builder.Services.AddScoped<MultiTurnAgentExecutor>();
 // Remove incorrect Cosmos client registration for openai; we now added explicit AzureOpenAIClient above.
 
 // Add background service for long-running agent tasks
@@ -181,6 +189,27 @@ app.MapGet("/agents/raw", async (IAgentStorageService storage, Microsoft.Azure.C
     return operation;
 })
 .Produces<List<object>>(StatusCodes.Status200OK);
+
+// Diagnostics: OpenAI configuration
+app.MapGet("/diagnostics/openai", (IServiceProvider sp) =>
+{
+    var client = sp.GetService<Azure.AI.OpenAI.AzureOpenAIClient>();
+    return Results.Ok(new
+    {
+        configured = client != null,
+        endpoint = openAiEndpoint,
+        timestampUtc = DateTime.UtcNow
+    });
+})
+.WithName("GetOpenAIDiagnostics")
+.WithSummary("Diagnostics: OpenAI configuration mode")
+.WithDescription("Shows whether the service is using the real Azure OpenAI client or dummy execution services.")
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Diagnostics" }];
+    return operation;
+})
+.Produces<object>(StatusCodes.Status200OK);
 
 // Diagnostics: counts by entityType
 app.MapGet("/agents/counts", async (IAgentStorageService storage, Microsoft.Azure.Cosmos.CosmosClient cosmosClient) =>

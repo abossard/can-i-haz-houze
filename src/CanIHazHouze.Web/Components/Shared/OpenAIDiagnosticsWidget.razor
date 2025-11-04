@@ -1,0 +1,110 @@
+@namespace CanIHazHouze.Web.Components.Shared
+@inject AgentApiClient AgentApi
+
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <strong>🧪 OpenAI Diagnostics</strong>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="Refresh" disabled="@(loading)">
+            @(loading ? "Refreshing..." : "Refresh")
+        </button>
+    </div>
+    <div class="card-body">
+        @if (error != null)
+        {
+            <div class="alert alert-danger mb-0">@error</div>
+        }
+        else if (loading)
+        {
+            <div class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                <span>Loading diagnostics...</span>
+            </div>
+        }
+        else if (diagnostics is null)
+        {
+            <div class="text-muted">No diagnostics available.</div>
+        }
+        else
+        {
+            <div class="row g-3">
+                <div class="col-12 col-md-6">
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-@(diagnostics.Mode == "real" ? "success" : diagnostics.Mode == "dummy" ? "warning text-dark" : "secondary") me-2">
+                            @diagnostics.Mode.ToUpperInvariant()
+                        </span>
+                        <small class="text-muted">Mode</small>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div>
+                        <small class="text-muted">Endpoint:</small><br />
+                        <code>@(string.IsNullOrWhiteSpace(diagnostics.Endpoint) ? "(none)" : diagnostics.Endpoint)</code>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div>
+                        <small class="text-muted">Executor Type:</small><br />
+                        <code>@diagnostics.ExecutorType</code>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div>
+                        <small class="text-muted">Azure Client Registered:</small><br />
+                        <span class="badge bg-@(diagnostics.AzureClientRegistered ? "success" : "secondary")">@(diagnostics.AzureClientRegistered ? "Yes" : "No")</span>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div>
+                        <small class="text-muted">Dummy Executor:</small><br />
+                        <span class="badge bg-@(diagnostics.IsDummyExecutor ? "warning text-dark" : "success")">@(diagnostics.IsDummyExecutor ? "Yes" : "No")</span>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div>
+                        <small class="text-muted">Timestamp (UTC):</small><br />
+                        <code>@diagnostics.TimestampUtc.ToString("O")</code>
+                    </div>
+                </div>
+            </div>
+            <hr />
+            <small class="text-muted">Tip: Configure a valid Azure OpenAI endpoint via user secrets (ConnectionStrings:openai) to switch from dummy to real mode.</small>
+        }
+    </div>
+</div>
+
+@code {
+    private OpenAiDiagnostics? diagnostics;
+    private bool loading = true;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task Refresh()
+    {
+        await LoadAsync(force:true);
+    }
+
+    private async Task LoadAsync(bool force = false)
+    {
+        try
+        {
+            loading = true;
+            error = null;
+            diagnostics = await AgentApi.GetOpenAiDiagnosticsAsync();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+}

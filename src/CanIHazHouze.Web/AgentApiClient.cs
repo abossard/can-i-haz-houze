@@ -89,6 +89,12 @@ public class AgentApiClient(HttpClient httpClient)
     {
         return await httpClient.GetFromJsonAsync<ActiveRunsResponse>("/runs/active", cancellationToken);
     }
+
+    public async Task<OpenAiDiagnostics?> GetOpenAiDiagnosticsAsync(CancellationToken cancellationToken = default)
+    {
+        // Endpoint returns anonymous object with keys: mode, endpoint, azureClientRegistered, executorType, isDummyExecutor, timestampUtc
+        return await httpClient.GetFromJsonAsync<OpenAiDiagnostics>("/diagnostics/openai", cancellationToken);
+    }
 }
 
 public class AsyncRunResponse
@@ -320,4 +326,25 @@ public class ModelDeployment
     
     [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
+}
+
+public class OpenAiDiagnostics
+{
+    [JsonPropertyName("mode")]
+    public string Mode { get; set; } = string.Empty;
+
+    [JsonPropertyName("endpoint")]
+    public string Endpoint { get; set; } = string.Empty;
+
+    [JsonPropertyName("azureClientRegistered")]
+    public bool AzureClientRegistered { get; set; }
+
+    [JsonPropertyName("executorType")]
+    public string ExecutorType { get; set; } = string.Empty;
+
+    [JsonPropertyName("isDummyExecutor")]
+    public bool IsDummyExecutor { get; set; }
+
+    [JsonPropertyName("timestampUtc")]
+    public DateTime TimestampUtc { get; set; }
 }

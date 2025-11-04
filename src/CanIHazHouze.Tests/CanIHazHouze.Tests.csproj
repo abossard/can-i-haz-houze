@@ -8,6 +8,7 @@
     <IsTestProject>true</IsTestProject>
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
     <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+    <UserSecretsId>can-i-haz-houze-tests</UserSecretsId>
     <!-- Suppress warnings about transitive dependency version resolution -->
     <NoWarn>$(NoWarn);NU1608</NoWarn>
   </PropertyGroup>
