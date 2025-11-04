@@ -4,6 +4,9 @@ namespace CanIHazHouze.Web;
 
 public class AgentApiClient(HttpClient httpClient)
 {
+    // Expose the HttpClient for URL resolution (e.g., SignalR hub connections)
+    public HttpClient HttpClient => httpClient;
+    
     public async Task<List<ModelDeployment>> GetAvailableModelsAsync(CancellationToken cancellationToken = default)
     {
         return await httpClient.GetFromJsonAsync<List<ModelDeployment>>("/models", cancellationToken)

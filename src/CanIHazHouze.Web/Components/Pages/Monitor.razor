@@ -5,6 +5,7 @@
 @using Newtonsoft.Json
 @inject NavigationManager Navigation
 @inject IHttpClientFactory HttpClientFactory
+@inject AgentApiClient AgentApiClient
 @implements IAsyncDisposable
 
 <PageTitle>Agent Monitor</PageTitle>
@@ -376,15 +377,42 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Create HttpClient for agentservice to resolve the URL via service discovery
-        var httpClient = HttpClientFactory.CreateClient();
-        httpClient.BaseAddress = new Uri("https+http://agentservice");
+        // SignalR connections are initiated from the browser, so we need a real HTTP(S) URL
+        // We can't use the https+http:// scheme directly since browsers don't understand it
         
-        // For SignalR, we need to resolve the actual URL
-        // In development, use localhost directly
-        var hubUrl = Navigation.BaseUri.Contains("localhost")
-            ? "https://localhost:7069/hubs/agent"
-            : "https+http://agentservice/hubs/agent";
+        string hubUrl;
+        if (Navigation.BaseUri.Contains("localhost"))
+        {
+            // Local development: use the AgentService's direct port
+            hubUrl = "https://localhost:7069/hubs/agent";
+        }
+        else
+        {
+            // In Azure Container Apps: Make a health check call to resolve the actual URL
+            // The HttpClient uses Aspire service discovery to resolve https+http://agentservice
+            try
+            {
+                var healthResponse = await AgentApiClient.HttpClient.GetAsync("/health");
+                var requestUri = healthResponse.RequestMessage?.RequestUri;
+                if (requestUri != null)
+                {
+                    // Use the resolved URL from the HttpClient - GetLeftPart handles port correctly
+                    var baseUrl = requestUri.GetLeftPart(UriPartial.Authority);
+                    hubUrl = $"{baseUrl}/hubs/agent";
+                }
+                else
+                {
+                    // Fallback: try using the base URI
+                    hubUrl = $"{Navigation.BaseUri.TrimEnd('/')}/hubs/agent";
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Monitor] Error resolving AgentService URL: {ex.Message}");
+                // Last resort fallback
+                hubUrl = $"{Navigation.BaseUri.TrimEnd('/')}/hubs/agent";
+            }
+        }
             
         _hubConnection = new HubConnectionBuilder()
             .WithUrl(hubUrl)
@@ -527,17 +555,11 @@
     {
         try
         {
-            var httpClient = HttpClientFactory.CreateClient();
-            httpClient.BaseAddress = new Uri("https+http://agentservice");
-            var response = await httpClient.GetAsync($"/agents/{agentId}");
-            
-            if (response.IsSuccessStatusCode)
+            // Use the AgentApiClient which has the properly configured HttpClient
+            var agent = await AgentApiClient.GetAgentAsync(agentId);
+            if (agent != null)
             {
-                var json = await response.Content.ReadAsStringAsync();
-                var agent = JsonConvert.DeserializeObject<dynamic>(json);
-                var name = agent?.name?.ToString() ?? agentId;
-                
-                _agentNames[agentId] = name;
+                _agentNames[agentId] = agent.Name;
                 await InvokeAsync(StateHasChanged);
             }
         }
