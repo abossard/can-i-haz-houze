@@ -88,6 +88,12 @@ builder.Services.Configure<CanIHazHouze.AgentService.Configuration.OpenAIConfigu
     options.ApiKey = string.Empty; // Using keyless authentication with DefaultAzureCredential
 });
 
+// Add HttpClient for MCP client service
+builder.Services.AddHttpClient();
+
+// Add MCP client service for connecting to MCP servers
+builder.Services.AddSingleton<IMcpClientService, McpClientService>();
+
 // Add agent services
 builder.Services.AddScoped<IAgentStorageService, AgentStorageService>();
 builder.Services.AddScoped<IAgentExecutionService, AgentExecutionService>();

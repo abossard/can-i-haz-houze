@@ -12,19 +12,25 @@ public class AgentExecutionService : IAgentExecutionService
 {
     private readonly IAgentStorageService _storageService;
     private readonly Azure.AI.OpenAI.AzureOpenAIClient _openAIClient;
+    private readonly IMcpClientService _mcpClientService;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<AgentExecutionService> _logger;
 
     public AgentExecutionService(
         IAgentStorageService storageService,
         Azure.AI.OpenAI.AzureOpenAIClient openAIClient,
+        IMcpClientService mcpClientService,
+        IConfiguration configuration,
         ILogger<AgentExecutionService> logger)
     {
         _storageService = storageService;
         _openAIClient = openAIClient;
+        _mcpClientService = mcpClientService;
+        _configuration = configuration;
         _logger = logger;
     }
     
-    private Kernel CreateKernelForModel(string deploymentName, List<string> tools)
+    private async Task<Kernel> CreateKernelForModelAsync(string deploymentName, List<string> tools, CancellationToken cancellationToken)
     {
         var builder = Kernel.CreateBuilder();
         
@@ -33,34 +39,39 @@ public class AgentExecutionService : IAgentExecutionService
             deploymentName: deploymentName,
             azureOpenAIClient: _openAIClient);
         
-        // Register plugins based on agent's tool configuration
+        // Map of tool names to their MCP endpoints (from service discovery)
+        var mcpEndpoints = new Dictionary<string, string>
+        {
+            ["ledgerapi"] = _configuration.GetConnectionString("ledgerservice") + "/mcp",
+            ["crmapi"] = _configuration.GetConnectionString("crmservice") + "/mcp",
+            ["documentsapi"] = _configuration.GetConnectionString("documentservice") + "/mcp",
+            // Add more services as needed
+        };
+        
+        // Register MCP plugins based on agent's tool configuration
         foreach (var tool in tools)
         {
-            switch (tool.ToLowerInvariant())
+            var toolKey = tool.ToLowerInvariant();
+            
+            if (mcpEndpoints.TryGetValue(toolKey, out var mcpEndpoint))
             {
-                case "ledgerapi":
-                    // TODO: Implement LedgerAPI plugin
-                    _logger.LogWarning("LedgerAPI plugin not yet implemented");
-                    break;
-                case "crmapi":
-                    // TODO: Implement CRMAPI plugin
-                    _logger.LogWarning("CRMAPI plugin not yet implemented");
-                    break;
-                case "documentsapi":
-                    // TODO: Implement DocumentsAPI plugin
-                    _logger.LogWarning("DocumentsAPI plugin not yet implemented");
-                    break;
-                case "agentworkbench":
-                    // TODO: Implement AgentWorkbench plugin
-                    _logger.LogWarning("AgentWorkbench plugin not yet implemented");
-                    break;
-                case "websearch":
-                    // TODO: Implement WebSearch plugin
-                    _logger.LogWarning("WebSearch plugin not yet implemented");
-                    break;
-                default:
-                    _logger.LogWarning("Unknown tool: {Tool}", tool);
-                    break;
+                try
+                {
+                    await builder.AddMcpToolsAsync(
+                        _mcpClientService,
+                        mcpEndpoint,
+                        tool, // Use original casing for plugin name
+                        _logger,
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to load MCP tools for {Tool} from {Endpoint}", tool, mcpEndpoint);
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Unknown tool or no MCP endpoint configured: {Tool}", tool);
             }
         }
         
@@ -143,7 +154,7 @@ public class AgentExecutionService : IAgentExecutionService
             });
 
             // Create kernel with the agent's specified model deployment and tools
-            var kernel = CreateKernelForModel(agent.Config.Model, agent.Tools);
+            var kernel = await CreateKernelForModelAsync(agent.Config.Model, agent.Tools, CancellationToken.None);
             
             // Enable automatic function calling if tools are configured
             if (agent.Tools.Any())
