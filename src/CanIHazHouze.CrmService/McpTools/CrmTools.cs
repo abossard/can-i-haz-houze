@@ -91,4 +91,14 @@ public class CrmTools
     {
         return await _crmService.DeleteComplaintAsync(Guid.Parse(id), customerName);
     }
+
+    [McpServerTool]
+    [Description("Delete a specific comment from a complaint")]
+    public async Task<Complaint?> DeleteComplaintComment(
+        [Description("Complaint ID")] string id,
+        [Description("Comment ID to delete")] string commentId,
+        [Description("Customer name")] string customerName)
+    {
+        return await _crmService.DeleteCommentAsync(Guid.Parse(id), Guid.Parse(commentId), customerName);
+    }
 }

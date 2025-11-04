@@ -115,6 +115,66 @@ public class DocumentTools
             Success = true
         };
     }
+
+    [McpServerTool]
+    [Description("Enhance document tags using AI suggestions based on content analysis")]
+    public async Task<DocumentTagEnhancementResult> EnhanceDocumentTags(
+        [Description("Document ID to enhance tags for")] string documentId,
+        [Description("Document owner")] string owner,
+        [Description("Maximum number of tag suggestions")] int maxSuggestions = 5)
+    {
+        var docMeta = await _documentService.GetDocumentAsync(Guid.Parse(documentId), owner);
+        if (docMeta == null)
+            return new DocumentTagEnhancementResult { Error = "Document not found" };
+
+        // Get document content for analysis
+        var contentStream = await _documentService.GetDocumentContentAsync(Guid.Parse(documentId), owner);
+        if (contentStream == null)
+            return new DocumentTagEnhancementResult { Error = "Document content not available" };
+
+        using var reader = new StreamReader(contentStream);
+        var textContent = await reader.ReadToEndAsync();
+
+        // Get AI tag suggestions
+        var suggestions = await _aiService.SuggestTagsAsync(textContent, docMeta.Tags, maxSuggestions);
+        
+        return new DocumentTagEnhancementResult
+        {
+            DocumentId = Guid.Parse(documentId),
+            OriginalTags = docMeta.Tags,
+            SuggestedTags = suggestions,
+            Success = true
+        };
+    }
+
+    [McpServerTool]
+    [Description("Download document content as base64-encoded string")]
+    public async Task<DocumentDownloadResult> DownloadDocument(
+        [Description("Document ID to download")] string documentId,
+        [Description("Document owner")] string owner)
+    {
+        var docMeta = await _documentService.GetDocumentAsync(Guid.Parse(documentId), owner);
+        if (docMeta == null)
+            return new DocumentDownloadResult { Error = "Document not found" };
+
+        var contentStream = await _documentService.GetDocumentContentAsync(Guid.Parse(documentId), owner);
+        if (contentStream == null)
+            return new DocumentDownloadResult { Error = "Document content not available" };
+
+        // Read stream and convert to base64
+        using var memoryStream = new MemoryStream();
+        await contentStream.CopyToAsync(memoryStream);
+        var base64Content = Convert.ToBase64String(memoryStream.ToArray());
+
+        return new DocumentDownloadResult
+        {
+            DocumentId = Guid.Parse(documentId),
+            FileName = docMeta.FileName,
+            Base64Content = base64Content,
+            ContentLength = memoryStream.Length,
+            Success = true
+        };
+    }
 }
 
 // Custom result types for MCP tool outputs
@@ -133,5 +193,24 @@ public class DocumentAnalysisResult
 {
     public bool Success { get; set; }
     public DocumentMetadata? Metadata { get; set; }
+    public string? Error { get; set; }
+}
+
+public class DocumentTagEnhancementResult
+{
+    public bool Success { get; set; }
+    public Guid DocumentId { get; set; }
+    public List<string> OriginalTags { get; set; } = new();
+    public List<string> SuggestedTags { get; set; } = new();
+    public string? Error { get; set; }
+}
+
+public class DocumentDownloadResult
+{
+    public bool Success { get; set; }
+    public Guid DocumentId { get; set; }
+    public string FileName { get; set; } = string.Empty;
+    public string Base64Content { get; set; } = string.Empty;
+    public long ContentLength { get; set; }
     public string? Error { get; set; }
 }

@@ -78,4 +78,22 @@ public class MortgageTools
         var verification = await _verificationService.VerifyMortgageRequirementsAsync(request.UserName, request.RequestData);
         return new { Success = true, Verification = verification };
     }
+
+    [McpServerTool]
+    [Description("Delete a mortgage application request")]
+    public async Task<bool> DeleteMortgageRequest([Description("Request ID to delete")] string requestId)
+    {
+        return await _mortgageService.DeleteMortgageRequestAsync(Guid.Parse(requestId));
+    }
+
+    [McpServerTool]
+    [Description("Get list of mortgage requests with optional filtering by status")]
+    public async Task<IEnumerable<MortgageRequestDto>> GetMortgageRequests(
+        [Description("Page number (default: 1)")] int page = 1,
+        [Description("Page size (default: 10)")] int pageSize = 10,
+        [Description("Filter by status (optional)")] string? status = null)
+    {
+        var requests = await _mortgageService.GetMortgageRequestsAsync(page, pageSize, status);
+        return requests.Select(MortgageRequestDto.FromDomain).ToList();
+    }
 }
