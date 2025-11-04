@@ -15,19 +15,28 @@ public class AgentExecutionService : IAgentExecutionService
     private readonly IMcpClientService _mcpClientService;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AgentExecutionService> _logger;
+    private readonly IAgentEventBroadcaster _broadcaster;
 
     public AgentExecutionService(
         IAgentStorageService storageService,
         Azure.AI.OpenAI.AzureOpenAIClient openAIClient,
         IMcpClientService mcpClientService,
         IConfiguration configuration,
-        ILogger<AgentExecutionService> logger)
+        ILogger<AgentExecutionService> logger,
+        IAgentEventBroadcaster broadcaster)
     {
         _storageService = storageService;
         _openAIClient = openAIClient;
         _mcpClientService = mcpClientService;
         _configuration = configuration;
         _logger = logger;
+        _broadcaster = broadcaster;
+    }
+    
+    private async Task AddLogAsync(AgentRun run, AgentRunLog log)
+    {
+        run.Logs.Add(log);
+        await _broadcaster.BroadcastLogAsync(run.Id, run.AgentId, log);
     }
     
     private async Task<Kernel> CreateKernelForModelAsync(string deploymentName, List<string> tools, AgentRun run, CancellationToken cancellationToken)
@@ -35,7 +44,7 @@ public class AgentExecutionService : IAgentExecutionService
         var builder = Kernel.CreateBuilder();
         
         // Add function invocation filter to log all tool calls
-        builder.Services.AddSingleton<IFunctionInvocationFilter>(new FunctionInvocationLoggingFilter(run, _logger));
+        builder.Services.AddSingleton<IFunctionInvocationFilter>(new FunctionInvocationLoggingFilter(run, _logger, _broadcaster));
         
         // Use the shared AzureOpenAIClient which already has DefaultAzureCredential configured
         builder.AddAzureOpenAIChatCompletion(
@@ -234,6 +243,17 @@ public class AgentExecutionService : IAgentExecutionService
             var chatHistory = new ChatHistory();
             chatHistory.AddUserMessage(prompt);
 
+            // Broadcast user message
+            var userTurn = new ConversationTurn
+            {
+                TurnNumber = 0,
+                Role = "user",
+                Content = prompt,
+                Timestamp = DateTime.UtcNow
+            };
+            run.ConversationHistory.Add(userTurn);
+            await _broadcaster.BroadcastConversationAsync(run.Id, run.AgentId, userTurn);
+
             run.Logs.Add(new AgentRunLog
             {
                 Level = "info",
@@ -248,6 +268,17 @@ public class AgentExecutionService : IAgentExecutionService
             run.Result = result.Content;
             run.Status = "completed";
             run.CompletedAt = DateTime.UtcNow;
+
+            // Broadcast assistant response
+            var assistantTurn = new ConversationTurn
+            {
+                TurnNumber = 1,
+                Role = "assistant",
+                Content = result.Content ?? "",
+                Timestamp = DateTime.UtcNow
+            };
+            run.ConversationHistory.Add(assistantTurn);
+            await _broadcaster.BroadcastConversationAsync(run.Id, run.AgentId, assistantTurn);
 
             run.Logs.Add(new AgentRunLog
             {
@@ -284,11 +315,19 @@ internal class FunctionInvocationLoggingFilter : IFunctionInvocationFilter
 {
     private readonly AgentRun _run;
     private readonly ILogger _logger;
+    private readonly IAgentEventBroadcaster _broadcaster;
 
-    public FunctionInvocationLoggingFilter(AgentRun run, ILogger logger)
+    public FunctionInvocationLoggingFilter(AgentRun run, ILogger logger, IAgentEventBroadcaster broadcaster)
     {
         _run = run;
         _logger = logger;
+        _broadcaster = broadcaster;
+    }
+    
+    private async Task AddLogAndBroadcastAsync(AgentRunLog log)
+    {
+        _run.Logs.Add(log);
+        await _broadcaster.BroadcastLogAsync(_run.Id, _run.AgentId, log);
     }
 
     public async Task OnFunctionInvocationAsync(FunctionInvocationContext context, Func<FunctionInvocationContext, Task> next)
@@ -301,7 +340,7 @@ internal class FunctionInvocationLoggingFilter : IFunctionInvocationFilter
             type = kvp.Value?.GetType().Name ?? "null"
         }).ToList();
 
-        _run.Logs.Add(new AgentRunLog
+        await AddLogAndBroadcastAsync(new AgentRunLog
         {
             Timestamp = DateTime.UtcNow,
             Level = "info",
@@ -326,10 +365,22 @@ internal class FunctionInvocationLoggingFilter : IFunctionInvocationFilter
             await next(context);
 
             // Log after successful invocation
-            var resultValue = context.Result?.GetValue<object>()?.ToString();
-            var resultPreview = resultValue?.Length > 200 ? resultValue.Substring(0, 200) + "..." : resultValue;
+            var resultObj = context.Result?.GetValue<object>();
+            
+            // Extract the actual string value if it's wrapped in a JsonElement or similar
+            string resultString;
+            if (resultObj is System.Text.Json.JsonElement jsonElement)
+            {
+                resultString = jsonElement.GetRawText();
+            }
+            else
+            {
+                resultString = resultObj?.ToString() ?? "no result";
+            }
+            
+            var resultPreview = resultString.Length > 200 ? resultString.Substring(0, 200) + "..." : resultString;
 
-            _run.Logs.Add(new AgentRunLog
+            await AddLogAndBroadcastAsync(new AgentRunLog
             {
                 Timestamp = DateTime.UtcNow,
                 Level = "info",
@@ -339,7 +390,8 @@ internal class FunctionInvocationLoggingFilter : IFunctionInvocationFilter
                     { "function", context.Function.Name },
                     { "plugin", context.Function.PluginName ?? "default" },
                     { "success", true },
-                    { "resultPreview", resultPreview ?? "no result" }
+                    { "result", resultString },
+                    { "resultPreview", resultPreview }
                 }
             });
 
@@ -351,7 +403,7 @@ internal class FunctionInvocationLoggingFilter : IFunctionInvocationFilter
         catch (Exception ex)
         {
             // Log error
-            _run.Logs.Add(new AgentRunLog
+            await AddLogAndBroadcastAsync(new AgentRunLog
             {
                 Timestamp = DateTime.UtcNow,
                 Level = "error",
