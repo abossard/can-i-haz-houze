@@ -13,15 +13,24 @@ public class MultiTurnAgentExecutor
     private readonly IAgentStorageService _storageService;
     private readonly OpenAIConfiguration _openAIConfig;
     private readonly ILogger<MultiTurnAgentExecutor> _logger;
+    private readonly IAgentEventBroadcaster _broadcaster;
 
     public MultiTurnAgentExecutor(
         IAgentStorageService storageService,
         IOptions<OpenAIConfiguration> openAIConfig,
-        ILogger<MultiTurnAgentExecutor> logger)
+        ILogger<MultiTurnAgentExecutor> logger,
+        IAgentEventBroadcaster broadcaster)
     {
         _storageService = storageService;
         _openAIConfig = openAIConfig.Value;
         _logger = logger;
+        _broadcaster = broadcaster;
+    }
+    
+    private async Task AddConversationTurnAsync(AgentRun run, ConversationTurn turn)
+    {
+        run.ConversationHistory.Add(turn);
+        await _broadcaster.BroadcastConversationAsync(run.Id, run.AgentId, turn);
     }
     
     private Kernel CreateKernelForModel(string deploymentName)
@@ -104,7 +113,7 @@ public class MultiTurnAgentExecutor
             
             // Add system message
             chatHistory.AddSystemMessage(systemPrompt);
-            run.ConversationHistory.Add(new ConversationTurn
+            await AddConversationTurnAsync(run, new ConversationTurn
             {
                 TurnNumber = 0,
                 Role = "system",
@@ -140,7 +149,7 @@ public class MultiTurnAgentExecutor
                     var assistantMessage = response.Content ?? string.Empty;
                     chatHistory.AddAssistantMessage(assistantMessage);
                     
-                    run.ConversationHistory.Add(new ConversationTurn
+                    await AddConversationTurnAsync(run, new ConversationTurn
                     {
                         TurnNumber = run.TurnCount,
                         Role = "assistant",
@@ -166,7 +175,7 @@ public class MultiTurnAgentExecutor
                     {
                         var continueMessage = "Continue working towards the goal.";
                         chatHistory.AddUserMessage(continueMessage);
-                        run.ConversationHistory.Add(new ConversationTurn
+                        await AddConversationTurnAsync(run, new ConversationTurn
                         {
                             TurnNumber = run.TurnCount,
                             Role = "user",

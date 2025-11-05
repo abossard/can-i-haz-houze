@@ -24,6 +24,9 @@ builder.Services.AddScoped<ToastService>();
 // Add background activity tracking service
 builder.Services.AddScoped<BackgroundActivityService>();
 
+// Add service URL resolver for client-side connections
+builder.Services.AddSingleton<IServiceUrlResolver, ServiceUrlResolver>();
+
 // Add error handling delegating handler
 builder.Services.AddTransient<ErrorHandlingDelegatingHandler>();
 

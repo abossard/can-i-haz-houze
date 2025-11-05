@@ -1,0 +1,567 @@
+@page "/monitor"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.SignalR.Client
+@using CanIHazHouze.Web.Services
+@using Newtonsoft.Json
+@inject NavigationManager Navigation
+@inject AgentApiClient AgentApiClient
+@inject IServiceUrlResolver ServiceUrlResolver
+@implements IAsyncDisposable
+
+<PageTitle>Agent Monitor</PageTitle>
+
+<h1>🔍 Agent Execution Monitor</h1>
+
+<div class="connection-status @_connectionClass">
+    @_connectionStatus
+</div>
+
+<div class="filters">
+    <div class="filter-group">
+        <label>🤖 Agent:</label>
+        <select class="filter-select" @bind="_selectedAgentId">
+            <option value="">All Agents (@_uniqueAgents.Count)</option>
+            @foreach (var agent in _uniqueAgents.OrderBy(a => a.Name))
+            {
+                <option value="@agent.Id">@agent.Name</option>
+            }
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>🔄 Run:</label>
+        <select class="filter-select" @bind="_selectedRunId">
+            <option value="">All Runs (@_uniqueRuns.Count)</option>
+            @foreach (var run in _uniqueRuns.OrderByDescending(r => r.Timestamp))
+            {
+                <option value="@run.Id">@run.Id.Substring(0, 8)... (@run.Timestamp.ToLocalTime().ToString("HH:mm:ss"))</option>
+            }
+        </select>
+    </div>
+</div>
+
+<div class="events-container">
+    <div class="section">
+        <h2>📊 Logs (@_filteredLogs.Count() / @_logs.Count)</h2>
+        <div class="controls">
+            <input type="text" class="search-box" placeholder="🔍 Search logs..." @bind="_logSearch" @bind:event="oninput" />
+            <button class="btn btn-sm btn-secondary" @onclick="ClearLogs">Clear</button>
+        </div>
+        <div class="events-list">
+            @foreach (var log in _filteredLogs.OrderByDescending(l => l.Timestamp).Take(100))
+            {
+                <div class="event-item log-@log.Level">
+                    <div class="event-time">@log.Timestamp.ToLocalTime().ToString("HH:mm:ss.fff")</div>
+                    <div class="event-meta">
+                        <span class="badge">@log.RunId</span>
+                        <span class="badge">@log.AgentId</span>
+                        <span class="badge badge-level-@log.Level">@log.Level.ToUpper()</span>
+                    </div>
+                    <div class="event-content">@log.Message</div>
+                    @if (log.Data != null && log.Data.Count > 0)
+                    {
+                        <div class="event-data">
+                            @if (log.Data.ContainsKey("arguments"))
+                            {
+                                <details>
+                                    <summary>📥 Inputs</summary>
+                                    <pre>@JsonConvert.SerializeObject(log.Data["arguments"], Formatting.Indented)</pre>
+                                </details>
+                            }
+                            @if (log.Data.ContainsKey("result") || log.Data.ContainsKey("resultPreview"))
+                            {
+                                <details open>
+                                    <summary>📤 Output</summary>
+                                    <pre>@FormatOutput(log.Data.ContainsKey("result") ? log.Data["result"] : log.Data["resultPreview"])</pre>
+                                </details>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>💬 Conversations (@_filteredConversations.Count() / @_conversations.Count)</h2>
+        <div class="controls">
+            <input type="text" class="search-box" placeholder="🔍 Search conversations..." @bind="_conversationSearch" @bind:event="oninput" />
+            <button class="btn btn-sm btn-secondary" @onclick="ClearConversations">Clear</button>
+        </div>
+        <div class="events-list">
+            @foreach (var conv in _filteredConversations.OrderByDescending(c => c.Timestamp).Take(50))
+            {
+                <div class="event-item conversation-@conv.Role">
+                    <div class="event-time">@conv.Timestamp.ToLocalTime().ToString("HH:mm:ss.fff")</div>
+                    <div class="event-meta">
+                        <span class="badge">@conv.RunId</span>
+                        <span class="badge">@conv.AgentId</span>
+                        <span class="badge badge-role-@conv.Role">@conv.Role</span>
+                        <span class="badge">Turn @conv.TurnNumber</span>
+                    </div>
+                    <div class="event-content">@conv.Content</div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+    .connection-status {
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+    .connected { background: #d4edda; color: #155724; }
+    .connecting { background: #fff3cd; color: #856404; }
+    .disconnected { background: #f8d7da; color: #721c24; }
+
+    .events-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    .section {
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 1rem;
+        background: white;
+    }
+
+    .section h2 {
+        margin-top: 0;
+        font-size: 1.25rem;
+    }
+
+    .events-list {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .event-item {
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-left: 3px solid;
+        border-radius: 4px;
+        background: #f8f9fa;
+    }
+
+    .log-info { border-color: #007bff; }
+    .log-warning { border-color: #ffc107; background: #fff3cd; }
+    .log-error { border-color: #dc3545; background: #f8d7da; }
+
+    .conversation-user { border-color: #17a2b8; }
+    .conversation-assistant { border-color: #6f42c1; }
+    .conversation-system { border-color: #6c757d; }
+
+    .event-time {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-bottom: 0.25rem;
+    }
+
+    .event-meta {
+        margin-bottom: 0.5rem;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 3px;
+        background: #e9ecef;
+        margin-right: 0.25rem;
+    }
+
+    .badge-level-info { background: #cfe2ff; color: #084298; }
+    .badge-level-warning { background: #fff3cd; color: #856404; }
+    .badge-level-error { background: #f8d7da; color: #842029; }
+
+    .badge-role-user { background: #d1ecf1; color: #0c5460; }
+    .badge-role-assistant { background: #e2d9f3; color: #432874; }
+    .badge-role-system { background: #e2e3e5; color: #383d41; }
+
+    .event-content {
+        font-size: 0.875rem;
+        line-height: 1.4;
+        word-wrap: break-word;
+    }
+
+    .event-data {
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .event-data details {
+        margin-top: 0.25rem;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 3px;
+        border: 1px solid #dee2e6;
+    }
+
+    .event-data summary {
+        cursor: pointer;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    .event-data pre {
+        margin: 0.5rem 0 0 0;
+        padding: 0.75rem;
+        background: #282c34;
+        color: #abb2bf;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-size: 0.75rem;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        line-height: 1.5;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .btn {
+        cursor: pointer;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+    }
+
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background: #5a6268;
+    }
+
+    .controls {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .search-box {
+        flex: 1;
+        padding: 0.5rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        font-size: 0.875rem;
+    }
+
+    .search-box:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    }
+
+    .filters {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+    }
+
+    .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .filter-group label {
+        font-weight: 600;
+        font-size: 0.875rem;
+        margin: 0;
+    }
+
+    .filter-select {
+        padding: 0.5rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        min-width: 200px;
+    }
+
+    .filter-select:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    }
+</style>
+
+@code {
+    private HubConnection? _hubConnection;
+    private List<LogEvent> _logs = new();
+    private List<ConversationEvent> _conversations = new();
+    private string _connectionStatus = "Disconnected";
+    private string _connectionClass = "disconnected";
+    private string _logSearch = "";
+    private string _conversationSearch = "";
+    private string _selectedAgentId = "";
+    private string _selectedRunId = "";
+    private Dictionary<string, string> _agentNames = new();
+
+    private List<(string Id, string Name)> _uniqueAgents => _logs
+        .Select(l => l.AgentId)
+        .Concat(_conversations.Select(c => c.AgentId))
+        .Distinct()
+        .Select(id => (Id: id, Name: _agentNames.GetValueOrDefault(id, id)))
+        .ToList();
+
+    private List<(string Id, DateTime Timestamp)> _uniqueRuns => _logs
+        .Select(l => (Id: l.RunId, Timestamp: l.Timestamp))
+        .Concat(_conversations.Select(c => (Id: c.RunId, Timestamp: c.Timestamp)))
+        .GroupBy(r => r.Id)
+        .Select(g => (Id: g.Key, Timestamp: g.Max(x => x.Timestamp)))
+        .ToList();
+
+    private IEnumerable<LogEvent> _filteredLogs
+    {
+        get
+        {
+            var filtered = _logs.AsEnumerable();
+            
+            if (!string.IsNullOrWhiteSpace(_selectedAgentId))
+                filtered = filtered.Where(l => l.AgentId == _selectedAgentId);
+            
+            if (!string.IsNullOrWhiteSpace(_selectedRunId))
+                filtered = filtered.Where(l => l.RunId == _selectedRunId);
+            
+            if (!string.IsNullOrWhiteSpace(_logSearch))
+                filtered = filtered.Where(l => 
+                    l.Message.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+                    l.Level.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+                    l.RunId.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+                    l.AgentId.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) ||
+                    (l.Data != null && l.Data.Values.Any(v => v?.ToString()?.Contains(_logSearch, StringComparison.OrdinalIgnoreCase) == true)));
+            
+            return filtered;
+        }
+    }
+
+    private IEnumerable<ConversationEvent> _filteredConversations
+    {
+        get
+        {
+            var filtered = _conversations.AsEnumerable();
+            
+            if (!string.IsNullOrWhiteSpace(_selectedAgentId))
+                filtered = filtered.Where(c => c.AgentId == _selectedAgentId);
+            
+            if (!string.IsNullOrWhiteSpace(_selectedRunId))
+                filtered = filtered.Where(c => c.RunId == _selectedRunId);
+            
+            if (!string.IsNullOrWhiteSpace(_conversationSearch))
+                filtered = filtered.Where(c =>
+                    c.Content.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
+                    c.Role.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
+                    c.RunId.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase) ||
+                    c.AgentId.Contains(_conversationSearch, StringComparison.OrdinalIgnoreCase));
+            
+            return filtered;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Get the resolved AgentService URL from the service URL resolver
+        var agentBaseUrl = ServiceUrlResolver.GetAgentServiceUrl();
+        var hubUrl = $"{agentBaseUrl}/hubs/agent";
+            
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(hubUrl)
+            .AddNewtonsoftJsonProtocol()
+            .WithAutomaticReconnect()
+            .Build();
+
+        Console.WriteLine($"[Monitor] Setting up SignalR connection to: {hubUrl}");
+
+        // Subscribe to events
+        Console.WriteLine("[Monitor] Registering Log handler");
+        _hubConnection.On<LogEventData>("Log", (data) =>
+        {
+            _logs.Add(new LogEvent
+            {
+                RunId = data.runId,
+                AgentId = data.agentId,
+                Timestamp = data.log.Timestamp,
+                Level = data.log.Level ?? "info",
+                Message = data.log.Message ?? "",
+                Data = data.log.Data
+            });
+            
+            // Fetch agent name if we don't have it yet
+            if (!_agentNames.ContainsKey(data.agentId))
+            {
+                _ = FetchAgentNameAsync(data.agentId);
+            }
+            
+            InvokeAsync(StateHasChanged);
+        });
+
+        Console.WriteLine("[Monitor] Registering Conversation handler");
+        _hubConnection.On<ConversationEventData>("Conversation", (data) =>
+        {
+            try
+            {
+                Console.WriteLine($"[Monitor] Received conversation event - RunId: {data.runId}, AgentId: {data.agentId}, Turn: {data.turn.TurnNumber}, Role: {data.turn.Role}");
+                _conversations.Add(new ConversationEvent
+                {
+                    RunId = data.runId,
+                    AgentId = data.agentId,
+                    Timestamp = data.turn.Timestamp,
+                    Role = data.turn.Role ?? "user",
+                    Content = data.turn.Content ?? "",
+                    TurnNumber = data.turn.TurnNumber
+                });
+                Console.WriteLine($"[Monitor] Total conversations: {_conversations.Count}");
+                InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Monitor] ERROR processing conversation: {ex.Message}");
+                Console.WriteLine($"[Monitor] Stack: {ex.StackTrace}");
+            }
+        });
+
+        _hubConnection.Reconnecting += error =>
+        {
+            _connectionStatus = "Reconnecting...";
+            _connectionClass = "connecting";
+            InvokeAsync(StateHasChanged);
+            return Task.CompletedTask;
+        };
+
+        _hubConnection.Reconnected += connectionId =>
+        {
+            _connectionStatus = $"Connected (ID: {connectionId})";
+            _connectionClass = "connected";
+            InvokeAsync(StateHasChanged);
+            return Task.CompletedTask;
+        };
+
+        _hubConnection.Closed += error =>
+        {
+            _connectionStatus = $"Disconnected: {error?.Message ?? "Unknown error"}";
+            _connectionClass = "disconnected";
+            InvokeAsync(StateHasChanged);
+            return Task.CompletedTask;
+        };
+
+        // Connect
+        _connectionStatus = "Connecting...";
+        _connectionClass = "connecting";
+        
+        try
+        {
+            Console.WriteLine("[Monitor] Starting SignalR connection...");
+            await _hubConnection.StartAsync();
+            _connectionStatus = $"Connected (ID: {_hubConnection.ConnectionId})";
+            _connectionClass = "connected";
+            Console.WriteLine($"[Monitor] Connected! Connection ID: {_hubConnection.ConnectionId}");
+        }
+        catch (Exception ex)
+        {
+            _connectionStatus = $"Connection failed: {ex.Message}";
+            _connectionClass = "disconnected";
+            Console.WriteLine($"[Monitor] Connection failed: {ex.Message}");
+        }
+    }
+
+    private void ClearLogs()
+    {
+        _logs.Clear();
+    }
+
+    private void ClearConversations()
+    {
+        _conversations.Clear();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+
+    private string FormatOutput(object? output)
+    {
+        if (output == null)
+            return "no result";
+            
+        var text = output.ToString() ?? "no result";
+
+        // Simple approach: Parse JSON and re-serialize with indentation
+        try
+        {
+            var obj = JsonConvert.DeserializeObject(text);
+            return JsonConvert.SerializeObject(obj, Formatting.Indented);
+        }
+        catch
+        {
+            return text;
+        }
+    }
+
+    private async Task FetchAgentNameAsync(string agentId)
+    {
+        try
+        {
+            // Use the AgentApiClient which has the properly configured HttpClient
+            var agent = await AgentApiClient.GetAgentAsync(agentId);
+            if (agent != null)
+            {
+                _agentNames[agentId] = agent.Name;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch
+        {
+            // If fetch fails, use agentId as name
+            _agentNames[agentId] = agentId;
+        }
+    }
+
+    // Data models
+    private class LogEvent
+    {
+        public string RunId { get; set; } = "";
+        public string AgentId { get; set; } = "";
+        public DateTime Timestamp { get; set; }
+        public string Level { get; set; } = "";
+        public string Message { get; set; } = "";
+        public Dictionary<string, object>? Data { get; set; }
+    }
+
+    private class ConversationEvent
+    {
+        public string RunId { get; set; } = "";
+        public string AgentId { get; set; } = "";
+        public DateTime Timestamp { get; set; }
+        public string Role { get; set; } = "";
+        public string Content { get; set; } = "";
+        public int TurnNumber { get; set; }
+    }
+
+    // SignalR message models
+    private record LogEventData(string runId, string agentId, LogData log);
+    private record LogData(DateTime Timestamp, string? Level, string? Message, Dictionary<string, object>? Data);
+    
+    private record ConversationEventData(string runId, string agentId, TurnData turn);
+    private record TurnData(DateTime Timestamp, string? Role, string? Content, int TurnNumber);
+}

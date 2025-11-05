@@ -13,7 +13,7 @@ builder.AddServiceDefaults();
 // Add services to the container.
 builder.Services.AddProblemDetails();
 
-// Add CORS
+// Add CORS for SignalR
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -23,6 +23,10 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader();
     });
 });
+
+// Configure SignalR to use Newtonsoft.Json (matches our model attributes)
+builder.Services.AddSignalR()
+    .AddNewtonsoftJsonProtocol();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.AddOpenApiWithAzureContainerAppsServers();
@@ -98,6 +102,10 @@ builder.Services.AddSingleton<IMcpClientService, McpClientService>();
 builder.Services.AddScoped<IAgentStorageService, AgentStorageService>();
 builder.Services.AddScoped<IAgentExecutionService, AgentExecutionService>();
 builder.Services.AddScoped<MultiTurnAgentExecutor>();
+
+// Add SignalR event broadcaster
+builder.Services.AddSingleton<IAgentEventBroadcaster, AgentEventBroadcaster>();
+
 // Remove incorrect Cosmos client registration for openai; we now added explicit AzureOpenAIClient above.
 
 // Add background service for long-running agent tasks
@@ -594,6 +602,9 @@ app.MapGet("/runs/active", (AgentExecutionBackgroundService backgroundService) =
     return operation;
 })
 .Produces(StatusCodes.Status200OK);
+
+// Map SignalR hub
+app.MapHub<CanIHazHouze.AgentService.Hubs.AgentHub>("/hubs/agent");
 
 app.Run();
 

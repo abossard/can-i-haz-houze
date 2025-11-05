@@ -1,0 +1,249 @@
+@page "/agents/history"
+@rendermode InteractiveServer
+@using AgentModel = CanIHazHouze.Web.Agent
+@using AgentRunModel = CanIHazHouze.Web.AgentRun
+@inject AgentApiClient AgentApi
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<PageTitle>Runs History - CanIHazHouze</PageTitle>
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>📋 Runs History</h1>
+        <button class="btn btn-outline-secondary" @onclick="RefreshRuns">
+            🔄 Refresh
+        </button>
+    </div>
+
+    <div class="filters mb-4">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">🤖 Filter by Agent</label>
+                <select class="form-select" @bind="selectedAgentId">
+                    <option value="">All Agents</option>
+                    @foreach (var agent in uniqueAgents)
+                    {
+                        <option value="@agent.Key">@agent.Value</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">📊 Filter by Status</label>
+                <select class="form-select" @bind="selectedStatus">
+                    <option value="">All Status</option>
+                    <option value="running">Running</option>
+                    <option value="paused">Paused</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">🔍 Search</label>
+                <input type="text" class="form-control" placeholder="Search runs, goals, conversations..." @bind="searchText" @bind:event="oninput" />
+            </div>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Loading runs history...</p>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="alert alert-danger" role="alert">
+            <strong>Error:</strong> @error
+        </div>
+    }
+    else if (filteredRuns.Count == 0)
+    {
+        <div class="alert alert-info" role="alert">
+            <h4 class="alert-heading">No runs found</h4>
+            <p>No runs match your current filters.</p>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info mb-4">
+            Showing <strong>@filteredRuns.Count</strong> of <strong>@allRuns.Count</strong> run(s)
+        </div>
+
+        <div class="list-group">
+            @foreach (var run in filteredRuns)
+            {
+                <div class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <h5 class="mb-1">
+                                <span class="badge bg-@GetStatusColor(run.Status)">@run.Status.ToUpper()</span>
+                                <code class="ms-2">@run.Id.Substring(0, Math.Min(8, run.Id.Length))</code>
+                            </h5>
+                            <p class="mb-1">
+                                <strong>Agent:</strong> @(agentNames.GetValueOrDefault(run.AgentId, run.AgentId.Substring(0, Math.Min(8, run.AgentId.Length))))
+                                <span class="ms-3"><strong>Turns:</strong> @run.TurnCount / @run.MaxTurns</span>
+                            </p>
+                            @if (!string.IsNullOrEmpty(run.Goal))
+                            {
+                                <p class="mb-1 text-muted"><strong>Goal:</strong> @run.Goal</p>
+                            }
+                            <small class="text-muted">
+                                Started: @run.StartedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                                @if (run.CompletedAt.HasValue)
+                                {
+                                    <span class="ms-2">| Completed: @run.CompletedAt.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</span>
+                                }
+                            </small>
+                        </div>
+                        <div class="ms-3">
+                            <button class="btn btn-sm btn-info" @onclick="() => ViewDetails(run.AgentId, run.Id)">
+                                👁️ View Details
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (run.ConversationHistory?.Count > 0)
+                    {
+                        <div class="mt-3">
+                            <strong>Latest Conversation:</strong>
+                            <div class="small" style="max-height: 150px; overflow-y: auto; background-color: #f8f9fa; padding: 10px; border-radius: 4px;">
+                                @{
+                                    var latestTurn = run.ConversationHistory.LastOrDefault();
+                                    if (latestTurn != null)
+                                    {
+                                        <div class="mb-2">
+                                            <span class="badge bg-@GetRoleBadgeColor(latestTurn.Role)">@latestTurn.Role.ToUpper()</span>
+                                            <span class="text-muted ms-2">@latestTurn.Timestamp.ToLocalTime().ToString("HH:mm:ss")</span>
+                                        </div>
+                                        <pre style="white-space: pre-wrap; word-wrap: break-word; margin: 0; font-size: 0.85em;">@(latestTurn.Content.Length > 200 ? latestTurn.Content.Substring(0, 200) + "..." : latestTurn.Content)</pre>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<AgentRunModel> allRuns = new();
+    private Dictionary<string, string> agentNames = new();
+    private bool loading = true;
+    private string? error;
+    private Timer? refreshTimer;
+    private string selectedAgentId = "";
+    private string selectedStatus = "";
+    private string searchText = "";
+
+    private Dictionary<string, string> uniqueAgents => allRuns
+        .GroupBy(r => r.AgentId)
+        .ToDictionary(g => g.Key, g => agentNames.GetValueOrDefault(g.Key, g.Key.Substring(0, Math.Min(8, g.Key.Length))));
+
+    private List<AgentRunModel> filteredRuns
+    {
+        get
+        {
+            var runs = allRuns.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(selectedAgentId))
+            {
+                runs = runs.Where(r => r.AgentId == selectedAgentId);
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedStatus))
+            {
+                runs = runs.Where(r => r.Status.Equals(selectedStatus, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(searchText))
+            {
+                runs = runs.Where(r =>
+                    r.Id.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                    r.AgentId.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                    (r.Goal?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                    (r.ConversationHistory?.Any(c => c.Content.Contains(searchText, StringComparison.OrdinalIgnoreCase)) ?? false));
+            }
+
+            return runs.OrderByDescending(r => r.StartedAt).ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshRuns();
+        refreshTimer = new Timer(async _ => await InvokeAsync(async () => await RefreshRuns()), null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10));
+    }
+
+    private async Task RefreshRuns()
+    {
+        try
+        {
+            loading = true;
+            error = null;
+            
+            // Fetch agents in parallel with their runs
+            var agents = await AgentApi.GetAgentsAsync();
+            
+            // Cache agent names
+            foreach (var agent in agents)
+            {
+                agentNames[agent.Id] = agent.Name;
+            }
+            
+            // Fetch all runs in parallel
+            var runTasks = agents.Select(agent => AgentApi.GetAgentRunsAsync(agent.Id));
+            var allRunsArrays = await Task.WhenAll(runTasks);
+            
+            allRuns = allRunsArrays.SelectMany(runs => runs).ToList();
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ViewDetails(string agentId, string runId)
+    {
+        NavigationManager.NavigateTo($"/agents/runs/{agentId}");
+    }
+
+    private string GetStatusColor(string status)
+    {
+        return status.ToLower() switch
+        {
+            "running" => "primary",
+            "paused" => "warning",
+            "completed" => "success",
+            "failed" => "danger",
+            _ => "secondary"
+        };
+    }
+
+    private string GetRoleBadgeColor(string role)
+    {
+        return role.ToLower() switch
+        {
+            "system" => "secondary",
+            "user" => "primary",
+            "assistant" => "success",
+            "tool" => "info",
+            _ => "secondary"
+        };
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+    }
+}
