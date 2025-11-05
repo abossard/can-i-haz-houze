@@ -4,26 +4,89 @@
 
 Welcome to the ultimate .NET Aspire-powered mortgage approval system! This baby combines document management, ledger tracking, and AI-powered analysis to make mortgage approvals as smooth as butter on hot toast. 🧈🔥
 
-## 🚀 What's Inside This Magical Box?
-
-- **🏢 AppHost**: The orchestrator that keeps everyone in line
-- **📄 Document Service**: Where your PDFs go to get analyzed by AI 
-- **📊 Ledger Service**: Tracks your financial shenanigans
-- **🏦 Mortgage Approver**: The final boss that says "yes" or "no"
-- **🎫 CRM Service**: Manage customer complaints and support workflows
-- **🌐 Web Frontend**: Pretty UI for humans to click buttons
-- **🤖 Azure OpenAI Integration**: Because humans are terrible at reading documents
-- **🔌 MCP Server Support**: Model Context Protocol for AI assistant integration
-- **🎯 AI Agent Workbench**: Build and manage AI agents with Semantic Kernel
-
-## 🛠️ Prerequisites (The Boring Stuff)
-# 🎬🏠🚀 **WATCH THIS FIRST!** 🤩📺✨
+## 🎬 Watch This First!
 
 [![Watch the Ultimate Can I Haz Houze? Walkthrough!](image.png)](https://youtu.be/FjfPg8VdgfA)
 
 > **This video explains EVERYTHING you need to know!**  
 > 👉 Click above to get the full tour, setup, and pro tips in action!  
 > _Don't miss it before you start!_ 🎉
+
+## 🚀 What's Inside This Magical Box?
+
+```mermaid
+graph TB
+    subgraph Frontend["🌐 Frontend Layer"]
+        Web["Web UI<br/>Blazor Components"]
+        Agent["Agent Workbench<br/>Semantic Kernel"]
+    end
+    
+    subgraph Services["🔧 Core Services"]
+        AppHost["AppHost<br/>Orchestrator"]
+        Doc["Document Service<br/>AI Analysis"]
+        Ledger["Ledger Service<br/>Transactions"]
+        Mortgage["Mortgage Approver<br/>Decisions"]
+        CRM["CRM Service<br/>Support"]
+    end
+    
+    subgraph Integration["🤖 AI & Integration"]
+        OpenAI["Azure OpenAI<br/>GPT-4o-mini"]
+        MCP["MCP Server<br/>AI Assistants"]
+    end
+    
+    subgraph Data["💾 Data Layer"]
+        Cosmos["Cosmos DB"]
+        Blob["Blob Storage"]
+    end
+    
+    Web --> AppHost
+    Agent --> AppHost
+    AppHost --> Doc
+    AppHost --> Ledger
+    AppHost --> Mortgage
+    AppHost --> CRM
+    Doc --> OpenAI
+    Agent --> OpenAI
+    Mortgage --> OpenAI
+    MCP --> Doc
+    MCP --> Ledger
+    MCP --> Mortgage
+    MCP --> CRM
+    Doc --> Blob
+    Doc --> Cosmos
+    Ledger --> Cosmos
+    Mortgage --> Cosmos
+    CRM --> Cosmos
+    
+    style Frontend fill:#2d3748,stroke:#4299e1,stroke-width:2px,color:#fff
+    style Services fill:#2d3748,stroke:#48bb78,stroke-width:2px,color:#fff
+    style Integration fill:#2d3748,stroke:#9f7aea,stroke-width:2px,color:#fff
+    style Data fill:#2d3748,stroke:#ed8936,stroke-width:2px,color:#fff
+    style Web fill:#1a202c,stroke:#4299e1,color:#63b3ed
+    style Agent fill:#1a202c,stroke:#4299e1,color:#63b3ed
+    style AppHost fill:#1a202c,stroke:#48bb78,color:#68d391
+    style Doc fill:#1a202c,stroke:#48bb78,color:#68d391
+    style Ledger fill:#1a202c,stroke:#48bb78,color:#68d391
+    style Mortgage fill:#1a202c,stroke:#48bb78,color:#68d391
+    style CRM fill:#1a202c,stroke:#48bb78,color:#68d391
+    style OpenAI fill:#1a202c,stroke:#9f7aea,color:#b794f4
+    style MCP fill:#1a202c,stroke:#9f7aea,color:#b794f4
+    style Cosmos fill:#1a202c,stroke:#ed8936,color:#f6ad55
+    style Blob fill:#1a202c,stroke:#ed8936,color:#f6ad55
+```
+
+**Key Components:**
+- **🏢 AppHost**: Orchestrates all services with .NET Aspire
+- **📄 Document Service**: AI-powered PDF analysis and storage
+- **📊 Ledger Service**: Financial transaction management
+- **🏦 Mortgage Approver**: Automated decision-making workflow
+- **🎫 CRM Service**: Customer support and complaint tracking
+- **🌐 Web Frontend**: Blazor-based user interface
+- **🎯 AI Agent Workbench**: Build custom AI agents with Semantic Kernel
+- **🤖 Azure OpenAI**: GPT-4o-mini for intelligent processing
+- **🔌 MCP Server**: Connect Claude, Copilot, and other AI assistants
+
+## 🛠️ Prerequisites
 
 Before you can haz houze, you need:
 
@@ -34,6 +97,20 @@ Before you can haz houze, you need:
 - An IDE that doesn't make you cry ([VS 2022](https://visualstudio.microsoft.com/), [Rider](https://www.jetbrains.com/rider/), or [VS Code](https://code.visualstudio.com/)) 💻
 
 ## 🏃‍♂️ Quick Start (The Fun Part!)
+
+```mermaid
+graph LR
+    A["1️⃣ Clone Repo"] --> B["2️⃣ Set Secrets"]
+    B --> C["3️⃣ Run AppHost"]
+    C --> D["4️⃣ Open Dashboard"]
+    D --> E["🎉 You're Ready!"]
+    
+    style A fill:#2d3748,stroke:#48bb78,stroke-width:2px,color:#68d391
+    style B fill:#2d3748,stroke:#9f7aea,stroke-width:2px,color:#b794f4
+    style C fill:#2d3748,stroke:#ed8936,stroke-width:2px,color:#f6ad55
+    style D fill:#2d3748,stroke:#4299e1,stroke-width:2px,color:#63b3ed
+    style E fill:#1a202c,stroke:#48bb78,stroke-width:3px,color:#68d391
+```
 
 ### 1. Clone & Navigate 📂
 ```bash
@@ -59,7 +136,8 @@ export ConnectionStrings__openai="Endpoint=https://your-openai-resource.openai.a
 dotnet run --project CanIHazHouze.AppHost
 ```
 
-Then open your browser to the Aspire dashboard (usually `https://localhost:17001`) and watch the magic happen! ✨
+### 4. Open the Dashboard 🎯
+Open your browser to the Aspire dashboard (usually `https://localhost:17001`) and watch the magic happen! ✨
 
 ## 🤖 Azure OpenAI Configuration Guide
 
@@ -214,13 +292,7 @@ dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=<endpoint>;ApiKey=<
 - **Real-time Communication**: WebSocket-based protocol with JSON-RPC 2.0
 - **Parallel REST APIs**: MCP and REST APIs work simultaneously
 - **Built-in Documentation**: `/mcp/capabilities` endpoint for tool discovery
-
-### MCP (Model Context Protocol) Support 🔌
-- **AI Assistant Integration**: Connect Claude Desktop and other AI tools directly
-- **16+ MCP Tools**: Complete API access via standardized protocol
-- **Real-time Communication**: WebSocket-based protocol with JSON-RPC 2.0
-- **Parallel REST APIs**: MCP and REST APIs work simultaneously
-- **Built-in Documentation**: `/mcp/capabilities` endpoint for tool discovery
+- 📖 **[MCP Setup Guide →](docs/tutorials/MCP_SETUP.md)** | **[MCP Usage Guide →](docs/guides/MCP_USAGE_GUIDE.md)**
 
 ### Document Service 📄
 - **Upload documents** with drag & drop
@@ -247,110 +319,70 @@ dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=<endpoint>;ApiKey=<
 
 ## 🤖 AI Assistant Integration
 
-CanIHazHouze now supports **Model Context Protocol (MCP)** for seamless AI assistant integration!
+CanIHazHouze supports **Model Context Protocol (MCP)** for seamless AI assistant integration with Claude Desktop, GitHub Copilot, and other AI tools!
 
-### Quick MCP Setup for Claude Desktop
+### Quick MCP Setup
 
-1. **Start the application**: `dotnet run --project src/CanIHazHouze.AppHost`
-2. **Add to Claude Desktop config**:
-   ```json
-   {
-     "mcpServers": {
-       "canihazhouze": {
-         "command": "websocket",
-         "args": ["ws://localhost:5001/mcp"]
-       }
-     }
-   }
-   ```
-3. **Chat with your mortgage system**: Ask Claude to check balances, upload documents, or process applications!
+```bash
+# 1. Start the application
+dotnet run --project src/CanIHazHouze.AppHost
 
-### Available MCP Tools
-- **Financial Management**: Check balances, process transactions, view history
-- **Document Processing**: Upload, analyze, and verify mortgage documents  
-- **Mortgage Applications**: Create, update, and track application status
-- **CRM Management**: Create, update, and manage customer complaints
-- **Cross-Service Integration**: Automated verification across all services
+# 2. Configure your AI assistant (example for Claude Desktop)
+# Add to claude_desktop_config.json:
+{
+  "mcpServers": {
+    "canihazhouze": {
+      "command": "websocket",
+      "args": ["ws://localhost:5001/mcp"]
+    }
+  }
+}
+```
 
-📚 **Full MCP Documentation**: See [`MCP_IMPLEMENTATION.md`](src/MCP_IMPLEMENTATION.md) and [`MCP_USAGE_GUIDE.md`](src/MCP_USAGE_GUIDE.md)
+### Available MCP Capabilities
+- 🏦 **Financial Management**: Check balances, process transactions, view history
+- 📄 **Document Processing**: Upload, analyze, and verify mortgage documents  
+- 🏠 **Mortgage Applications**: Create, update, and track application status
+- 🎫 **CRM Management**: Create, update, and manage customer complaints
+- 🔗 **Cross-Service Integration**: Automated verification across all services
+
+📚 **Learn More**: [MCP Setup Guide](docs/tutorials/MCP_SETUP.md) | [MCP Usage Guide](docs/guides/MCP_USAGE_GUIDE.md) | [MCP Implementation Details](docs/technical/MCP_IMPLEMENTATION.md)
 
 ## 🤖 AI Agent Workbench
 
-**NEW!** Build sophisticated AI agents with Microsoft Semantic Kernel!
+Build sophisticated AI agents with Microsoft Semantic Kernel! The Agent Workbench provides a complete platform for creating, configuring, and managing AI agents powered by Azure OpenAI.
 
-The Agent Workbench provides a complete platform for creating, configuring, and managing AI agents powered by Azure OpenAI.
+### ✨ Highlights
 
-### Key Features
+- 🎯 **Agent Management** - Create and edit AI agents with custom prompts
+- 🔄 **Multi-Turn Conversations** - Agents work iteratively towards defined goals
+- 🤖 **Multiple Models** - GPT-4o, GPT-4o Mini, GPT-3.5 Turbo, GPT-4 Turbo
+- 🔧 **Tool Integration** - Connect to Ledger, CRM, and Documents APIs
+- 🎛️ **Background Processing** - Run agents asynchronously with pause/resume/cancel
+- 📊 **Live Monitoring** - Real-time dashboard with conversation tracking
 
-- **🎯 Agent Management**: Create and edit AI agents with custom prompts
-- **🔄 Multi-Turn Conversations**: Agents work iteratively towards defined goals
-- **🤖 Multiple Models**: Choose from GPT-4o, GPT-4o Mini, GPT-3.5 Turbo, GPT-4 Turbo
-- **🔧 Tool Integration**: Connect to Ledger, CRM, and Documents APIs
-- **⚙️ Advanced Config**: Fine-tune temperature, top P, tokens, and penalties
-- **🎛️ Background Processing**: Run agents asynchronously with pause/resume/cancel
-- **📊 Live Monitoring**: Real-time dashboard showing active agents
-- **💬 Conversation History**: Full tracking of turns and tool calls with JSON formatting
+### 🚀 Quick Start
 
-### Getting Started
+```bash
+# Start the app
+dotnet run --project src/CanIHazHouze.AppHost
 
-1. Start the application: `dotnet run --project src/CanIHazHouze.AppHost`
-2. Navigate to **🤖 Agent Workbench** in the sidebar
-3. Create your first agent with a custom prompt
-4. Configure model, parameters, and tools
-5. Add input variables for dynamic prompts
-6. Execute and monitor your agent!
-
-📚 **Full Documentation**: See [`AGENT_WORKBENCH.md`](AGENT_WORKBENCH.md) for detailed guide with screenshots, examples, and best practices.
-
-### API Documentation for Azure AI Foundry 🔌
-**NEW!** Build AI agents with our comprehensive API documentation page!
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│              🔌 API Documentation Page                      │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  🏦 Mortgage Service    📋 OpenAPI Spec + System Prompt    │
-│  📄 Document Service    📋 OpenAPI Spec + System Prompt    │
-│  💰 Ledger Service      📋 OpenAPI Spec + System Prompt    │
-│  🎫 CRM Service         📋 OpenAPI Spec + System Prompt    │
-│                                                             │
-│  ✨ One-Click Copy to Clipboard                            │
-│  ✨ Ready for Azure AI Foundry                             │
-│  ✨ Complete System Prompts Included                       │
-└─────────────────────────────────────────────────────────────┘
+# Navigate to "🤖 Agent Workbench" in the sidebar
+# Create your first agent and start building!
 ```
 
-**Features:**
-- **Dynamic URL Resolution**: OpenAPI URLs automatically resolve to actual FQDNs in production
-- **Four Complete Agents**: Mortgage, Document, Ledger, and CRM agents with detailed system prompts
-- **Copy-to-Clipboard**: Easy copying of URLs and prompts for Azure AI Foundry
-- **Tutorial Ready**: Perfect for learning Azure AI Foundry agent creation
+📚 **Learn More**: [Agent Workbench Guide](docs/guides/AGENT_WORKBENCH.md) - Complete walkthrough with screenshots and examples
 
-**How to Use:**
-1. Navigate to `/api-docs` or click "🔌 API Documentation" in the sidebar
-2. Copy the OpenAPI specification URL for your desired service
-3. Copy the corresponding system prompt
-4. Create a new agent in Azure AI Foundry with these configs
-5. Your AI agent is ready to interact with CanIHazHouze services!
+### 🔌 API Documentation for Azure AI Foundry
 
-**Example - Creating a Mortgage Agent:**
-```
-1. Copy: https://mortgageapprover.../openapi/v1.json
-2. Copy: Complete Mortgage Agent system prompt (included on page)
-3. In Azure AI Foundry:
-   - Create new agent
-   - Paste OpenAPI spec URL
-   - Paste system prompt
-   - Configure and deploy!
-```
+Build AI agents with our comprehensive API documentation! Navigate to `/api-docs` for:
 
-Each agent includes:
-- **Role & Responsibilities**: Clear definition of agent purpose
-- **Core Directives**: Behavioral guidelines (e.g., "NEVER FABRICATE DATA")
-- **API Features**: Complete documentation of available tools
-- **Workflows**: Example interactions and best practices
-- **Communication Style**: Professional tone guidelines
+- 📋 **OpenAPI Specifications** - Ready-to-use API specs for all services
+- 🤖 **System Prompts** - Pre-configured prompts for Mortgage, Document, Ledger, and CRM agents
+- 📋 **Copy to Clipboard** - One-click copying for Azure AI Foundry setup
+- 🚀 **Production Ready** - Dynamic URL resolution for development and production
+
+📚 **Learn More**: [API Documentation Implementation](docs/technical/API_DOCUMENTATION_PAGE_IMPLEMENTATION.md)
 
 ## 🔧 Development Tips
 
@@ -415,7 +447,85 @@ CultureInfo.DefaultThreadCurrentUICulture = culture;
 - Check Azure subscription permissions
 - Verify resource naming doesn't conflict with existing resources
 
-## 📚 Useful Links
+## 📚 Documentation
+
+All documentation has been organized into a comprehensive hub! Visit **[docs/README.md](docs/README.md)** for the complete documentation index.
+
+### 🎓 Quick Links
+
+**Getting Started**
+- [📖 Documentation Hub](docs/README.md) - Complete documentation index
+- [🤖 Local OpenAI Setup](docs/tutorials/LOCAL_OPENAI_SETUP.md) - Configure Azure OpenAI for local development
+- [🔌 MCP Setup Guide](docs/tutorials/MCP_SETUP.md) - Set up AI assistant integration
+- [🐳 Devcontainer Setup](docs/tutorials/devcontainer-setup.md) - GitHub Codespaces configuration
+
+**Feature Guides**
+- [🤖 Agent Workbench Guide](docs/guides/AGENT_WORKBENCH.md) - Build AI agents with Semantic Kernel
+- [🔌 MCP Usage Guide](docs/guides/MCP_USAGE_GUIDE.md) - Use MCP with AI assistants
+- [🏦 Mortgage Approver Guide](docs/guides/mortgage-approver-guide.md) - Mortgage approval workflow
+- [🎫 CRM Service Guide](docs/guides/crm-service-guide.md) - Customer relationship management
+- [💡 Usage Examples](docs/guides/USAGE_EXAMPLES.md) - Frontend features and patterns
+
+**Technical Deep Dives**
+- [🤖 Azure OpenAI Integration](docs/technical/AZURE_OPENAI_INTEGRATION.md) - Technical implementation details
+- [🌌 Aspire Cosmos DB Configuration](docs/technical/ASPIRE_COSMOS_DB_CONFIGURATION.md) - Database setup
+- [🔌 MCP Implementation](docs/technical/MCP_IMPLEMENTATION.md) - MCP server architecture
+- [⚡ Frontend Performance](docs/technical/FRONTEND_PERFORMANCE_IMPROVEMENTS.md) - UI optimizations
+
+### 📂 Documentation Structure
+
+```mermaid
+graph LR
+    Hub["📖 docs/README.md<br/><b>START HERE!</b>"]
+    
+    subgraph Tutorials["🎓 tutorials/"]
+        T1["Local OpenAI Setup"]
+        T2["MCP Setup"]
+        T3["Devcontainer"]
+        T4["GitHub Workflows"]
+    end
+    
+    subgraph Guides["📖 guides/"]
+        G1["Agent Workbench"]
+        G2["MCP Usage"]
+        G3["Mortgage Approver"]
+        G4["CRM Service"]
+        G5["Testing & More"]
+    end
+    
+    subgraph Technical["🔧 technical/"]
+        Tech1["Azure OpenAI"]
+        Tech2["MCP Implementation"]
+        Tech3["Cosmos DB"]
+        Tech4["Migrations & More"]
+    end
+    
+    Hub --> Tutorials
+    Hub --> Guides
+    Hub --> Technical
+    
+    style Hub fill:#2d3748,stroke:#4299e1,stroke-width:3px,color:#63b3ed,font-weight:bold
+    style Tutorials fill:#1a202c,stroke:#48bb78,stroke-width:2px,color:#68d391
+    style Guides fill:#1a202c,stroke:#9f7aea,stroke-width:2px,color:#b794f4
+    style Technical fill:#1a202c,stroke:#ed8936,stroke-width:2px,color:#f6ad55
+    style T1 fill:#2d3748,stroke:#48bb78,color:#68d391
+    style T2 fill:#2d3748,stroke:#48bb78,color:#68d391
+    style T3 fill:#2d3748,stroke:#48bb78,color:#68d391
+    style T4 fill:#2d3748,stroke:#48bb78,color:#68d391
+    style G1 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style G2 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style G3 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style G4 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style G5 fill:#2d3748,stroke:#9f7aea,color:#b794f4
+    style Tech1 fill:#2d3748,stroke:#ed8936,color:#f6ad55
+    style Tech2 fill:#2d3748,stroke:#ed8936,color:#f6ad55
+    style Tech3 fill:#2d3748,stroke:#ed8936,color:#f6ad55
+    style Tech4 fill:#2d3748,stroke:#ed8936,color:#f6ad55
+```
+
+**32 documentation files** organized into 3 categories for easy navigation!
+
+## 🔗 Useful Links
 
 - [.NET Aspire Documentation](https://learn.microsoft.com/en-us/dotnet/aspire/) 📖
 - [Azure Developer CLI Docs](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/) ⚡
