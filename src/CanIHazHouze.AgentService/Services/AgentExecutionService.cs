@@ -54,13 +54,12 @@ public class AgentExecutionService : IAgentExecutionService
             deploymentName: deploymentName,
             azureOpenAIClient: _openAIClient);
         
-        // Map of tool names to their service discovery URLs
-        // Use https+http:// scheme which Aspire resolves at runtime
+        // Map of tool names to their service names
         var serviceMap = new Dictionary<string, string>
         {
-            ["ledgerapi"] = "https+http://ledgerservice",
-            ["crmapi"] = "https+http://crmservice",
-            ["documentsapi"] = "https+http://documentservice"
+            ["ledgerapi"] = "ledgerservice",
+            ["crmapi"] = "crmservice",
+            ["documentsapi"] = "documentservice"
         };
         
         // Register MCP plugins based on agent's tool configuration
@@ -68,33 +67,26 @@ public class AgentExecutionService : IAgentExecutionService
         {
             var toolKey = tool.ToLowerInvariant();
             
-            if (serviceMap.TryGetValue(toolKey, out var serviceDiscoveryUrl))
+            if (serviceMap.TryGetValue(toolKey, out var serviceName))
             {
-                // Create an HttpClient to resolve the service URL via Aspire service discovery
-                var httpClient = _httpClientFactory.CreateClient();
-                httpClient.BaseAddress = new Uri(serviceDiscoveryUrl);
+                // Resolve service URL from Aspire configuration
+                // Format: services:servicename:https:0 (injected as services__servicename__https__0 env var)
+                var httpsUrl = _configuration[$"services:{serviceName}:https:0"];
+                var httpUrl = _configuration[$"services:{serviceName}:http:0"];
                 
-                // Make a request to resolve the actual URL
-                string mcpEndpoint;
-                try
-                {
-                    // The BaseAddress after service discovery resolution gives us the real URL
-                    var resolvedUrl = httpClient.BaseAddress?.ToString().TrimEnd('/');
-                    if (string.IsNullOrEmpty(resolvedUrl))
-                    {
-                        throw new InvalidOperationException("Service discovery failed to resolve URL");
-                    }
-                    mcpEndpoint = $"{resolvedUrl}/mcp";
-                }
-                catch (Exception ex)
+                var serviceUrl = httpsUrl ?? httpUrl;
+                
+                if (string.IsNullOrEmpty(serviceUrl))
                 {
                     run.Logs.Add(new AgentRunLog
                     {
                         Level = "error",
-                        Message = $"Failed to resolve service URL for {tool}: {ex.Message}"
+                        Message = $"Service URL not found for '{serviceName}'. Expected configuration key: services:{serviceName}:https:0"
                     });
                     continue;
                 }
+                
+                var mcpEndpoint = $"{serviceUrl.TrimEnd('/')}/mcp";
                 
                 run.Logs.Add(new AgentRunLog
                 {

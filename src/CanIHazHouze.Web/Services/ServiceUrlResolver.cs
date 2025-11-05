@@ -21,16 +21,20 @@ public class ServiceUrlResolver : IServiceUrlResolver
 
     public string GetAgentServiceUrl()
     {
-        // Try to get from connection string (Aspire injects this)
-        var connectionString = _configuration.GetConnectionString("agentservice");
+        // Aspire injects service URLs as services:servicename:https:0 (or :http:0)
+        // In Azure Container Apps, these come as environment variables: services__servicename__https__0
+        var httpsUrl = _configuration["services:agentservice:https:0"];
+        var httpUrl = _configuration["services:agentservice:http:0"];
         
-        if (!string.IsNullOrEmpty(connectionString))
+        var serviceUrl = httpsUrl ?? httpUrl;
+        
+        if (!string.IsNullOrEmpty(serviceUrl))
         {
-            return connectionString.TrimEnd('/');
+            return serviceUrl.TrimEnd('/');
         }
 
-        // Fallback: try to get from the HttpClient configuration
-        // Create a temporary client to check its base address
+        // Fallback: try to get the base URL from the configured HttpClient
+        // This works because the HttpClient uses service discovery
         var client = _httpClientFactory.CreateClient("CanIHazHouze.Web.AgentApiClient");
         var baseAddress = client.BaseAddress?.ToString();
         
@@ -39,7 +43,7 @@ public class ServiceUrlResolver : IServiceUrlResolver
             return baseAddress.TrimEnd('/');
         }
 
-        // Last resort: local development default
+        // Last resort: local development default (shouldn't be reached if AppHost is running)
         return "https://localhost:7069";
     }
 }
