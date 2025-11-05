@@ -112,6 +112,48 @@
                                 </div>
                             }
 
+                            @* Chat continuation for completed runs *@
+                            @if (run.Status == "completed" && run.ConversationHistory.Count > 0)
+                            {
+                                <div class="mt-4">
+                                    <h6>💬 Continue Conversation</h6>
+                                    <div class="conversation-container mb-3" style="max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; background-color: #f8f9fa;">
+                                        @foreach (var turn in run.ConversationHistory.TakeLast(5))
+                                        {
+                                            <div class="conversation-message mb-2 @(turn.Role == "user" ? "text-end" : "")">
+                                                <div class="d-inline-block" style="max-width: 80%;">
+                                                    <small class="text-muted">
+                                                        <strong>@(turn.Role == "user" ? "You" : turn.Role == "assistant" ? "Agent" : turn.Role):</strong>
+                                                    </small>
+                                                    <div class="p-2 rounded @(turn.Role == "user" ? "bg-primary text-white" : "bg-white")" style="word-wrap: break-word;">
+                                                        @turn.Content
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" @bind="chatMessage" @onkeypress="OnChatKeyPress"
+                                               placeholder="Type your message..." disabled="@chatting" />
+                                        <button class="btn btn-primary" @onclick="SendChatMessage" disabled="@(chatting || string.IsNullOrWhiteSpace(chatMessage))">
+                                            @if (chatting)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                <text>Sending...</text>
+                                            }
+                                            else
+                                            {
+                                                <span>📤 Send</span>
+                                            }
+                                        </button>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(chatError))
+                                    {
+                                        <div class="alert alert-danger mt-2 mb-0">@chatError</div>
+                                    }
+                                </div>
+                            }
+
                             @if (run.Logs.Count > 0)
                             {
                                 <div class="mt-3">
@@ -167,7 +209,10 @@
     private Dictionary<string, string> inputValues = new();
     private bool loading = true;
     private bool running = false;
+    private bool chatting = false;
     private string? error;
+    private string chatMessage = string.Empty;
+    private string? chatError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -261,5 +306,39 @@
     private void GoBack()
     {
         NavigationManager.NavigateTo("/agents");
+    }
+
+    private async Task SendChatMessage()
+    {
+        if (string.IsNullOrWhiteSpace(chatMessage) || run == null || agent == null) return;
+
+        try
+        {
+            chatting = true;
+            chatError = null;
+
+            var updatedRun = await AgentApi.SendChatMessageAsync(AgentId!, run.Id, chatMessage);
+            if (updatedRun != null)
+            {
+                run = updatedRun;
+                chatMessage = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            chatError = ex.Message;
+        }
+        finally
+        {
+            chatting = false;
+        }
+    }
+
+    private async Task OnChatKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(chatMessage))
+        {
+            await SendChatMessage();
+        }
     }
 }

@@ -222,6 +222,34 @@
                                                         </div>
                                                     </div>
                                                 }
+
+                                                @* Chat continuation for completed runs *@
+                                                @if (run.Status == "completed" && run.ConversationHistory?.Count > 0)
+                                                {
+                                                    <div class="mb-3">
+                                                        <h6>💬 Continue Conversation</h6>
+                                                        <div class="input-group">
+                                                            <input type="text" class="form-control" @bind="chatMessages[run.Id]" @onkeypress="@(e => OnChatKeyPress(e, run))"
+                                                                   placeholder="Type your message..." disabled="@chattingRunIds.Contains(run.Id)" />
+                                                            <button class="btn btn-primary" @onclick="() => SendChatMessage(run)" 
+                                                                    disabled="@(chattingRunIds.Contains(run.Id) || string.IsNullOrWhiteSpace(GetChatMessage(run.Id)))">
+                                                                @if (chattingRunIds.Contains(run.Id))
+                                                                {
+                                                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                                    <text>Sending...</text>
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span>📤 Send</span>
+                                                                }
+                                                            </button>
+                                                        </div>
+                                                        @if (chatErrors.ContainsKey(run.Id) && !string.IsNullOrEmpty(chatErrors[run.Id]))
+                                                        {
+                                                            <div class="alert alert-danger mt-2 mb-0">@chatErrors[run.Id]</div>
+                                                        }
+                                                    </div>
+                                                }
                                             </div>
                                         </div>
                                     </td>
@@ -245,6 +273,9 @@
     private bool deleting = false;
     private string? error;
     private string? expandedRunId;
+    private Dictionary<string, string> chatMessages = new();
+    private Dictionary<string, string> chatErrors = new();
+    private HashSet<string> chattingRunIds = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -361,6 +392,51 @@
         catch
         {
             return json;
+        }
+    }
+
+    private string GetChatMessage(string runId)
+    {
+        return chatMessages.TryGetValue(runId, out var message) ? message : string.Empty;
+    }
+
+    private async Task SendChatMessage(AgentRunModel run)
+    {
+        var message = GetChatMessage(run.Id);
+        if (string.IsNullOrWhiteSpace(message)) return;
+
+        try
+        {
+            chattingRunIds.Add(run.Id);
+            chatErrors.Remove(run.Id);
+
+            var updatedRun = await AgentApi.SendChatMessageAsync(AgentId!, run.Id, message);
+            if (updatedRun != null)
+            {
+                // Update the run in the list
+                var index = runs.FindIndex(r => r.Id == run.Id);
+                if (index >= 0)
+                {
+                    runs[index] = updatedRun;
+                }
+                chatMessages[run.Id] = string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            chatErrors[run.Id] = ex.Message;
+        }
+        finally
+        {
+            chattingRunIds.Remove(run.Id);
+        }
+    }
+
+    private async Task OnChatKeyPress(KeyboardEventArgs e, AgentRunModel run)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(GetChatMessage(run.Id)))
+        {
+            await SendChatMessage(run);
         }
     }
 

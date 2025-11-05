@@ -112,6 +112,14 @@ public class AgentApiClient(HttpClient httpClient)
         var result = await response.Content.ReadFromJsonAsync<DeleteRunsResponse>(cancellationToken);
         return result?.Count ?? 0;
     }
+
+    public async Task<AgentRun?> SendChatMessageAsync(string agentId, string runId, string message, CancellationToken cancellationToken = default)
+    {
+        var request = new { Message = message };
+        var response = await httpClient.PostAsJsonAsync($"/runs/{agentId}/{runId}/chat", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<AgentRun>(cancellationToken);
+    }
 }
 
 public class AsyncRunResponse

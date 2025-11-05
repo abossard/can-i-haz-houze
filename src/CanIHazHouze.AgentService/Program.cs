@@ -649,10 +649,45 @@ app.MapGet("/runs/active", (AgentExecutionBackgroundService backgroundService) =
 })
 .Produces(StatusCodes.Status200OK);
 
+// Chat continuation endpoint
+app.MapPost("/runs/{agentId}/{id}/chat", async (
+    string agentId,
+    string id,
+    [FromBody] ChatMessageRequest request,
+    IAgentExecutionService executionService) =>
+{
+    try
+    {
+        var run = await executionService.ContinueChatAsync(agentId, id, request.Message);
+        return Results.Ok(run);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error continuing chat for run {RunId}", LogSanitizer.Sanitize(id));
+        return Results.Problem($"An error occurred while continuing the chat: {ex.Message}");
+    }
+})
+.WithName("ContinueChat")
+.WithSummary("Continue chatting with a completed agent")
+.WithDescription("Sends a message to continue the conversation with a completed agent run, maintaining context and tool access.")
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Agent Execution" }];
+    return operation;
+})
+.Produces<AgentRun>(StatusCodes.Status200OK);
+
 // Map SignalR hub
 app.MapHub<CanIHazHouze.AgentService.Hubs.AgentHub>("/hubs/agent");
 
 app.Run();
+
+// DTOs
+public record ChatMessageRequest(string Message);
 
 // Make Program class accessible for testing (WebApplicationFactory)
 namespace CanIHazHouze.AgentService

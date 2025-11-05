@@ -321,6 +321,142 @@ public class AgentExecutionService : IAgentExecutionService
         await _storageService.UpdateRunAsync(run);
         return run;
     }
+
+    public async Task<AgentRun> ContinueChatAsync(string agentId, string runId, string userMessage)
+    {
+        // Load the completed run
+        var run = await _storageService.GetRunAsync(runId, agentId);
+        if (run == null)
+        {
+            throw new InvalidOperationException($"Run {runId} not found");
+        }
+
+        if (run.Status != "completed")
+        {
+            throw new InvalidOperationException($"Can only chat with completed runs. Current status: {run.Status}");
+        }
+
+        try
+        {
+            await AddLogAsync(run, new AgentRunLog
+            {
+                Level = "info",
+                Message = "Chat continuation started"
+            });
+
+            // Load the agent to get its configuration
+            var agent = await _storageService.GetAgentAsync(agentId);
+            if (agent == null)
+            {
+                throw new InvalidOperationException($"Agent {agentId} not found");
+            }
+
+            // Reconstruct ChatHistory from conversation history
+            var chatHistory = new ChatHistory();
+            foreach (var turn in run.ConversationHistory)
+            {
+                switch (turn.Role.ToLower())
+                {
+                    case "system":
+                        chatHistory.AddSystemMessage(turn.Content);
+                        break;
+                    case "user":
+                        chatHistory.AddUserMessage(turn.Content);
+                        break;
+                    case "assistant":
+                        chatHistory.AddAssistantMessage(turn.Content);
+                        break;
+                }
+            }
+
+            // Add the new user message
+            chatHistory.AddUserMessage(userMessage);
+            var userTurn = new ConversationTurn
+            {
+                TurnNumber = run.ConversationHistory.Count + 1,
+                Role = "user",
+                Content = userMessage,
+                Timestamp = DateTime.UtcNow
+            };
+            run.ConversationHistory.Add(userTurn);
+            await _broadcaster.BroadcastConversationAsync(runId, agentId, userTurn);
+
+            await AddLogAsync(run, new AgentRunLog
+            {
+                Level = "info",
+                Message = $"User message added: {userMessage.Substring(0, Math.Min(50, userMessage.Length))}..."
+            });
+
+            // Create kernel with the same tools as original execution
+            var kernel = await CreateKernelForModelAsync(agent.Config.Model, agent.Tools, run, CancellationToken.None);
+
+            // Configure execution settings
+            var executionSettings = new OpenAIPromptExecutionSettings
+            {
+                Temperature = agent.Config.Temperature,
+                TopP = agent.Config.TopP,
+                MaxTokens = agent.Config.MaxTokens,
+                FrequencyPenalty = agent.Config.FrequencyPenalty,
+                PresencePenalty = agent.Config.PresencePenalty
+            };
+
+            // Enable automatic function calling if tools are configured
+            if (agent.Tools.Any())
+            {
+                executionSettings.ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions;
+            }
+
+            // Get AI response
+            var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
+            var response = await chatCompletion.GetChatMessageContentAsync(
+                chatHistory,
+                executionSettings,
+                kernel);
+
+            var assistantMessage = response.Content ?? string.Empty;
+            chatHistory.AddAssistantMessage(assistantMessage);
+
+            var assistantTurn = new ConversationTurn
+            {
+                TurnNumber = run.ConversationHistory.Count + 1,
+                Role = "assistant",
+                Content = assistantMessage,
+                Timestamp = DateTime.UtcNow
+            };
+            run.ConversationHistory.Add(assistantTurn);
+            await _broadcaster.BroadcastConversationAsync(runId, agentId, assistantTurn);
+
+            await AddLogAsync(run, new AgentRunLog
+            {
+                Level = "info",
+                Message = $"Assistant response generated ({assistantMessage.Length} chars)"
+            });
+
+            // Update the run in storage
+            run.LastUpdated = DateTime.UtcNow;
+            await _storageService.UpdateRunAsync(run);
+
+            _logger.LogInformation("Chat continued for run {RunId} of agent {AgentId}",
+                LogSanitizer.Sanitize(runId),
+                LogSanitizer.Sanitize(agentId));
+
+            return run;
+        }
+        catch (Exception ex)
+        {
+            await AddLogAsync(run, new AgentRunLog
+            {
+                Level = "error",
+                Message = $"Chat continuation failed: {ex.Message}"
+            });
+
+            _logger.LogError(ex, "Chat continuation failed for run {RunId} of agent {AgentId}",
+                LogSanitizer.Sanitize(runId),
+                LogSanitizer.Sanitize(agentId));
+
+            throw;
+        }
+    }
 }
 
 /// <summary>
@@ -330,9 +466,9 @@ internal class FunctionInvocationLoggingFilter : IFunctionInvocationFilter
 {
     private readonly AgentRun _run;
     private readonly ILogger _logger;
-    private readonly IAgentEventBroadcaster _broadcaster;
+    private readonly CanIHazHouze.AgentService.Services.IAgentEventBroadcaster _broadcaster;
 
-    public FunctionInvocationLoggingFilter(AgentRun run, ILogger logger, IAgentEventBroadcaster broadcaster)
+    public FunctionInvocationLoggingFilter(AgentRun run, ILogger logger, CanIHazHouze.AgentService.Services.IAgentEventBroadcaster broadcaster)
     {
         _run = run;
         _logger = logger;
