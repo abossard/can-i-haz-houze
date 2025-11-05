@@ -78,6 +78,9 @@
                                 <button class="btn btn-outline-info btn-sm" @onclick="() => ViewRuns(agent.Id)">
                                     📊 History
                                 </button>
+                                <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteAgent(agent.Id, agent.Name)">
+                                    🗑️ Delete
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -143,4 +146,24 @@
     {
         NavigationManager.NavigateTo($"/agents/runs/{agentId}");
     }
+
+    private async Task DeleteAgent(string agentId, string agentName)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete '{agentName}'? This will also delete all execution history for this agent."))
+        {
+            return;
+        }
+
+        try
+        {
+            await AgentApi.DeleteAgentAsync(agentId);
+            await LoadAgents();
+        }
+        catch (Exception ex)
+        {
+            error = $"Failed to delete agent: {ex.Message}";
+        }
+    }
 }
+
+@inject IJSRuntime JSRuntime

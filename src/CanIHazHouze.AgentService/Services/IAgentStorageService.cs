@@ -14,4 +14,6 @@ public interface IAgentStorageService
     Task<AgentRun?> GetRunAsync(string id, string agentId);
     Task<List<AgentRun>> GetRunsByAgentAsync(string agentId);
     Task<AgentRun> UpdateRunAsync(AgentRun run);
+    Task DeleteRunAsync(string id, string agentId);
+    Task<int> DeleteAllRunsAsync(string agentId);
 }

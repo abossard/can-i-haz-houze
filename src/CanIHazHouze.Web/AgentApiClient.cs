@@ -98,6 +98,20 @@ public class AgentApiClient(HttpClient httpClient)
         // Endpoint returns anonymous object with keys: mode, endpoint, azureClientRegistered, executorType, isDummyExecutor, timestampUtc
         return await httpClient.GetFromJsonAsync<OpenAiDiagnostics>("/diagnostics/openai", cancellationToken);
     }
+
+    public async Task DeleteRunAsync(string agentId, string runId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.DeleteAsync($"/runs/{agentId}/{runId}", cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<int> DeleteAllAgentRunsAsync(string agentId, CancellationToken cancellationToken = default)
+    {
+        var response = await httpClient.DeleteAsync($"/agents/{agentId}/runs", cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<DeleteRunsResponse>(cancellationToken);
+        return result?.Count ?? 0;
+    }
 }
 
 public class AsyncRunResponse
@@ -350,4 +364,13 @@ public class OpenAiDiagnostics
 
     [JsonPropertyName("timestampUtc")]
     public DateTime TimestampUtc { get; set; }
+}
+
+public class DeleteRunsResponse
+{
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
+
+    [JsonPropertyName("count")]
+    public int Count { get; set; }
 }

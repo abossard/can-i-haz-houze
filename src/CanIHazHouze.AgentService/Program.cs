@@ -434,6 +434,52 @@ app.MapGet("/agents/{agentId}/runs", async (string agentId, IAgentStorageService
 })
 .Produces<List<AgentRun>>(StatusCodes.Status200OK);
 
+app.MapDelete("/runs/{agentId}/{id}", async (string agentId, string id, IAgentStorageService storage) =>
+{
+    try
+    {
+        await storage.DeleteRunAsync(id, agentId);
+        return Results.NoContent();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error deleting run {RunId} for agent {AgentId}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(agentId));
+        return Results.Problem("An error occurred while deleting the run");
+    }
+})
+.WithName("DeleteRun")
+.WithSummary("Delete a run")
+.WithDescription("Deletes a specific agent execution run.")
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Agent Execution" }];
+    return operation;
+})
+.Produces(StatusCodes.Status204NoContent);
+
+app.MapDelete("/agents/{agentId}/runs", async (string agentId, IAgentStorageService storage) =>
+{
+    try
+    {
+        var count = await storage.DeleteAllRunsAsync(agentId);
+        return Results.Ok(new { message = $"Deleted {count} runs", count });
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Error deleting all runs for agent {AgentId}", LogSanitizer.Sanitize(agentId));
+        return Results.Problem("An error occurred while deleting runs");
+    }
+})
+.WithName("DeleteAllAgentRuns")
+.WithSummary("Delete all runs for an agent")
+.WithDescription("Deletes all execution runs for a specific agent.")
+.WithOpenApi(operation =>
+{
+    operation.Tags = [new() { Name = "Agent Execution" }];
+    return operation;
+})
+.Produces(StatusCodes.Status200OK);
+
 // Background execution endpoints
 app.MapPost("/agents/{id}/run-async", async (
     string id,

@@ -152,4 +152,42 @@ public class AgentStorageService : IAgentStorageService
         _logger.LogInformation("Updated run {RunId} for agent {AgentId}", LogSanitizer.Sanitize(run.Id), LogSanitizer.Sanitize(run.AgentId));
         return response.Resource;
     }
+
+    public async Task DeleteRunAsync(string id, string agentId)
+    {
+        var container = await GetContainerAsync();
+        await container.DeleteItemAsync<AgentRun>(id, new PartitionKey(agentId));
+        _logger.LogInformation("Deleted run {RunId} for agent {AgentId}", LogSanitizer.Sanitize(id), LogSanitizer.Sanitize(agentId));
+    }
+
+    public async Task<int> DeleteAllRunsAsync(string agentId)
+    {
+        var container = await GetContainerAsync();
+        var query = new QueryDefinition("SELECT c.id FROM c WHERE c.agentId = @agentId AND c.entityType = @entityType")
+            .WithParameter("@agentId", agentId)
+            .WithParameter("@entityType", "agent-run");
+        
+        var iterator = container.GetItemQueryIterator<dynamic>(query, requestOptions: new QueryRequestOptions 
+        { 
+            PartitionKey = new PartitionKey(agentId) 
+        });
+        
+        var runIds = new List<string>();
+        while (iterator.HasMoreResults)
+        {
+            var response = await iterator.ReadNextAsync();
+            foreach (var item in response)
+            {
+                runIds.Add((string)item.id);
+            }
+        }
+
+        foreach (var runId in runIds)
+        {
+            await container.DeleteItemAsync<AgentRun>(runId, new PartitionKey(agentId));
+        }
+
+        _logger.LogInformation("Deleted {Count} runs for agent {AgentId}", runIds.Count, LogSanitizer.Sanitize(agentId));
+        return runIds.Count;
+    }
 }
