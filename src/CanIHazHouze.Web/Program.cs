@@ -81,6 +81,8 @@ builder.Services.AddHttpClient<AgentApiClient>(client =>
         // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
         client.BaseAddress = new("https+http://agentservice");
+        // Increased timeout for agent execution (agents can take longer to complete)
+        client.Timeout = TimeSpan.FromMinutes(2);
     });
 
 var app = builder.Build();
