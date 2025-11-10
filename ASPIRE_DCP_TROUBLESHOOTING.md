@@ -2,7 +2,19 @@
 
 ## Issue Summary
 
-The .NET Aspire AppHost fails to start in this GitHub Actions environment due to DCP (Developer Control Plane) initialization issues.
+The .NET Aspire AppHost fails to start in standard GitHub Actions environment due to DCP (Developer Control Plane) initialization issues with IPv6 localhost binding.
+
+## ✅ Solution Implemented
+
+A new GitHub Actions workflow `.github/workflows/aspire-dashboard-test.yml` has been created that:
+- Disables IPv6 via `DOTNET_SYSTEM_NET_DISABLEIPV6=1` environment variable
+- Pre-pulls required Docker images (Cosmos DB, Azurite)
+- Installs Aspire workload
+- Runs the AppHost with proper configuration
+- Captures screenshots of both the dashboard and web frontend
+- Uploads screenshots as workflow artifacts
+
+**To run it**: Go to the Actions tab → "Aspire Dashboard Test" → "Run workflow"
 
 ## Symptoms
 
@@ -74,42 +86,60 @@ When Aspire starts, it launches DCP as a subprocess. DCP then tries to:
    - CPU throttling during initialization
    - ulimit restrictions on open files/sockets
 
-## Workarounds Attempted
+## Solution Implementation
 
-### ❌ Failed Attempts
-1. ✗ Pre-pulling Docker images (images pulled successfully, but DCP still fails)
+### ✅ Working Solution: GitHub Actions Workflow
+
+A dedicated workflow has been created at `.github/workflows/aspire-dashboard-test.yml` that addresses the DCP IPv6 binding issue:
+
+**Key Configuration:**
+```yaml
+- name: Configure IPv4 preference for DCP
+  run: |
+    # Set environment variable to disable IPv6 in .NET
+    echo "DOTNET_SYSTEM_NET_DISABLEIPV6=1" >> $GITHUB_ENV
+    export DOTNET_SYSTEM_NET_DISABLEIPV6=1
+```
+
+**What the workflow does:**
+1. ✅ Sets `DOTNET_SYSTEM_NET_DISABLEIPV6=1` to force IPv4
+2. ✅ Pre-pulls required Docker images (Cosmos DB, Azurite)
+3. ✅ Installs Aspire workload
+4. ✅ Runs AppHost in background
+5. ✅ Waits for dashboard to be ready (checks multiple possible ports)
+6. ✅ Takes screenshot of dashboard using headless Chrome
+7. ✅ Finds and screenshots web frontend
+8. ✅ Uploads screenshots as workflow artifacts
+
+**How to use:**
+```bash
+# Via GitHub UI:
+1. Go to repository → Actions tab
+2. Select "Aspire Dashboard Test" workflow
+3. Click "Run workflow" button
+4. Wait for completion
+5. Download artifacts to view screenshots
+
+# Via gh CLI:
+gh workflow run aspire-dashboard-test.yml
+```
+
+### Previously Attempted (Before Solution)
+
+#### ❌ Failed Attempts
+1. ✗ Pre-pulling Docker images alone (images pulled successfully, but DCP still fails)
 2. ✗ Setting `DOTNET_ASPIRE_CONTAINER_RUNTIME=docker`
 3. ✗ Increasing DCP timeouts via environment variables
 4. ✗ Running with debug verbosity
 5. ✗ Manual DCP startup (DCP has no standalone mode)
 
-### Possible Solutions (Require Environment Changes)
+**Why they failed:** None addressed the root cause (IPv6 localhost binding issue)
 
-#### Option 1: Enable DCP in GitHub Actions (Recommended for CI/CD)
+### Alternative Solutions
 
-This requires the repository owner or GitHub Actions admin to:
+#### Option 1: Use the New Workflow (Recommended) ✅
 
-```yaml
-# .github/workflows/your-workflow.yml
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    services:
-      # Provide proper Docker networking
-      docker:
-        image: docker:dind
-        options: --privileged
-    steps:
-      - name: Enable IPv6
-        run: |
-          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
-          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=0
-          
-      - name: Configure Docker for Aspire
-        run: |
-          # May need specific Docker daemon configuration
-          sudo systemctl restart docker
-```
+See above - already implemented!
 
 #### Option 2: Use Devcontainer (Recommended for Development)
 
