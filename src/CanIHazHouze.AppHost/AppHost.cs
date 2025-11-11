@@ -104,7 +104,7 @@ var agentService = builder.AddProject<Projects.CanIHazHouze_AgentService>("agent
     .WithReference(documentService) // ← Add reference for MCP endpoint discovery
     .WithHttpHealthCheck("/health");
 
-builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")
+var webFrontend = builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(documentService)
@@ -117,5 +117,16 @@ builder.AddProject<Projects.CanIHazHouze_Web>("webfrontend")
     .WaitFor(mortgageService)
     .WaitFor(crmService)
     .WaitFor(agentService);
+
+// Configure Production environment for Azure Container Apps deployment
+if (builder.ExecutionContext.IsPublishMode)
+{
+    webFrontend.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+    documentService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+    ledgerService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+    mortgageService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+    crmService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+    agentService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+}
 
 builder.Build().Run();

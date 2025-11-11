@@ -1,6 +1,7 @@
 @page "/monitor"
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.Http.Connections
 @using CanIHazHouze.Web.Services
 @using Newtonsoft.Json
 @inject NavigationManager Navigation
@@ -382,9 +383,24 @@
         var hubUrl = $"{agentBaseUrl}/hubs/agent";
             
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl(hubUrl)
+            .WithUrl(hubUrl, options =>
+            {
+                // Use ONLY Long Polling for maximum corporate proxy compatibility
+                // This avoids WebSocket issues entirely and works through any proxy
+                options.SkipNegotiation = false;
+                options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.LongPolling;
+                
+                // Increase timeouts for slower corporate proxy connections
+                options.CloseTimeout = TimeSpan.FromSeconds(30);
+            })
             .AddNewtonsoftJsonProtocol()
-            .WithAutomaticReconnect()
+            .WithAutomaticReconnect(new[] {
+                TimeSpan.Zero,          // First retry immediately
+                TimeSpan.FromSeconds(2), // Then 2 seconds
+                TimeSpan.FromSeconds(5), // Then 5 seconds
+                TimeSpan.FromSeconds(10), // Then 10 seconds
+                TimeSpan.FromSeconds(30)  // Then 30 seconds, and keep trying every 30s
+            })
             .Build();
 
         Console.WriteLine($"[Monitor] Setting up SignalR connection to: {hubUrl}");

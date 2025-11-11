@@ -2,6 +2,11 @@ using CanIHazHouze.Web;
 using CanIHazHouze.Web.Components;
 using CanIHazHouze.Web.Services;
 using System.Globalization;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
+using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.Components.Server;
+using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +16,24 @@ CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("en-US");
 
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
+
+// Configure response compression for better performance
+builder.Services.AddResponseCompression(opts =>
+{
+    opts.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+        new[] { "application/octet-stream" });
+    opts.EnableForHttps = true;
+});
+
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.Fastest;
+});
+
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+{
+    options.Level = CompressionLevel.SmallestSize;
+});
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -30,22 +53,41 @@ builder.Services.AddSingleton<IServiceUrlResolver, ServiceUrlResolver>();
 // Add error handling delegating handler
 builder.Services.AddTransient<ErrorHandlingDelegatingHandler>();
 
-// Configure circuit options for better performance and reconnection
-builder.Services.AddServerSideBlazor(options =>
+// Configure circuit options for production scalability and reliability
+// Based on Microsoft best practices for high-performance Blazor Server apps
+builder.Services.Configure<CircuitOptions>(options =>
 {
+    // Enable detailed errors only in development
     options.DetailedErrors = builder.Environment.IsDevelopment();
+    
+    // Circuit retention settings - optimized for production scale
+    // Keep disconnected circuits for 3 minutes to handle temporary network issues
     options.DisconnectedCircuitMaxRetained = 100;
     options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(3);
+    
+    // Timeout settings for reliability
     options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(1);
+    
+    // Limit buffered render batches to prevent memory issues under load
     options.MaxBufferedUnacknowledgedRenderBatches = 10;
 });
 
-// Configure SignalR Hub options for long-running agent operations
-builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(options =>
+// Configure Hub options for Long Polling (maximum compatibility through corporate proxies)
+builder.Services.Configure<HubOptions>(options =>
 {
-    options.ClientTimeoutInterval = TimeSpan.FromMinutes(3);
-    options.HandshakeTimeout = TimeSpan.FromSeconds(30);
-    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    // Increase max message size for large data transfers (e.g., documents)
+    options.MaximumReceiveMessageSize = 10 * 1024 * 1024; // 10MB
+});
+
+// Configure SignalR with Long Polling transport for reliability
+// For Azure SignalR Service integration (100K+ users), add:
+// - Microsoft.Azure.SignalR package
+// - builder.Services.AddSignalR().AddAzureSignalR("<connection-string>");
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);
+    options.HandshakeTimeout = TimeSpan.FromSeconds(15);
 });
 
 builder.Services.AddHttpClient<DocumentApiClient>(client =>
@@ -91,9 +133,13 @@ builder.Services.AddHttpClient<AgentApiClient>(client =>
         client.BaseAddress = new("https+http://agentservice");
         // Increased timeout for agent execution (agents can take longer to complete)
         client.Timeout = TimeSpan.FromMinutes(2);
-    });
+    })
+    .AddHttpMessageHandler<ErrorHandlingDelegatingHandler>();
 
 var app = builder.Build();
+
+// Enable response compression for production performance
+app.UseResponseCompression();
 
 if (!app.Environment.IsDevelopment())
 {
@@ -110,6 +156,9 @@ app.UseOutputCache();
 
 app.MapStaticAssets();
 
+// Map Blazor components with Interactive Server render mode
+// Note: Transport configuration (Long Polling) is handled via client-side JavaScript if needed
+// For production: Consider Azure SignalR Service for 100K+ concurrent connections
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
