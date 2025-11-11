@@ -21,7 +21,24 @@
 <body>
     <Routes />
     <script src="@Assets["js/preloader.js"]"></script>
-    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>
+    <script>
+        // Configure Blazor to use ONLY Long Polling for maximum corporate proxy compatibility
+        // This disables WebSockets entirely and works through any proxy/firewall
+        Blazor.start({
+            circuit: {
+                configureSignalR: function (builder) {
+                    builder.withUrl("/_blazor", {
+                        transport: 4, // 4 = LongPolling only (no WebSockets)
+                        skipNegotiation: false
+                    });
+                    
+                    // Configure automatic reconnection with exponential backoff
+                    builder.withAutomaticReconnect([0, 2000, 5000, 10000, 30000]);
+                }
+            }
+        });
+    </script>
 </body>
 
 </html>
