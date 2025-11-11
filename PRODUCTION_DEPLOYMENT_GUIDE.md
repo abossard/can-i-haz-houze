@@ -88,6 +88,48 @@ ConnectionStrings__openai=<Azure OpenAI connection string>
 ConnectionStrings__cosmos=<Cosmos DB connection string>
 ConnectionStrings__storage=<Blob Storage connection string>
 
+# Environment setting (automatically configured via AppHost)
+ASPNETCORE_ENVIRONMENT=Production
+```
+
+### Automatic Production Configuration
+
+The AppHost is configured to automatically set `ASPNETCORE_ENVIRONMENT=Production` for all services when deploying to Azure Container Apps via `azd`:
+
+**AppHost.cs**:
+```csharp
+// Configure Production environment for Azure Container Apps deployment
+if (builder.ExecutionContext.IsPublishMode)
+{
+    webFrontend.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+    documentService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+    ledgerService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+    mortgageService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+    crmService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+    agentService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
+}
+```
+
+This ensures:
+- All services use their `appsettings.Production.json` files
+- Production logging levels are applied (Warning instead of Information)
+- Production optimizations are enabled
+- Circuit options and Kestrel limits are properly configured
+
+**No manual configuration needed** - When you run `azd up` or `azd deploy`, the Production environment is automatically set.
+
+### Verifying Production Configuration
+
+After deployment, verify the environment is set correctly:
+
+```bash
+# Check environment variables in Azure Container App
+az containerapp show --name webfrontend --resource-group <resource-group> \
+  --query "properties.template.containers[0].env" -o table
+
+# You should see ASPNETCORE_ENVIRONMENT set to "Production"
+```
+
 # Optional: Kestrel configuration
 ASPNETCORE_URLS=http://+:8080
 ASPNETCORE_ENVIRONMENT=Production
