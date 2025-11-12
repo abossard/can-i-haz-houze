@@ -1,29 +1,23 @@
-using Azure.AI.OpenAI;
-using OpenAI.Chat;
+using Azure.AI.Inference;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace CanIHazHouze.DocumentService;
 
 /// <summary>
-/// AI-powered document analysis service using Azure OpenAI
+/// AI-powered document analysis service using Azure AI Foundry
 /// </summary>
 public class DocumentAIService : IDocumentAIService
 {
-    private readonly AzureOpenAIClient _openAIClient;
+    private readonly ChatCompletionsClient _chatClient;
     private readonly ILogger<DocumentAIService> _logger;
-    private readonly string _modelDeploymentName;
 
     public DocumentAIService(
-        AzureOpenAIClient openAIClient, 
-        ILogger<DocumentAIService> logger,
-        IConfiguration configuration)
+        ChatCompletionsClient chatClient, 
+        ILogger<DocumentAIService> logger)
     {
-        _openAIClient = openAIClient ?? throw new ArgumentNullException(nameof(openAIClient));
+        _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
-        // Use the model deployment name from configuration, default to gpt-4o-mini
-        _modelDeploymentName = configuration["OpenAI:ModelDeployment"] ?? "gpt-4o-mini";
     }
 
     public async Task<DocumentMetadata> ExtractMetadataAsync(
@@ -38,23 +32,21 @@ public class DocumentAIService : IDocumentAIService
             var systemPrompt = CreateMetadataExtractionPrompt();
             var userPrompt = CreateDocumentAnalysisPrompt(textContent, fileName);
 
-            var chatClient = _openAIClient.GetChatClient(_modelDeploymentName);
-            
-            var response = await chatClient.CompleteChatAsync(
-                [
-                    new SystemChatMessage(systemPrompt),
-                    new UserChatMessage(userPrompt)
-                ],
-                new ChatCompletionOptions
+            var requestOptions = new ChatCompletionsOptions
+            {
+                Messages =
                 {
-                    Temperature = 0.1f, // Low temperature for consistent extraction
-                    MaxOutputTokenCount = 2000,
-                    ResponseFormat = ChatResponseFormat.CreateJsonObjectFormat()
+                    new ChatRequestSystemMessage(systemPrompt),
+                    new ChatRequestUserMessage(userPrompt)
                 },
-                cancellationToken);
+                Temperature = 0.1f, // Low temperature for consistent extraction
+                MaxTokens = 2000
+            };
 
-            var jsonResponse = response.Value.Content[0].Text;
-            _logger.LogDebug("OpenAI response: {Response}", jsonResponse);
+            var response = await _chatClient.CompleteAsync(requestOptions, cancellationToken);
+
+            var jsonResponse = response.Value.Content;
+            _logger.LogDebug("AI response: {Response}", jsonResponse);
 
             var metadata = ParseMetadataResponse(jsonResponse);
             
@@ -93,18 +85,16 @@ public class DocumentAIService : IDocumentAIService
                 {textContent}
                 """;
 
-            var chatClient = _openAIClient.GetChatClient(_modelDeploymentName);
-            
-            var response = await chatClient.CompleteChatAsync(
-                [new UserChatMessage(prompt)],
-                new ChatCompletionOptions
-                {
-                    Temperature = 0.3f,
-                    MaxOutputTokenCount = 150
-                },
-                cancellationToken);
+            var requestOptions = new ChatCompletionsOptions
+            {
+                Messages = { new ChatRequestUserMessage(prompt) },
+                Temperature = 0.3f,
+                MaxTokens = 150
+            };
 
-            var summary = response.Value.Content[0].Text.Trim();
+            var response = await _chatClient.CompleteAsync(requestOptions, cancellationToken);
+
+            var summary = response.Value.Content.Trim();
             
             _logger.LogInformation("Successfully generated summary");
             return summary;
@@ -140,19 +130,16 @@ public class DocumentAIService : IDocumentAIService
                 {textContent}
                 """;
 
-            var chatClient = _openAIClient.GetChatClient(_modelDeploymentName);
-            
-            var response = await chatClient.CompleteChatAsync(
-                [new UserChatMessage(prompt)],
-                new ChatCompletionOptions
-                {
-                    Temperature = 0.4f,
-                    MaxOutputTokenCount = 100,
-                    ResponseFormat = ChatResponseFormat.CreateJsonObjectFormat()
-                },
-                cancellationToken);
+            var requestOptions = new ChatCompletionsOptions
+            {
+                Messages = { new ChatRequestUserMessage(prompt) },
+                Temperature = 0.4f,
+                MaxTokens = 100
+            };
 
-            var jsonResponse = response.Value.Content[0].Text;
+            var response = await _chatClient.CompleteAsync(requestOptions, cancellationToken);
+
+            var jsonResponse = response.Value.Content;
             
             // Try to parse as JSON array
             try

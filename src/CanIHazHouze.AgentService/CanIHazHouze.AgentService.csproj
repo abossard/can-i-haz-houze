@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Microsoft.Azure.Cosmos" Version="9.3.1" />
+    <PackageReference Include="Aspire.Azure.AI.Inference" Version="13.0.0-preview.1.25560.3" />
     <PackageReference Include="Azure.AI.OpenAI" Version="2.5.0-beta.1" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="9.0.0" />
@@ -19,8 +20,8 @@
     <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI" Version="1.67.0" />
     <PackageReference Include="ModelContextProtocol" Version="0.4.0-preview.3" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.4.16" />
-    <!-- Explicit reference to fix Azure Container Apps deployment: Upgrade to 9.x to resolve assembly loading issues -->
-    <PackageReference Include="System.Memory.Data" Version="9.0.0" />
+    <!-- Explicit reference to fix Azure Container Apps deployment: Upgrade to 10.x for AI Foundry compatibility -->
+    <PackageReference Include="System.Memory.Data" Version="10.0.0" />
   </ItemGroup>
 
   <!-- Suppress NU1608 warnings for Azure.AI.OpenAI - Semantic Kernel 1.33.0 works fine with the stable 2.1.0 release -->
