@@ -55,32 +55,14 @@ builder.AddAzureCosmosClient("cosmos");
 logger.LogInformation("📁 Adding Azure Blob Storage client...");
 builder.AddAzureBlobClient("blobs");
 
-// Keyless Azure OpenAI client (DefaultAzureCredential)
-// REQUIRED: Set user secret with: dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=https://YOUR-RESOURCE.openai.azure.com/"
-logger.LogInformation("🤖 Configuring Azure OpenAI client (DefaultAzureCredential)...");
-var openAiConn = builder.Configuration.GetConnectionString("openai");
-if (string.IsNullOrWhiteSpace(openAiConn))
-{
-    throw new InvalidOperationException(
-        "OpenAI connection string is required. Set user secret with: " +
-        "dotnet user-secrets set \"ConnectionStrings:openai\" \"Endpoint=https://YOUR-RESOURCE.openai.azure.com/\"");
-}
+// Azure AI Foundry chat completions client (via Aspire)
+// Connection name matches deployment name from AppHost: "gpt-4o-mini" or "openai" (local dev)
+logger.LogInformation("🤖 Configuring Azure AI Foundry chat client...");
+var connectionName = builder.Configuration.GetConnectionString("gpt-4o-mini") != null 
+    ? "gpt-4o-mini"  // Production: AI Foundry deployment
+    : "openai";       // Local dev: fallback connection string
 
-string? openAiEndpoint = openAiConn.Split(';', StringSplitOptions.RemoveEmptyEntries)
-    .FirstOrDefault(p => p.StartsWith("Endpoint=", StringComparison.OrdinalIgnoreCase))?
-    .Substring("Endpoint=".Length);
-
-if (string.IsNullOrWhiteSpace(openAiEndpoint) || !Uri.TryCreate(openAiEndpoint, UriKind.Absolute, out var openAiUri) || openAiUri.Scheme != Uri.UriSchemeHttps)
-{
-    throw new InvalidOperationException(
-        $"Invalid OpenAI endpoint: '{openAiEndpoint}'. Must be a valid HTTPS URL.");
-}
-
-builder.Services.AddSingleton(sp =>
-{
-    var credential = new Azure.Identity.DefaultAzureCredential();
-    return new Azure.AI.OpenAI.AzureOpenAIClient(openAiUri, credential);
-});
+builder.AddAzureChatCompletionsClient(connectionName);
 
 // Add document service
 logger.LogInformation("📄 Registering document service...");
