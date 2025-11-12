@@ -10,6 +10,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Add service defaults & Aspire client integrations.
 builder.AddServiceDefaults();
 
+// Add MCP server support with AgentTools
+builder.AddMCPSupport()
+    .WithTools<CanIHazHouze.AgentService.McpTools.AgentTools>();
+
 // Add services to the container.
 builder.Services.AddProblemDetails();
 
@@ -683,6 +687,11 @@ app.MapPost("/runs/{agentId}/{id}/chat", async (
 
 // Map SignalR hub
 app.MapHub<CanIHazHouze.AgentService.Hubs.AgentHub>("/hubs/agent");
+
+// Map MCP endpoints
+app.MapDefaultEndpoints();
+
+app.Logger.LogInformation("🔧 AgentService MCP tools registered at /mcp endpoint");
 
 app.Run();
 

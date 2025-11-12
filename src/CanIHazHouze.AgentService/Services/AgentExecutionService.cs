@@ -54,36 +54,63 @@ public class AgentExecutionService : IAgentExecutionService
             deploymentName: deploymentName,
             azureOpenAIClient: _openAIClient);
         
-        // Map of tool names to their service names
-        var serviceMap = new Dictionary<string, string>
+        // Map of tool names to their service names (case-insensitive)
+        var serviceMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["ledgerapi"] = "ledgerservice",
             ["crmapi"] = "crmservice",
-            ["documentsapi"] = "documentservice"
+            ["documentsapi"] = "documentservice",
+            ["agentapi"] = "agentservice",
+            ["agentworkbench"] = "agentservice"
         };
         
         // Register MCP plugins based on agent's tool configuration
         foreach (var tool in tools)
         {
-            var toolKey = tool.ToLowerInvariant();
+            var toolKey = tool;
             
             if (serviceMap.TryGetValue(toolKey, out var serviceName))
             {
-                // Resolve service URL from Aspire configuration
-                // Format: services:servicename:https:0 (injected as services__servicename__https__0 env var)
-                var httpsUrl = _configuration[$"services:{serviceName}:https:0"];
-                var httpUrl = _configuration[$"services:{serviceName}:http:0"];
+                string? serviceUrl;
                 
-                var serviceUrl = httpsUrl ?? httpUrl;
-                
-                if (string.IsNullOrEmpty(serviceUrl))
+                // Special handling for self-reference (agentservice)
+                if (serviceName.Equals("agentservice", StringComparison.OrdinalIgnoreCase))
                 {
-                    run.Logs.Add(new AgentRunLog
+                    // Use local base URL for self-reference to avoid circular dependency
+                    var urls = _configuration["ASPNETCORE_URLS"] ?? _configuration["urls"];
+                    if (!string.IsNullOrEmpty(urls))
                     {
-                        Level = "error",
-                        Message = $"Service URL not found for '{serviceName}'. Expected configuration key: services:{serviceName}:https:0"
-                    });
-                    continue;
+                        // ASPNETCORE_URLS can be multiple URLs separated by semicolons
+                        serviceUrl = urls.Split(';')[0];
+                    }
+                    else
+                    {
+                        run.Logs.Add(new AgentRunLog
+                        {
+                            Level = "warning",
+                            Message = $"Cannot reference own MCP tools - self-reference not supported. Skipping '{tool}'."
+                        });
+                        continue;
+                    }
+                }
+                else
+                {
+                    // Resolve service URL from Aspire configuration
+                    // Format: services:servicename:https:0 (injected as services__servicename__https__0 env var)
+                    var httpsUrl = _configuration[$"services:{serviceName}:https:0"];
+                    var httpUrl = _configuration[$"services:{serviceName}:http:0"];
+                    
+                    serviceUrl = httpsUrl ?? httpUrl;
+                    
+                    if (string.IsNullOrEmpty(serviceUrl))
+                    {
+                        run.Logs.Add(new AgentRunLog
+                        {
+                            Level = "error",
+                            Message = $"Service URL not found for '{serviceName}'. Expected configuration key: services:{serviceName}:https:0"
+                        });
+                        continue;
+                    }
                 }
                 
                 var mcpEndpoint = $"{serviceUrl.TrimEnd('/')}/mcp";
