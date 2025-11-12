@@ -1,0 +1,209 @@
+name: Aspire Dashboard Test
+
+on:
+  workflow_dispatch:  # Manual trigger
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - '.github/workflows/aspire-dashboard-test.yml'
+
+jobs:
+  run-aspire-dashboard:
+    name: Run Aspire AppHost and Capture Dashboard
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+    
+    - name: Configure IPv4 preference for DCP
+      run: |
+        echo "Configuring system to prefer IPv4..."
+        # Set environment variable to disable IPv6 in .NET
+        echo "DOTNET_SYSTEM_NET_DISABLEIPV6=1" >> $GITHUB_ENV
+        # Also set for current shell
+        export DOTNET_SYSTEM_NET_DISABLEIPV6=1
+        
+    - name: Setup Docker
+      run: |
+        echo "Docker version:"
+        docker --version
+        echo "Docker is already available on ubuntu-latest"
+        
+    - name: Pull required Docker images
+      run: |
+        echo "Pre-pulling Cosmos DB and Azurite images..."
+        docker pull mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest &
+        docker pull mcr.microsoft.com/azure-storage/azurite:latest &
+        wait
+        echo "Images pulled successfully"
+        
+    - name: Install Aspire workload
+      run: |
+        dotnet workload install aspire
+        
+    - name: Restore dependencies
+      run: dotnet restore src/CanIHazHouze.sln
+      
+    - name: Build solution
+      run: dotnet build src/CanIHazHouze.sln --no-restore --configuration Release
+      
+    - name: Start Aspire AppHost in background
+      run: |
+        cd src
+        # Start AppHost in background
+        nohup dotnet run --project CanIHazHouze.AppHost --no-build --configuration Release > apphost.log 2>&1 &
+        APPHOST_PID=$!
+        echo "APPHOST_PID=$APPHOST_PID" >> $GITHUB_ENV
+        echo "AppHost started with PID: $APPHOST_PID"
+        
+    - name: Wait for services to be ready
+      run: |
+        echo "Waiting for Aspire dashboard to be ready..."
+        max_attempts=60
+        attempt=0
+        
+        # Try multiple possible dashboard URLs
+        dashboard_urls=(
+          "http://localhost:15097"
+          "https://localhost:17032"
+          "http://localhost:17001"
+          "https://localhost:18888"
+        )
+        
+        while [ $attempt -lt $max_attempts ]; do
+          echo "Attempt $((attempt + 1))/$max_attempts"
+          
+          for url in "${dashboard_urls[@]}"; do
+            if curl -k -s -o /dev/null -w "%{http_code}" "$url" | grep -q "200\|302\|301"; then
+              echo "Dashboard is ready at $url!"
+              echo "DASHBOARD_URL=$url" >> $GITHUB_ENV
+              exit 0
+            fi
+          done
+          
+          # Check if AppHost is still running
+          if ! ps -p $APPHOST_PID > /dev/null 2>&1; then
+            echo "AppHost process has stopped!"
+            echo "=== AppHost Log ==="
+            cat src/apphost.log || echo "Log file not found"
+            exit 1
+          fi
+          
+          sleep 5
+          attempt=$((attempt + 1))
+        done
+        
+        echo "Timeout waiting for dashboard. Last 100 lines of log:"
+        tail -100 src/apphost.log || echo "Log file not found"
+        exit 1
+        
+    - name: Install screenshot tools
+      if: success()
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y chromium-browser xvfb
+        
+    - name: Take dashboard screenshot
+      if: success()
+      run: |
+        # Start virtual display
+        export DISPLAY=:99
+        Xvfb :99 -screen 0 1920x1080x24 &
+        sleep 2
+        
+        # Take screenshot using chromium in headless mode
+        chromium-browser --headless --disable-gpu --screenshot=$GITHUB_WORKSPACE/dashboard-screenshot.png \
+          --window-size=1920,1080 --no-sandbox --disable-dev-shm-usage \
+          $DASHBOARD_URL || echo "Screenshot failed"
+          
+    - name: List running services
+      if: success()
+      run: |
+        echo "=== Docker Containers ==="
+        docker ps
+        
+        echo "=== Aspire Dashboard URL ==="
+        echo $DASHBOARD_URL
+        
+        echo "=== AppHost Log (last 50 lines) ==="
+        tail -50 src/apphost.log || echo "Log file not found"
+        
+    - name: Find web frontend URL
+      if: success()
+      run: |
+        # Parse the log to find web frontend URL
+        if [ -f src/apphost.log ]; then
+          WEB_URL=$(grep -oP 'webfrontend.*?https?://[^\s]+' src/apphost.log | head -1 | grep -oP 'https?://[^\s]+' || echo "")
+          if [ -n "$WEB_URL" ]; then
+            echo "WEB_URL=$WEB_URL" >> $GITHUB_ENV
+            echo "Found web frontend at: $WEB_URL"
+          else
+            echo "Could not find web frontend URL in logs"
+          fi
+        fi
+        
+    - name: Take web frontend screenshot
+      if: success() && env.WEB_URL != ''
+      run: |
+        export DISPLAY=:99
+        chromium-browser --headless --disable-gpu --screenshot=$GITHUB_WORKSPACE/webfrontend-screenshot.png \
+          --window-size=1920,1080 --no-sandbox --disable-dev-shm-usage \
+          $WEB_URL || echo "Web frontend screenshot failed"
+          
+    - name: Upload screenshots
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: aspire-screenshots
+        path: |
+          dashboard-screenshot.png
+          webfrontend-screenshot.png
+          src/apphost.log
+        if-no-files-found: warn
+        
+    - name: Stop AppHost
+      if: always()
+      run: |
+        if [ -n "$APPHOST_PID" ]; then
+          echo "Stopping AppHost (PID: $APPHOST_PID)..."
+          kill $APPHOST_PID || true
+          sleep 2
+          kill -9 $APPHOST_PID 2>/dev/null || true
+        fi
+        
+    - name: Workflow Summary
+      if: always()
+      run: |
+        echo "## Aspire Dashboard Test Results 🚀" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f dashboard-screenshot.png ]; then
+          echo "✅ Dashboard screenshot captured" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Dashboard screenshot failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ -f webfrontend-screenshot.png ]; then
+          echo "✅ Web frontend screenshot captured" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ Web frontend screenshot not captured" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Configuration" >> $GITHUB_STEP_SUMMARY
+        echo "- IPv6 Disabled: \`DOTNET_SYSTEM_NET_DISABLEIPV6=1\`" >> $GITHUB_STEP_SUMMARY
+        echo "- Dashboard URL: \`$DASHBOARD_URL\`" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -n "$WEB_URL" ]; then
+          echo "- Web Frontend URL: \`$WEB_URL\`" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Download artifacts to view screenshots." >> $GITHUB_STEP_SUMMARY
