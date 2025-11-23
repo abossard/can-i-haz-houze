@@ -297,6 +297,15 @@
             }
 
             runs = await AgentApi.GetAgentRunsAsync(AgentId!);
+
+            // Initialize chat messages dictionary for all runs
+            foreach (var run in runs)
+            {
+                if (!chatMessages.ContainsKey(run.Id))
+                {
+                    chatMessages[run.Id] = string.Empty;
+                }
+            }
         }
         catch (Exception ex)
         {
