@@ -42,59 +42,45 @@ builder.Services.Configure<AgentStorageOptions>(
 // Add Azure Cosmos DB using Aspire
 builder.AddAzureCosmosClient("cosmos");
 
-// Keyless Azure OpenAI client (DefaultAzureCredential)
-// REQUIRED: AppHost must be running with ConnectionStrings:openai configured
-// The connection string is injected by Aspire via WithReference(openai)
-var openAiConn = builder.Configuration.GetConnectionString("openai");
-if (string.IsNullOrWhiteSpace(openAiConn))
-{
-    // Enhanced diagnostics to help debug configuration issues
-    var allConnStrings = builder.Configuration.GetSection("ConnectionStrings").GetChildren()
-        .Select(c => $"{c.Key}={(string.IsNullOrWhiteSpace(c.Value) ? "<empty>" : "***")}")
-        .ToList();
-    
-    var configSources = string.Join(", ", builder.Configuration.AsEnumerable()
-        .Where(kvp => kvp.Key.Contains("openai", StringComparison.OrdinalIgnoreCase))
-        .Select(kvp => $"{kvp.Key}={(string.IsNullOrWhiteSpace(kvp.Value) ? "<empty>" : "***")}"));
-    
-    throw new InvalidOperationException(
-        $"OpenAI connection string is required but was not found or is empty.\n" +
-        $"Available connection strings: {(allConnStrings.Any() ? string.Join(", ", allConnStrings) : "none")}\n" +
-        $"OpenAI-related config keys: {(string.IsNullOrEmpty(configSources) ? "none" : configSources)}\n\n" +
-        $"When running via AppHost: Make sure AppHost has the connection string configured:\n" +
-        $"  cd src/CanIHazHouze.AppHost && dotnet user-secrets set \"ConnectionStrings:openai\" \"Endpoint=https://...\"\n\n" +
-        $"When running AgentService directly: Set the secret in this project:\n" +
-        $"  cd src/CanIHazHouze.AgentService && dotnet user-secrets set \"ConnectionStrings:openai\" \"Endpoint=https://...\"");
-}
+// Azure AI Foundry chat completions client (via Aspire)
+// Connection name matches deployment name from AppHost: "gpt-4o" or "openai" (local dev)
+var connectionName = builder.Configuration.GetConnectionString("gpt-4o") != null 
+    ? "gpt-4o"     // Production: AI Foundry deployment
+    : "openai";    // Local dev: fallback connection string
 
-string? openAiEndpoint = null;
-foreach (var part in openAiConn.Split(';', StringSplitOptions.RemoveEmptyEntries))
+builder.AddAzureChatCompletionsClient(connectionName);
+
+// Also configure legacy AzureOpenAIClient for Semantic Kernel compatibility
+// Parse endpoint from connection string for backward compatibility
+var openAiConn = builder.Configuration.GetConnectionString(connectionName);
+if (!string.IsNullOrWhiteSpace(openAiConn))
 {
-    if (part.StartsWith("Endpoint=", StringComparison.OrdinalIgnoreCase))
+    string? openAiEndpoint = null;
+    foreach (var part in openAiConn.Split(';', StringSplitOptions.RemoveEmptyEntries))
     {
-        openAiEndpoint = part.Substring("Endpoint=".Length).Trim();
-        break;
+        if (part.StartsWith("Endpoint=", StringComparison.OrdinalIgnoreCase))
+        {
+            openAiEndpoint = part.Substring("Endpoint=".Length).Trim();
+            break;
+        }
+    }
+
+    if (!string.IsNullOrWhiteSpace(openAiEndpoint) && Uri.TryCreate(openAiEndpoint, UriKind.Absolute, out var openAiUri) && openAiUri.Scheme == Uri.UriSchemeHttps)
+    {
+        builder.Services.AddSingleton(sp =>
+        {
+            var credential = new Azure.Identity.DefaultAzureCredential();
+            return new Azure.AI.OpenAI.AzureOpenAIClient(openAiUri, credential);
+        });
+
+        // Configure OpenAIConfiguration for AgentExecutionService
+        builder.Services.Configure<CanIHazHouze.AgentService.Configuration.OpenAIConfiguration>(options =>
+        {
+            options.Endpoint = openAiEndpoint;
+            options.ApiKey = string.Empty; // Using keyless authentication with DefaultAzureCredential
+        });
     }
 }
-
-if (string.IsNullOrWhiteSpace(openAiEndpoint) || !Uri.TryCreate(openAiEndpoint, UriKind.Absolute, out var openAiUri) || openAiUri.Scheme != Uri.UriSchemeHttps)
-{
-    throw new InvalidOperationException(
-        $"Invalid OpenAI endpoint: '{openAiEndpoint}'. Must be a valid HTTPS URL.");
-}
-
-builder.Services.AddSingleton(sp =>
-{
-    var credential = new Azure.Identity.DefaultAzureCredential();
-    return new Azure.AI.OpenAI.AzureOpenAIClient(openAiUri, credential);
-});
-
-// Configure OpenAIConfiguration for AgentExecutionService
-builder.Services.Configure<CanIHazHouze.AgentService.Configuration.OpenAIConfiguration>(options =>
-{
-    options.Endpoint = openAiEndpoint;
-    options.ApiKey = string.Empty; // Using keyless authentication with DefaultAzureCredential
-});
 
 // Add HttpClient for MCP client service
 builder.Services.AddHttpClient();
@@ -211,11 +197,13 @@ app.MapGet("/agents/raw", async (IAgentStorageService storage, Microsoft.Azure.C
 // Diagnostics: OpenAI configuration
 app.MapGet("/diagnostics/openai", (IServiceProvider sp) =>
 {
-    var client = sp.GetService<Azure.AI.OpenAI.AzureOpenAIClient>();
+    var azureClient = sp.GetService<Azure.AI.OpenAI.AzureOpenAIClient>();
+    var inferenceClient = sp.GetService<Azure.AI.Inference.ChatCompletionsClient>();
     return Results.Ok(new
     {
-        configured = client != null,
-        endpoint = openAiEndpoint,
+        azureOpenAIConfigured = azureClient != null,
+        aiFoundryConfigured = inferenceClient != null,
+        mode = inferenceClient != null ? "AI Foundry" : (azureClient != null ? "Azure OpenAI" : "None"),
         timestampUtc = DateTime.UtcNow
     });
 })

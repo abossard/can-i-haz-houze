@@ -1,3 +1,4 @@
+using Aspire.Hosting.Azure;
 using Azure.Provisioning.Storage;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -18,30 +19,6 @@ var cosmos = builder.AddAzureCosmosDB("cosmos")
     });
 #pragma warning restore ASPIRECOSMOSDB001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
 
-// OpenAI handling:
-//  - Publish mode: provision Azure OpenAI and register model deployments.
-//  - Local dev: use existing resource via connection string (set by setup-local-openai.sh).
-IResourceBuilder<IResourceWithConnectionString> openai;
-if (builder.ExecutionContext.IsPublishMode)
-{
-    var openaiAzure = builder.AddAzureOpenAI("openai");
-    // Add model deployments for document processing and agent execution
-    openaiAzure.AddDeployment(
-        name: "gpt-4o",
-        modelName: "gpt-4o",
-        modelVersion: "2024-11-20");
-
-    openaiAzure.AddDeployment(
-        name: "gpt-4o-mini",
-        modelName: "gpt-4o-mini",
-        modelVersion: "2024-07-18");
-
-    openai = openaiAzure; // AzureOpenAIResource implements IResourceWithConnectionString
-}
-else
-{
-    openai = builder.AddConnectionString("openai");
-}
 
 // Configure OpenAI resource for production
 // (Deployments moved into publish-mode branch above.)
@@ -71,7 +48,6 @@ var agentsContainer = houzeDatabase.AddContainer("agents", "/agentId");
 var documentService = builder.AddProject<Projects.CanIHazHouze_DocumentService>("documentservice")
     .WithExternalHttpEndpoints()
     .WithReference(cosmos) // Reference the cosmos resource instead of container
-    .WithReference(openai) // Add OpenAI reference for document processing
     .WithReference(blobStorage) // Add Blob Storage reference for document file storage
     .WithRoleAssignments(storage, StorageBuiltInRole.StorageBlobDataOwner) // Grant Storage Blob Data Owner role for blob operations
     .WithHttpHealthCheck("/health");
@@ -98,7 +74,6 @@ var crmService = builder.AddProject<Projects.CanIHazHouze_CrmService>("crmservic
 var agentService = builder.AddProject<Projects.CanIHazHouze_AgentService>("agentservice")
     .WithExternalHttpEndpoints()
     .WithReference(cosmos) 
-    .WithReference(openai)
     .WithReference(ledgerService)   // ← Add reference for MCP endpoint discovery
     .WithReference(crmService)      // ← Add reference for MCP endpoint discovery
     .WithReference(documentService) // ← Add reference for MCP endpoint discovery
@@ -129,4 +104,27 @@ if (builder.ExecutionContext.IsPublishMode)
     agentService.WithEnvironment("ASPNETCORE_ENVIRONMENT", "Production");
 }
 
+
+// AI Foundry handling:
+//  - Publish mode: provision Azure AI Foundry and register model deployments.
+//  - Local dev: use existing resource via connection string (set by setup-local-openai.sh).
+if (builder.ExecutionContext.IsPublishMode)
+{
+    var foundry = builder.AddAzureAIFoundry("foundry");
+    
+    // Add model deployments for document processing and agent execution
+    var gpt4o = foundry.AddDeployment("gpt-4o", AIFoundryModel.OpenAI.Gpt4o);
+    var gpt4oMini = foundry.AddDeployment("gpt-4o-mini", AIFoundryModel.OpenAI.Gpt4oMini);
+
+    // Configure references to specific model deployments
+    documentService.WithReference(gpt4oMini);
+    agentService.WithReference(gpt4o);
+}
+else
+{
+    // Local development: use connection string for backward compatibility
+    var openai = builder.AddConnectionString("openai");
+    documentService.WithReference(openai);
+    agentService.WithReference(openai);
+}
 builder.Build().Run();
