@@ -385,10 +385,8 @@
         _hubConnection = new HubConnectionBuilder()
             .WithUrl(hubUrl, options =>
             {
-                // Use ONLY Long Polling for maximum corporate proxy compatibility
-                // This avoids WebSocket issues entirely and works through any proxy
+                // Allow SignalR to negotiate the best available transport automatically
                 options.SkipNegotiation = false;
-                options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.LongPolling;
                 
                 // Increase timeouts for slower corporate proxy connections
                 options.CloseTimeout = TimeSpan.FromSeconds(30);

@@ -23,13 +23,11 @@
     <script src="@Assets["js/preloader.js"]"></script>
     <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>
     <script>
-        // Configure Blazor to use ONLY Long Polling for maximum corporate proxy compatibility
-        // This disables WebSockets entirely and works through any proxy/firewall
+        // Use default transport negotiation: WebSockets first, then SSE/LongPolling fallback
         Blazor.start({
             circuit: {
                 configureSignalR: function (builder) {
                     builder.withUrl("/_blazor", {
-                        transport: 4, // 4 = LongPolling only (no WebSockets)
                         skipNegotiation: false
                     });
                     

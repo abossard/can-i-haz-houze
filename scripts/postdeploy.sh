@@ -152,6 +152,45 @@ echo ""
 echo "=================================================="
 echo ""
 
+# Configure Container Apps ingress settings needed for Blazor SignalR
+echo "🌐 Configuring Container Apps ingress..."
+WEBFRONTEND_APP=$(az containerapp list \
+    --resource-group "$AZURE_RESOURCE_GROUP" \
+    --query "[?contains(name, 'webfrontend')].name | [0]" \
+    --output tsv 2>/dev/null)
+
+if [ -n "$WEBFRONTEND_APP" ]; then
+    echo "   Found web frontend app: $WEBFRONTEND_APP"
+
+    if az containerapp ingress sticky-sessions set \
+        --name "$WEBFRONTEND_APP" \
+        --resource-group "$AZURE_RESOURCE_GROUP" \
+        --affinity sticky \
+        --output none 2>/dev/null; then
+        echo "   ✅ Sticky sessions enabled successfully!"
+    else
+        echo "   ⚠️  Warning: Could not enable sticky sessions"
+        OVERALL_SUCCESS=false
+    fi
+
+    if az containerapp ingress update \
+        --name "$WEBFRONTEND_APP" \
+        --resource-group "$AZURE_RESOURCE_GROUP" \
+        --transport auto \
+        --output none 2>/dev/null; then
+        echo "   ✅ Ingress transport set to auto successfully!"
+    else
+        echo "   ⚠️  Warning: Could not set ingress transport to auto"
+        OVERALL_SUCCESS=false
+    fi
+else
+    echo "   ℹ️  No web frontend container app found"
+fi
+
+echo ""
+echo "=================================================="
+echo ""
+
 # ===================================================================
 # STEP 2: Setup Local OpenAI Connection
 # ===================================================================
