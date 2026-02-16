@@ -43,7 +43,7 @@ For local development, you need an existing Azure OpenAI resource. Add this to y
 ```json
 {
   "ConnectionStrings": {
-    "openai": "Endpoint=https://your-openai-resource.openai.azure.com/;Key=your-api-key;"
+    "openai": "Endpoint=https://your-openai-resource.openai.azure.com/"
   }
 }
 ```
@@ -52,7 +52,7 @@ To set user secrets for the AppHost:
 
 ```bash
 cd src/CanIHazHouze.AppHost
-dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=https://your-openai-resource.openai.azure.com/;Key=your-api-key;"
+dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=https://your-openai-resource.openai.azure.com/"
 ```
 
 ### 2. Azure Production Setup
@@ -170,7 +170,7 @@ azd up
 
 ## Security Considerations
 
-1. **API Keys**: Never hardcode API keys - use Azure Key Vault or user secrets
+1. **Authentication**: Use `DefaultAzureCredential` with RBAC/managed identities (keyless)
 2. **Access Control**: Document analysis respects owner-based access control
 3. **Data Privacy**: Document content is sent to Azure OpenAI for analysis
 4. **Rate Limiting**: Consider implementing rate limiting for AI endpoints in production
@@ -215,7 +215,7 @@ Monitor costs and usage through:
 1. **"OpenAI connection failed"**
    - Check connection string configuration
    - Verify Azure OpenAI resource is accessible
-   - Check API key permissions
+   - Check Azure role assignments (`Cognitive Services OpenAI User` or higher) and `az login` state
 
 2. **"Model deployment not found"**
    - Verify model deployment name in configuration

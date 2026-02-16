@@ -102,7 +102,8 @@ When using GitHub Codespaces, Docker is automatically available and Aspire can o
 #### Required Services
 - **Azure OpenAI**: Required for document analysis and AI features
   - Model: `gpt-4o-mini` (version 2024-07-18)
-  - Connection string format: `Endpoint=https://your-resource.openai.azure.com/;ApiKey=your-key`
+  - Connection string format: `Endpoint=https://your-resource.openai.azure.com/`
+  - Authentication: `DefaultAzureCredential` (no API key support)
   - Store in user secrets: `dotnet user-secrets set "ConnectionStrings:openai" "<connection-string>"`
 
 - **Azure Cosmos DB**: Used for data persistence
@@ -235,7 +236,7 @@ When creating issues for Copilot, include:
 
 - **Never commit secrets**: Use `dotnet user-secrets` for local development
 - **Connection strings**: Always use secure connection strings in production
-- **API keys**: Managed via Azure Key Vault in production (via azd)
+- **Azure OpenAI auth**: Use managed identities/RBAC (`DefaultAzureCredential`) instead of API keys
 - **Public network access**: 
   - The `scripts/enable-public-access.sh` script enables public endpoints on Storage Account and Cosmos DB
   - **WARNING**: This is for DEVELOPMENT/TESTING ONLY and should NOT be used in production

@@ -1,6 +1,7 @@
 using ModelContextProtocol.Client;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using System.Net;
 
 namespace CanIHazHouze.AgentService.Services;
 
@@ -90,6 +91,17 @@ public class McpClientService : IMcpClientService
             _logger.LogInformation("Retrieved {Count} tools from MCP server: {Endpoint}", tools.Count, mcpEndpointUrl);
             return tools;
         }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            _logger.LogWarning(ex, "MCP session not found for {Endpoint}. Recreating client and retrying once.", mcpEndpointUrl);
+            _clientCache.Remove(mcpEndpointUrl);
+
+            var client = await GetOrCreateClientAsync(mcpEndpointUrl, cancellationToken);
+            var tools = await client.ListToolsAsync();
+
+            _logger.LogInformation("Retrieved {Count} tools from MCP server after retry: {Endpoint}", tools.Count, mcpEndpointUrl);
+            return tools;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error listing tools from MCP server: {Endpoint}", mcpEndpointUrl);
@@ -117,6 +129,19 @@ public class McpClientService : IMcpClientService
             var resultText = string.Join("\n", result.Content.Select(c => c.Type == "text" ? c.ToString() : JsonSerializer.Serialize(c)));
             
             _logger.LogInformation("MCP tool '{Tool}' returned result", toolName);
+            return resultText;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            _logger.LogWarning(ex, "MCP session not found for {Endpoint}. Recreating client and retrying tool '{Tool}'.", mcpEndpointUrl, toolName);
+            _clientCache.Remove(mcpEndpointUrl);
+
+            var client = await GetOrCreateClientAsync(mcpEndpointUrl, cancellationToken);
+            var readOnlyArgs = arguments.ToDictionary(kvp => kvp.Key, kvp => (object?)kvp.Value);
+            var result = await client.CallToolAsync(toolName, readOnlyArgs, cancellationToken: cancellationToken);
+            var resultText = string.Join("\n", result.Content.Select(c => c.Type == "text" ? c.ToString() : JsonSerializer.Serialize(c)));
+
+            _logger.LogInformation("MCP tool '{Tool}' returned result after retry", toolName);
             return resultText;
         }
         catch (Exception ex)

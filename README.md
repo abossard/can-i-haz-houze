@@ -46,12 +46,12 @@ cd can-i-haz-houze/src
 #### For Local Development with Azure OpenAI:
 ```bash
 cd CanIHazHouze.AppHost
-dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=https://your-openai-resource.openai.azure.com/;ApiKey=your-super-secret-key"
+dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=https://your-openai-resource.openai.azure.com/"
 ```
 
 #### Alternative: Use Environment Variables (if you're into that)
 ```bash
-export ConnectionStrings__openai="Endpoint=https://your-openai-resource.openai.azure.com/;ApiKey=your-key"
+export ConnectionStrings__openai="Endpoint=https://your-openai-resource.openai.azure.com/"
 ```
 
 ### 3. Launch the Beast 🐉
@@ -67,12 +67,13 @@ Then open your browser to the Aspire dashboard (usually `https://localhost:17001
 
 1. **Get your Azure OpenAI details**: 
    - Endpoint: `https://your-resource.openai.azure.com/`
-   - API Key: From Azure Portal → Your OpenAI Resource → Keys and Endpoint
+   - Authentication: `DefaultAzureCredential` (Microsoft Entra ID / Managed Identity)
+   - Required role: `Cognitive Services OpenAI User` (or higher)
 
 2. **Set the connection string**:
    ```bash
    cd src/CanIHazHouze.AppHost
-   dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=https://your-resource.openai.azure.com/;ApiKey=your-key-here"
+   dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=https://your-resource.openai.azure.com/"
    ```
 
 ### Option B: Create New Azure OpenAI Resource
@@ -130,7 +131,7 @@ After running `azd up`, the system **automatically** performs post-deployment co
 The post-deploy hook will:
 - 🌐 Enable public network access on Storage Account and Cosmos DB (for development/testing)
 - 🔍 Find your deployed Azure OpenAI resource
-- 🔑 Retrieve the endpoint and API key
+- 🔑 Retrieve the endpoint
 - 🔐 Configure your local user secrets automatically
 - ✅ Make your app ready for local development
 
@@ -186,16 +187,9 @@ az cognitiveservices account show \
   --query properties.endpoint \
   --output tsv
 
-# Get the API key
-az cognitiveservices account keys list \
-  --name $OPENAI_SERVICE_NAME \
-  --resource-group $RESOURCE_GROUP \
-  --query key1 \
-  --output tsv
-
 # Set user secrets manually (if automatic setup failed)
 cd src/CanIHazHouze.AppHost
-dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=<endpoint>;ApiKey=<key>"
+dotnet user-secrets set "ConnectionStrings:openai" "Endpoint=<endpoint>"
 ```
 
 💡 **Pro Tip**: For production apps deployed with `azd`, the connection is automatically configured using managed identity - no manual connection string needed!
@@ -304,6 +298,7 @@ The Agent Workbench provides a complete platform for creating, configuring, and 
 
 ### API Documentation for Azure AI Foundry 🔌
 **NEW!** Build AI agents with our comprehensive API documentation page!
+⚠️ **Authentication Note**: This project is keyless-only. Use Microsoft Entra ID / managed identity for Azure OpenAI and Azure AI Foundry (API keys are not supported).
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -407,7 +402,7 @@ CultureInfo.DefaultThreadCurrentUICulture = culture;
 
 ### Azure OpenAI Connection Issues 🔌
 - Verify your endpoint URL doesn't have trailing slashes
-- Check your API key is valid and has proper permissions
+- Run `az login` and verify your identity has `Cognitive Services OpenAI User` (or higher)
 - Ensure your Azure OpenAI resource has the required model deployed
 
 ### azd Deployment Fails 💥

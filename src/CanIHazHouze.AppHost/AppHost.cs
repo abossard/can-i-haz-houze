@@ -36,6 +36,16 @@ if (builder.ExecutionContext.IsPublishMode)
         modelName: "gpt-4o-mini",
         modelVersion: "2024-07-18");
 
+    openaiAzure.AddDeployment(
+        name: "gpt-5-nano",
+        modelName: "gpt-5-nano",
+        modelVersion: "2025-08-07")
+        .WithProperties(deployment =>
+        {
+            deployment.SkuName = "DataZoneStandard";
+            deployment.SkuCapacity = 1;
+        });
+
     openai = openaiAzure; // AzureOpenAIResource implements IResourceWithConnectionString
 }
 else

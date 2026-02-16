@@ -50,7 +50,7 @@ public class Agent
 public class AgentConfig
 {
     // Deployment name (must match one of the configured deployments in AppHost)
-    // Available options: gpt-5, gpt-5-mini, gpt-5-nano, gpt-41, gpt-41-mini, gpt-41-nano
+    // Available options are exposed by AvailableModels.All
     [JsonProperty(PropertyName = "model")]
     public string Model { get; set; } = "gpt-41-mini";
     
@@ -106,6 +106,12 @@ public static class AvailableModels
             DeploymentName = "gpt-4o-mini", 
             DisplayName = "gpt-4o Mini", 
             Description = "Lightweight gpt-4o for cost-sensitive use cases with reasoning capabilities" 
+        },
+        new ModelDeployment
+        {
+            DeploymentName = "gpt-5-nano",
+            DisplayName = "gpt-5 Nano",
+            Description = "Fastest low-latency model for lightweight tasks and quick agent responses"
         },
     };
 }

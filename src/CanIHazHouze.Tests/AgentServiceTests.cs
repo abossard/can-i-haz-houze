@@ -38,6 +38,16 @@ public class AgentServiceTests
     }
 
     [Fact]
+    public void AvailableModels_IncludesGpt5Nano()
+    {
+        // Arrange
+        var deploymentNames = AvailableModels.All.Select(m => m.DeploymentName).ToList();
+
+        // Assert
+        Assert.Contains("gpt-5-nano", deploymentNames);
+    }
+
+    [Fact]
     public void AgentRun_HasDefaultStatus()
     {
         // Arrange & Act

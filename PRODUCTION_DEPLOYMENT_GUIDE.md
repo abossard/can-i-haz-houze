@@ -84,7 +84,7 @@ Production deployments should configure:
 
 ```bash
 # Required Azure services
-ConnectionStrings__openai=<Azure OpenAI connection string>
+ConnectionStrings__openai=Endpoint=https://<your-openai-resource>.openai.azure.com/
 ConnectionStrings__cosmos=<Cosmos DB connection string>
 ConnectionStrings__storage=<Blob Storage connection string>
 
