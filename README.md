@@ -11,7 +11,7 @@ This repository has been simplified to focus on **how the system works**, especi
 
 ## Start Here (Learning Path)
 
-1. Read **[DOCUMENT_WORKFLOW.md](DOCUMENT_WORKFLOW.md)** for the end-to-end document lifecycle.
+1. Read **[docs/DOCUMENT_WORKFLOW.md](docs/DOCUMENT_WORKFLOW.md)** for the end-to-end document lifecycle.
 2. Read service docs in `src/*/README.md` for implementation details.
 3. Use **/api-docs** in the running app for OpenAPI + system prompt copy/paste.
 
@@ -72,9 +72,6 @@ dotnet test
 ### Documents
 ![Webfrontend Documents](screenshots/webfrontend/02-documents.png)
 
-### API Docs
-![Webfrontend API Docs](screenshots/webfrontend/03-api-docs.png)
-
 ### Agents
 ![Webfrontend Agents](screenshots/webfrontend/04-agents.png)
 
@@ -87,7 +84,7 @@ dotnet test
 5. MortgageApprover uses document verification status during application evaluation.
 6. Documents can be listed, tagged, downloaded, or deleted.
 
-For full details and examples, see **[DOCUMENT_WORKFLOW.md](DOCUMENT_WORKFLOW.md)**.
+For full details and examples, see **[docs/DOCUMENT_WORKFLOW.md](docs/DOCUMENT_WORKFLOW.md)**.
 
 ## Deploy to Azure
 
@@ -100,12 +97,13 @@ azd down    # tear down
 ## Documentation Map
 
 - **Core onboarding**: this README
-- **Document deep dive**: [DOCUMENT_WORKFLOW.md](DOCUMENT_WORKFLOW.md)
+- **Document deep dive**: [docs/DOCUMENT_WORKFLOW.md](docs/DOCUMENT_WORKFLOW.md)
 - **Service behavior**: [src/CanIHazHouze.MortgageApprover/README.md](src/CanIHazHouze.MortgageApprover/README.md)
-- **Production**: [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md)
+- **Production**: [docs/PRODUCTION_DEPLOYMENT_GUIDE.md](docs/PRODUCTION_DEPLOYMENT_GUIDE.md)
 - **MCP usage**: [src/MCP_USAGE_GUIDE.md](src/MCP_USAGE_GUIDE.md)
 - **MCP setup for Copilot**: [.github/MCP_SETUP.md](.github/MCP_SETUP.md)
-- **Agent prompts**: [PROMPTS.md](PROMPTS.md)
-- **CRM testing flow**: [TESTING_GUIDE_CRM.md](TESTING_GUIDE_CRM.md)
+- **Agent prompts**: [docs/PROMPTS.md](docs/PROMPTS.md)
+- **CRM testing flow**: [docs/TESTING_GUIDE_CRM.md](docs/TESTING_GUIDE_CRM.md)
+- **All repo guides**: [docs/README.md](docs/README.md)
 
 Historical implementation-summary docs were consolidated into the guides above to keep onboarding simpler.

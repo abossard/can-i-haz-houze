@@ -134,9 +134,9 @@ azd down  # Clean up Azure resources
 ### Documentation
 
 - Start with `README.md` for setup and repository orientation
-- Use `DOCUMENT_WORKFLOW.md` for end-to-end document lifecycle behavior
+- Use `../docs/DOCUMENT_WORKFLOW.md` for end-to-end document lifecycle behavior
 - Use service docs in `src/*/README.md` for service-specific behavior
-- Use `PRODUCTION_DEPLOYMENT_GUIDE.md` for deployment and production behavior
+- Use `../docs/PRODUCTION_DEPLOYMENT_GUIDE.md` for deployment and production behavior
 
 ## Best Practices for Issues
 

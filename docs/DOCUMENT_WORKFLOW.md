@@ -118,6 +118,6 @@ done
 
 ## 9) Where to go deeper
 
-- Service docs: [src/CanIHazHouze.MortgageApprover/README.md](src/CanIHazHouze.MortgageApprover/README.md)
-- MCP usage details: [src/MCP_USAGE_GUIDE.md](src/MCP_USAGE_GUIDE.md)
+- Service docs: [../src/CanIHazHouze.MortgageApprover/README.md](../src/CanIHazHouze.MortgageApprover/README.md)
+- MCP usage details: [../src/MCP_USAGE_GUIDE.md](../src/MCP_USAGE_GUIDE.md)
 - Production hardening: [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md)
