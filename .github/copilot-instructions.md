@@ -12,7 +12,7 @@ This repository is configured with Model Context Protocol (MCP) servers that ext
 - **Docker Compose**: Support for Docker Compose commands (when needed)
 - **Web Search**: Search the web using Brave Search API for documentation, examples, and solutions
 
-For detailed setup instructions, see [MCP_SETUP.md](.github/MCP_SETUP.md).
+For detailed setup instructions, see [MCP_SETUP.md](MCP_SETUP.md).
 
 ### Quick Start with MCP Tools
 
@@ -133,12 +133,10 @@ azd down  # Clean up Azure resources
 
 ### Documentation
 
-- The README.md contains comprehensive setup and deployment instructions
-- Multiple implementation summary files document major features:
-  - `API_DOCUMENTATION_PAGE_IMPLEMENTATION.md`
-  - `AZURE_BLOB_STORAGE_MIGRATION_SUMMARY.md`
-  - `CRM_IMPLEMENTATION_SUMMARY.md`
-  - And others in `/src` directory
+- Start with `README.md` for setup and repository orientation
+- Use `DOCUMENT_WORKFLOW.md` for end-to-end document lifecycle behavior
+- Use service docs in `src/*/README.md` for service-specific behavior
+- Use `PRODUCTION_DEPLOYMENT_GUIDE.md` for deployment and production behavior
 
 ## Best Practices for Issues
 

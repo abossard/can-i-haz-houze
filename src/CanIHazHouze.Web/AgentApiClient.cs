@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace CanIHazHouze.Web;
@@ -6,6 +7,48 @@ public class AgentApiClient(HttpClient httpClient)
 {
     // Expose the HttpClient for URL resolution (e.g., SignalR hub connections)
     public HttpClient HttpClient => httpClient;
+    public string BaseUrl => httpClient.BaseAddress?.ToString().TrimEnd('/') ?? string.Empty;
+
+    public async Task<string?> GetPublicBaseUrlAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var response = await httpClient.GetAsync("/openapi/v1.json", cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var openApi = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+
+            if (!openApi.RootElement.TryGetProperty("servers", out var servers) || servers.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            foreach (var server in servers.EnumerateArray())
+            {
+                if (!server.TryGetProperty("url", out var urlElement))
+                {
+                    continue;
+                }
+
+                var url = urlElement.GetString();
+                if (!string.IsNullOrWhiteSpace(url))
+                {
+                    return url.TrimEnd('/');
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"AgentAPI OpenAPI URL resolution error: {ex.Message}");
+            return null;
+        }
+    }
     
     public async Task<List<ModelDeployment>> GetAvailableModelsAsync(CancellationToken cancellationToken = default)
     {

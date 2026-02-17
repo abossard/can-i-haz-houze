@@ -4,6 +4,7 @@
 @inject LedgerApiClient LedgerApiClient
 @inject MortgageApiClient MortgageApiClient
 @inject CrmApiClient CrmApiClient
+@inject AgentApiClient AgentApiClient
 
 <PageTitle>API Documentation - CanIHazHouze</PageTitle>
 
@@ -16,7 +17,7 @@
     <h6><span class="me-2">💡</span> Using this Documentation</h6>
     <p class="mb-0">
         Each service below provides an OpenAPI specification JSON link and a system prompt.
-        Use these to create specialized AI agents in Azure AI Foundry that can interact with the CanIHazHouze services.
+        The URLs resolve to public FQDNs from each service OpenAPI `servers` list when available, with automatic fallback to internal service-discovery URLs.
     </p>
 </div>
 
@@ -176,6 +177,36 @@
     </div>
 </div>
 
+@* Agent Service *@
+<div class="card mb-4">
+    <div class="card-header bg-dark text-white">
+        <h4 class="mb-0"><span class="me-2">🤖</span> Agent Service</h4>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <h5>REST API Base URL</h5>
+            <div class="input-group">
+                <input type="text" class="form-control" readonly value="@AgentRestApiUrl" id="agent-restapi-url" />
+                <button class="btn btn-outline-dark" type="button" @onclick="@(() => CopyToClipboard(AgentRestApiUrl))">
+                    <i class="bi bi-clipboard"></i> Copy
+                </button>
+            </div>
+            <small class="text-muted">Base URL for Agent Service REST endpoints</small>
+        </div>
+
+        <div class="mb-3">
+            <h5>MCP Endpoint</h5>
+            <div class="input-group">
+                <input type="text" class="form-control" readonly value="@AgentMcpUrl" id="agent-mcp-url" />
+                <button class="btn btn-outline-dark" type="button" @onclick="@(() => CopyToClipboard(AgentMcpUrl))">
+                    <i class="bi bi-clipboard"></i> Copy
+                </button>
+            </div>
+            <small class="text-muted">Model Context Protocol endpoint for AI agent integration</small>
+        </div>
+    </div>
+</div>
+
 @* Example Agent Scenarios Section *@
 <div class="mb-4 mt-5">
     <h2>🎭 Example Agent Scenarios</h2>
@@ -306,17 +337,25 @@
 </div>
 
 @code {
-    // OpenAPI URLs - dynamically resolved from API client base addresses
-    private string MortgageOpenApiUrl => $"{MortgageApiClient.BaseUrl}/openapi/v1.json";
-    private string DocumentOpenApiUrl => $"{DocumentApiClient.BaseUrl}/openapi/v1.json";
-    private string LedgerOpenApiUrl => $"{LedgerApiClient.BaseUrl}/openapi/v1.json";
-    private string CrmOpenApiUrl => $"{CrmApiClient.BaseUrl}/openapi/v1.json";
+    private string _mortgageResolvedBaseUrl = string.Empty;
+    private string _documentResolvedBaseUrl = string.Empty;
+    private string _ledgerResolvedBaseUrl = string.Empty;
+    private string _crmResolvedBaseUrl = string.Empty;
+    private string _agentResolvedBaseUrl = string.Empty;
 
-    // MCP Endpoint URLs - Model Context Protocol endpoints for AI agents
-    private string MortgageMcpUrl => $"{MortgageApiClient.BaseUrl}/mcp";
-    private string DocumentMcpUrl => $"{DocumentApiClient.BaseUrl}/mcp";
-    private string LedgerMcpUrl => $"{LedgerApiClient.BaseUrl}/mcp";
-    private string CrmMcpUrl => $"{CrmApiClient.BaseUrl}/mcp";
+    // OpenAPI URLs - resolved to public FQDNs when available
+    private string MortgageOpenApiUrl => $"{_mortgageResolvedBaseUrl}/openapi/v1.json";
+    private string DocumentOpenApiUrl => $"{_documentResolvedBaseUrl}/openapi/v1.json";
+    private string LedgerOpenApiUrl => $"{_ledgerResolvedBaseUrl}/openapi/v1.json";
+    private string CrmOpenApiUrl => $"{_crmResolvedBaseUrl}/openapi/v1.json";
+    private string AgentRestApiUrl => _agentResolvedBaseUrl;
+
+    // MCP Endpoint URLs - based on the same resolved base URLs
+    private string MortgageMcpUrl => $"{_mortgageResolvedBaseUrl}/mcp";
+    private string DocumentMcpUrl => $"{_documentResolvedBaseUrl}/mcp";
+    private string LedgerMcpUrl => $"{_ledgerResolvedBaseUrl}/mcp";
+    private string CrmMcpUrl => $"{_crmResolvedBaseUrl}/mcp";
+    private string AgentMcpUrl => $"{_agentResolvedBaseUrl}/mcp";
 
     // System Prompts - extracted from PROMPTS.md
     private string MortgageSystemPrompt => @"# MORTGAGE AGENT - CanIHazHouze System
@@ -1211,6 +1250,35 @@ Loss Percentage = Total Impact / Account Balance
 - Quality and completeness of investigation reports
 
 Remember: Your investigations protect both customers and the business. Be thorough, objective, and always base your conclusions on verified ledger data.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _mortgageResolvedBaseUrl = MortgageApiClient.BaseUrl;
+        _documentResolvedBaseUrl = DocumentApiClient.BaseUrl;
+        _ledgerResolvedBaseUrl = LedgerApiClient.BaseUrl;
+        _crmResolvedBaseUrl = CrmApiClient.BaseUrl;
+        _agentResolvedBaseUrl = AgentApiClient.BaseUrl;
+
+        var mortgagePublicUrlTask = MortgageApiClient.GetPublicBaseUrlAsync();
+        var documentPublicUrlTask = DocumentApiClient.GetPublicBaseUrlAsync();
+        var ledgerPublicUrlTask = LedgerApiClient.GetPublicBaseUrlAsync();
+        var crmPublicUrlTask = CrmApiClient.GetPublicBaseUrlAsync();
+        var agentPublicUrlTask = AgentApiClient.GetPublicBaseUrlAsync();
+
+        await Task.WhenAll(mortgagePublicUrlTask, documentPublicUrlTask, ledgerPublicUrlTask, crmPublicUrlTask, agentPublicUrlTask);
+
+        _mortgageResolvedBaseUrl = ResolveBaseUrl(mortgagePublicUrlTask.Result, MortgageApiClient.BaseUrl);
+        _documentResolvedBaseUrl = ResolveBaseUrl(documentPublicUrlTask.Result, DocumentApiClient.BaseUrl);
+        _ledgerResolvedBaseUrl = ResolveBaseUrl(ledgerPublicUrlTask.Result, LedgerApiClient.BaseUrl);
+        _crmResolvedBaseUrl = ResolveBaseUrl(crmPublicUrlTask.Result, CrmApiClient.BaseUrl);
+        _agentResolvedBaseUrl = ResolveBaseUrl(agentPublicUrlTask.Result, AgentApiClient.BaseUrl);
+    }
+
+    private static string ResolveBaseUrl(string? preferredBaseUrl, string fallbackBaseUrl)
+    {
+        var selectedUrl = string.IsNullOrWhiteSpace(preferredBaseUrl) ? fallbackBaseUrl : preferredBaseUrl;
+        return selectedUrl.TrimEnd('/');
+    }
 
     private async Task CopyToClipboard(string text)
     {
