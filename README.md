@@ -1,13 +1,14 @@
 # Can I Haz Houze 🏠
 
-Can I Haz Houze is a .NET 9 + .NET Aspire mortgage platform with multiple services for:
-- document intake and AI analysis,
-- financial ledger tracking,
-- mortgage approval orchestration,
-- CRM complaint handling,
-- and a Blazor web frontend.
+At its core, this is a **microservice application** built with **.NET Aspire** and a **Blazor web interface** where the different application functions can be used — document intake & AI analysis, financial ledger tracking, mortgage approval orchestration, CRM complaint handling, and more.
 
-This repository has been simplified to focus on **how the system works**, especially the **document workflow**.
+**BUT** that's just the (boring) surface. Here's what makes it interesting:
+
+- 🔌 **MCP everywhere** — Every API also exposes a [Model Context Protocol](src/MCP_USAGE_GUIDE.md) endpoint. Add them to VS Code and let Copilot read & modify data directly.
+- 🤖 **Agent Workbench** — Create a simple prompt-based agent, assign tools, and let it work autonomously.
+- 📡 **Best-practice observability** — End-to-end distributed tracing across all services, all the way into Azure OpenAI calls.
+- 🖥️ **Real-time Agent Monitor** — Watch tool calls your agent makes as they happen, in real time.
+- 🏢 **No AI Foundry required** — This demo works for customers who can't (or don't want to) use AI Foundry or similar managed platforms.
 
 ## Start Here (Learning Path)
 
