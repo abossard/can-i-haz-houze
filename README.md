@@ -10,11 +10,27 @@ At its core, this is a **microservice application** built with **.NET Aspire** a
 - 🖥️ **Real-time Agent Monitor** — Watch tool calls your agent makes as they happen, in real time.
 - 🏢 **No AI Foundry required** — This demo works for customers who can't (or don't want to) use AI Foundry or similar managed platforms.
 
+> [!CAUTION]
+> **The deployed website and all APIs have NO authentication.** Anyone with the URL can access and modify data. **Run `azd down` as soon as you're done** to tear down the Azure resources and avoid exposing unprotected endpoints.
+
 ## Start Here (Learning Path)
 
 1. Read **[docs/DOCUMENT_WORKFLOW.md](docs/DOCUMENT_WORKFLOW.md)** for the end-to-end document lifecycle.
 2. Read service docs in `src/*/README.md` for implementation details.
 3. Use **/api-docs** in the running app for OpenAPI + system prompt copy/paste.
+
+## Documentation Map
+
+- **Core onboarding**: this README
+- **Document deep dive**: [docs/DOCUMENT_WORKFLOW.md](docs/DOCUMENT_WORKFLOW.md)
+- **Service behavior**: [src/CanIHazHouze.MortgageApprover/README.md](src/CanIHazHouze.MortgageApprover/README.md)
+- **Production**: [docs/PRODUCTION_DEPLOYMENT_GUIDE.md](docs/PRODUCTION_DEPLOYMENT_GUIDE.md)
+- **MCP usage**: [src/MCP_USAGE_GUIDE.md](src/MCP_USAGE_GUIDE.md)
+- **MCP setup for Copilot**: [.github/MCP_SETUP.md](.github/MCP_SETUP.md)
+- **Agent prompts**: [docs/PROMPTS.md](docs/PROMPTS.md)
+- **CRM testing flow**: [docs/TESTING_GUIDE_CRM.md](docs/TESTING_GUIDE_CRM.md)
+- **All repo guides**: [docs/README.md](docs/README.md)
+- 🎬 **Video: Adding these APIs to AI Foundry**: [https://youtu.be/FjfPg8VdgfA](https://youtu.be/FjfPg8VdgfA)
 
 ## Quick Start
 
@@ -95,16 +111,4 @@ azd deploy  # deploy code changes
 azd down    # tear down
 ```
 
-## Documentation Map
 
-- **Core onboarding**: this README
-- **Document deep dive**: [docs/DOCUMENT_WORKFLOW.md](docs/DOCUMENT_WORKFLOW.md)
-- **Service behavior**: [src/CanIHazHouze.MortgageApprover/README.md](src/CanIHazHouze.MortgageApprover/README.md)
-- **Production**: [docs/PRODUCTION_DEPLOYMENT_GUIDE.md](docs/PRODUCTION_DEPLOYMENT_GUIDE.md)
-- **MCP usage**: [src/MCP_USAGE_GUIDE.md](src/MCP_USAGE_GUIDE.md)
-- **MCP setup for Copilot**: [.github/MCP_SETUP.md](.github/MCP_SETUP.md)
-- **Agent prompts**: [docs/PROMPTS.md](docs/PROMPTS.md)
-- **CRM testing flow**: [docs/TESTING_GUIDE_CRM.md](docs/TESTING_GUIDE_CRM.md)
-- **All repo guides**: [docs/README.md](docs/README.md)
-
-Historical implementation-summary docs were consolidated into the guides above to keep onboarding simpler.
